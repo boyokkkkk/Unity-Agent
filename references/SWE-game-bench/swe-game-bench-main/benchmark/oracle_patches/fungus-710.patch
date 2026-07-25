@@ -1,0 +1,13 @@
+diff --git a/Assets/Fungus/Scripts/Components/WriterAudio.cs b/Assets/Fungus/Scripts/Components/WriterAudio.cs
+index 6325dda4..95c8710d 100644
+--- a/Assets/Fungus/Scripts/Components/WriterAudio.cs
++++ b/Assets/Fungus/Scripts/Components/WriterAudio.cs
+@@ -228,7 +228,7 @@ namespace Fungus
+                 {
+                     if (nextBeepTime < Time.realtimeSinceStartup)
+                     {
+-                        targetAudioSource.clip = beepSounds[Random.Range(0, beepSounds.Count - 1)];
++                        targetAudioSource.clip = beepSounds[Random.Range(0, beepSounds.Count)];
+ 
+                         if (targetAudioSource.clip != null)
+                         {

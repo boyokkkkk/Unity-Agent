@@ -1,0 +1,32 @@
+Examine system doesn't work with the client.
+
+<!-- The notes within these arrows are for you but can be deleted. -->
+
+## Summary
+
+Everything is in the title. The examine system doesn't show anything when playing on the client when hovering over game objects. This only happens if the host loads the map before the client joins. 
+
+
+## Steps to Reproduce
+
+Connect as the host, load the map, and join with the client after the map is loaded.
+Simply connect as the client in game and try to put your mouse over a game object. You should see the name
+of the game object but nothing currently displays.
+
+## Expected Behavior
+
+The name of the objects hovered should just display just as on the host, or when the client joins before the map is loaded.
+
+## Possible Solution
+
+It's suspected that this issue might take roots in the server join -> lobby -> game mechanism.  Another issue should be opened soon once the root issue is clear.
+
+This error displays for the client in game when late-connecting. 
+
+[Image (image): description unavailable]
+
+
+
+## Context
+
+in version 0.3.95h

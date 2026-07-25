@@ -1,0 +1,13 @@
+diff --git a/Assets/Scripts/SS3D/Systems/Tile/TileMap.cs b/Assets/Scripts/SS3D/Systems/Tile/TileMap.cs
+index fd26e4d02e..1570255ba7 100644
+--- a/Assets/Scripts/SS3D/Systems/Tile/TileMap.cs
++++ b/Assets/Scripts/SS3D/Systems/Tile/TileMap.cs
+@@ -229,7 +229,7 @@ public void ClearTileObject(Vector3 placePosition, TileLayer layer, Direction di
+             }
+             else
+             {
+-                tileLocation.ClearAllPlacedObject();
++                tileLocation.TryClearPlacedObject(dir);
+             }
+ 
+             // Remove any invalid tile combinations

@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.env
+runs/
+benchmark/docker/docker-compose.generated.yml
+unity_license_data/
+*.log
+.qodo
+graphs/
+tools/*
+tmp/*

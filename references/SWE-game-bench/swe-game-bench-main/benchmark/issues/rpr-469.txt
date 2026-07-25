@@ -1,0 +1,10 @@
+Game crash on no AI bidding platform invocation
+
+When a bidding platform sets a new item, it should not crash if nothing has subscribed to the item-set event.
+The platform should still initialize the item and start the auction normally.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Game crash on no ai biddingplatform invocation
+
+Body:
+(no body on the GitHub issue)

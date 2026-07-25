@@ -1,0 +1,21 @@
+Skinned meshes not using hologram material when trying to build
+
+Expected behavior:
+- the construction hologram should update SkinnedMeshRenderer materials as well as MeshRenderer materials
+- all rendered hologram parts should use the ghost material while building
+- keep the change focused on the hologram color/material update logic
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Skinned meshes not using hologram material when trying to build
+
+Body:
+<!-- The notes within these arrows are for you but can be deleted. -->
+
+## Summary
+
+Objects using the skinned mesh renderer are being shown as normal objects when placing them using build menu. They should be shown using the hologram material like the other objects when trying to build them.
+
+## Steps to Reproduce
+
+- open build menu (b)
+- try to place an tile object that has a skinned mesh (SMES, SolarPanel, PacmanGenerator)

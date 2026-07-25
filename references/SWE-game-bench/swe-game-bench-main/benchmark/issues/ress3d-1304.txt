@@ -1,0 +1,27 @@
+Cannot delete items already saved on map
+
+Expected behavior:
+- loading a saved tile map should still process saved placed items correctly
+- the map load flow should complete even when saved item data is present
+- OnMapLoaded and adjacency updates should still run after the load finishes
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Cannot delete items already saved on map
+
+Body:
+<!-- The notes within these arrows are for you but can be deleted. -->
+
+## Summary
+
+Currently cannot delete items that are already saved on the tilemap. Items that are spawned by the user can be deleted though.
+
+## Steps to Reproduce
+
+Try to delete an item that starts on the map.
+
+## Context
+
+https://github.com/RE-SS3D/SS3D/assets/41941008/9403883b-07de-4949-a114-fe752203d502
+
+Likely broken in recent PR and not noticed:
+#1274 #1269

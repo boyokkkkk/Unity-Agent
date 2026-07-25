@@ -1,0 +1,14 @@
+LanePlayer.PositionPoints don't have any child elements
+
+ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+System.Collections.Generic.List`1[T].get_Item (System.Int32 index) (at <8ce0bd04a7a04b4b9395538239d3fdd8>:0)
+JANOARG.Client.Behaviors.Player.LanePlayer.UpdateMesh (System.Single time, System.Single beat, System.Single maxDistance) (at Assets/JANOARG.Client/Scripts/Behaviors/Player/LanePlayer.cs:127)
+JANOARG.Client.Behaviors.Player.LanePlayer.UpdateSelf (System.Single time, System.Single beat) (at Assets/JANOARG.Client/Scripts/Behaviors/Player/LanePlayer.cs:67)
+JANOARG.Client.Behaviors.Player.PlayerScreen.Update () (at Assets/JANOARG.Client/Scripts/Behaviors/Player/PlayerScreen.cs:626)
+
+The code :
+
+CurrentPosition = (TimeStamps.Count <= 1 || TimeStamps[0] > time) 
+                ? time * Current.LaneSteps[0].Speed * PlayerScreen.main.Speed 
+                : (time - TimeStamps[0]) * Current.LaneSteps[1].Speed * PlayerScreen.main.Speed + PositionPoints[0];

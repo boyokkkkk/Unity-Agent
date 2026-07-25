@@ -1,0 +1,13 @@
+Round.OnDeath throws InvalidOperationException on solo suicide.
+
+When the last living player kills themselves, Round.OnDeath enters the suicide branch and tries to read the surviving player from livingPlayers via .First(). Because Remove(victim) just emptied the list, .First() throws InvalidOperationException ("Sequence contains no elements") and the round never resolves.
+
+Expected behavior:
+- When a solo player commits suicide, OnDeath should resolve the round without throwing.
+- CheckWinCondition should accept a null lastKiller (the existing winner = lastKiller?.identity already handles null safely).
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Suicide leads to exception when soloing
+
+Body:
+(no body on the GitHub issue)

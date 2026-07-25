@@ -1,0 +1,3 @@
+Error via Command.GetSummary not showing correctly
+
+The red dot icon is not displaying and there is no other visual change. At a glance, these type of command configuration errors are hard to spot.

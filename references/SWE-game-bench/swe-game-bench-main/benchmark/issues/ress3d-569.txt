@@ -1,0 +1,23 @@
+Mobile container inventory UI gets doubled.
+
+When a player holds a mobile container like a toolbox or medkit, opening it can show twice as many slots as the container actually has.
+
+Expected behavior:
+- The same mobile container should not be counted twice.
+- The inventory UI should show each available container only once.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Resolved doubling of Mobile Container UI
+
+Body:
+### Summary
+
+Removes the issue where twice the number of slots appeared for held toolboxes / medkits.
+
+## Technical Notes (optional)
+
+AddRange() was being used to add Containers within the Inventory.GetContainers() method. This led to the held mobile inventories being returned by both twice (once in their own right, once as a child of the player inventory). Simple check added to prevent duplicate addition into list.
+
+## Fixes
+
+Closes #514

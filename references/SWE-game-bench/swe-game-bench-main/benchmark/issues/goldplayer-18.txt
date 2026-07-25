@@ -1,0 +1,25 @@
+Toggleable sprinting and crouching
+
+Add support for configurable toggle modes for sprinting/running and crouching.
+
+Expected behavior:
+- Player movement should expose a run toggle mode setting with Off, Permanent, and UntilNoInput options.
+- Player movement should expose a crouch toggle mode setting with Off and Permanent options.
+- The new settings should be writable and readable from the PlayerMovement API so projects can configure whether run/crouch require held input or toggle behavior.
+
+Constraints:
+- Do not modify tests.
+- Do not create helper scripts or extra files.
+- Make the smallest production code change needed.
+
+Repository context:
+- Base commit: 10c6b8001c54faf561156d7ce819924f7925300a
+- Unity version: 2018.3.3f1
+- Main production file: Assets/Hertzole/Gold Player/Scripts/Core/Modules/PlayerMovement.cs
+- Supporting enum file: Assets/Hertzole/Gold Player/Scripts/Core/Data Types/Enums.cs
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Toggleable sprinting and crouching
+
+Body:
+Have the ability to toggle sprinting and crouching.

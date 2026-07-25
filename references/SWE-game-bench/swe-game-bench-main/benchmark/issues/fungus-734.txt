@@ -1,0 +1,23 @@
+Custom Commands Don't Appear with Fungus Root in /Assets/Plugins
+
+_**Amended per conclusions from below**_
+
+Fungus does not find custom commands when placed in the /Assets/Plugins Special Folder (otherwise seems to work in any other random folder)
+
+Examples:
+
+Imported to: Assets/Fungus 
+-> All Commands Found
+
+Moved to: Assets/Plugins/Fungus
+Command in:
+Assets/Plugins -> FOUND
+Assets/Plugins/Commands  -> FOUND
+Assets/Commands -> NOT FOUND
+Assets/Scripts/Commands -> NOT FOUND
+
+If this can't be worked around, that's fine, but I feel like it should be documented in some way or that custom commands should be more clearly given a standard folder to reside in.
+
+Obviously, the ideal here is that we can use whatever folder structure we want and we can move Fungus around to whatever our hierarchy style guide needs it to be.
+
+Either way, minor issue, but hopefully it'll help anyone who ends up confused for two days like me.

@@ -1,0 +1,43 @@
+[BUG] Gas Burst Inconsistency
+
+Gas burst behaves inconsistently when the gas burst double-tap input is used compared with
+the regular gas burst input. Double-tapping can trigger gas burst twice in quick succession,
+costing extra gas without producing the expected extra speed/distance.
+
+Steps to reproduce:
+1. Host a room.
+2. Use gas burst without double tap and observe the power and distance travelled.
+3. Use gas burst with double tap enabled and compare the result.
+
+Expected behavior:
+- Gas burst should behave the same whether triggered by double tap or normal input.
+- Repeated burst input in a tiny time window should not consume extra gas or retrigger the burst.
+- The fix should add a short cooldown/guard around the dash/gas-burst path.
+
+Additional context:
+- Original report included a video demonstration.
+- Reported in Unity 2017, but still present in the Unity 2020 branch.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] Gas Burst Inconsistency
+
+Body:
+**Describe the bug**
+There appears to be inconsistency when gas burst double tap is used, and when the regular gas burst is used. 
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Host a room
+2. Use gas burst without double tap and observe the power and distance you can travel with it
+3. Use gas burst with double tap, and compare the two
+
+_Check Controls/Gas Burst Double Tap to enable/disable it_
+
+**Expected behavior**
+It is expected that gas burst works identical whether a player double taps or without a double tap.
+
+**Screenshots**
+https://youtu.be/pSExVmozaYo
+
+**Additional context**
+This was reported in Unity 2017, but issue should still be present in Unity 2020.

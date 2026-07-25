@@ -1,0 +1,30 @@
+Issue 945: Rejoining server causes prefabs to become unregistered
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+Joining a server, leaving, and then joining again causes prefabs to get unregistered and they can no longer be spawned, resulting in the client being thrown out of the server instantly. 
+
+**Repro project**
+[Mirage Issue.zip](https://github.com/MirageNet/Mirage/files/7219730/Mirage.Issue.zip)
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Open the attached project
+2. Go into the SampleScene in the Scenes folder.
+3. Make a build and run it.
+4. Create a server in either Unity or the built client.
+5. Join the server.
+6. Leave the server
+7. Join the server again
+8. Observe the issue
+
+**Expected behavior**
+The user should be able to rejoin the server.
+
+**Desktop (please complete the following information):**
+* OS: Windows 10 64-bit
+* Build target: Windows 64-bit
+* Unity version: 2020.3.17
+* Mirage version: 105.1.0

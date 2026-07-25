@@ -1,0 +1,34 @@
+Issue 399: NRE in [SyncVar] NetworkIdentity when set for a newly instantiated GameObject
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+Instantiating a `go`, setting a `[SyncVar] NetworkIdentity` on one of its components, and then Using `Server.Spawn(go);` causes NullReferenceException
+```
+System.NullReferenceException: Object reference not set to an instance of an object
+at Mirror.NetworkBehaviour.GetSyncVarNetworkIdentity (System.UInt32 netId, Mirror.NetworkIdentity& identityField) [0x00011] in C:\Unity\MirrorNG - SyncVar initialization bug\Assets\Mirror\Runtime\NetworkBehaviour.cs:397 
+at TestComp.get_NetworkIdentity () <0x1756d80e490 + 0x00072> in <157148441a354f5e811588a77f5b3f35>:0 
+at TestComp.set_NetworkIdentity (Mirror.NetworkIdentity value) [0x0000d] in <157148441a354f5e811588a77f5b3f35>:0 
+at Test.TestSpawn () [0x0000d] in C:\Unity\MirrorNG - SyncVar initialization bug\Assets\Test.cs:33 
+```
+
+**To Reproduce**
+- Create a server in Host mode
+- Spawn a GameObject - **use NetworkServer.Authenticated UnityEvent to call the spawn function**:
+```
+//code in spawn function
+var go = GameObject.Instantiate(prefab);
+go.GetComponent<TestComp>().Identity = NetIdentity;
+Server.Spawn(go);
+```
+- press Play and check Console for NRE
+
+**Desktop (please complete the following information):**
+* OS: Windows
+* Build target: Unity Editor
+* Unity version: 2019.4.10f1
+* MirrorNG version: v49.2.1
+
+**Additional context**
+The problem is the same with a remote client instead of host mode

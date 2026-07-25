@@ -1,0 +1,9 @@
+Single-Slot containers should have filters for Items
+
+## Summary
+
+After the rework, Single-Slot containers now accept any items on them, which is usually not the preferable case, things like the Cell Charger should only accept Power Cells, since they are Visual Containers and anything else put in them will look wrong.
+
+## Goal
+
+Only power cells in power charger, and have the option for filters on containers

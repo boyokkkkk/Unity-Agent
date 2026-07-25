@@ -1,0 +1,14 @@
+diff --git a/Assets/Mirror/Runtime/NetworkConnectionToServer.cs b/Assets/Mirror/Runtime/NetworkConnectionToServer.cs
+index 88b79ea5a..cee5a167c 100644
+--- a/Assets/Mirror/Runtime/NetworkConnectionToServer.cs
++++ b/Assets/Mirror/Runtime/NetworkConnectionToServer.cs
+@@ -22,9 +22,6 @@ public override void Disconnect()
+             // set not ready and handle client disconnect in any case
+             // (might be client or host mode here)
+             isReady = false;
+-            // TODO: This does not work if there is no player yet
+-            if (identity != null)
+-                identity.client.HandleClientDisconnect();
+             Transport.activeTransport.ClientDisconnect();
+         }
+     }

@@ -1,0 +1,28 @@
+Issue 517: Issue when doing StartHost after a StopHost call.
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+When stopping the server and then starting it again causes all scene objects with network behaviours to get destroyed.
+
+And when running the project in the Unity Editor.
+All scene objects with network behaviours get destroyed on the first StartHost call instead. To fix this you have either restarted unity or force a script compile.
+
+**Repro project**
+https://drive.google.com/file/d/1T-wNEG8RdG-I30N9prCUU2WQdF707kvm/view?usp=sharing
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Open the attached project
+2. Open Scenes/SampleScene
+3. Enter play mode
+4. Look at the NetworkBehaviour GameObject being destroyed on StartHost the second time.
+
+**Expected behavior**
+Scene Objects with **Network Behaviours** should not be deleted when doing **StopHost**.
+
+**Desktop:**
+* OS: \[Windows]
+* Unity version: \[2020.2.1f1]
+* Mirror branch: \[master]

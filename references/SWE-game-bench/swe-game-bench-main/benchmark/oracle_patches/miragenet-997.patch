@@ -1,0 +1,12 @@
+diff --git a/Assets/Mirage/Runtime/ClientObjectManager.cs b/Assets/Mirage/Runtime/ClientObjectManager.cs
+index 411f62d4..a1fe4bee 100644
+--- a/Assets/Mirage/Runtime/ClientObjectManager.cs
++++ b/Assets/Mirage/Runtime/ClientObjectManager.cs
+@@ -598,6 +598,7 @@ namespace Mirage
+                 callbacks.Remove(replyId);
+                 using (PooledNetworkReader reader = NetworkReaderPool.GetReader(reply.payload))
+                 {
++                    reader.ObjectLocator = Client.World;
+                     action(reader);
+                 }
+             }

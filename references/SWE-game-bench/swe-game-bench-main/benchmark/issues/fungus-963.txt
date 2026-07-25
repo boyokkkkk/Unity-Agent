@@ -1,0 +1,84 @@
+Issue 963: Text in Square brackets in Say Dialogs being parsed out due to Ink support
+
+Repository: snozbot/fungus
+
+Issue body:
+**Describe the bug**
+
+When a Say command contains a text wrapped into square brackets, that portion of text (including the brackets) is parsed out and not rendered ingame. 
+
+This happens due to the changes to Fungus to support Ink variable text. The responsible script is Fungus/Scripts/Utils/TextVariationHandler.cs, method TokenizeVarySections.
+
+
+
+**To Reproduce**
+
+1. Go to the scene 'TheExperiment' in the FungusExample 'Sherlock'
+
+2. Open the flowchart window, select the START block, select the first Say command
+
+3. Replace the text 'THE EXPERIMENT' with the text 'THE [test] EXPERIMENT'
+
+4. Play the game
+
+5. When that command is executed, you expect to read'THE [test] EXPERIMENT', instead you will read 'THE  EXPERIMENT'
+
+
+
+**Expected behavior**
+
+I understand this behavior is working as intended, but maybe it's possible somehow to restore the possibility of displaying text wrapped into square brackets.
+
+In my understanding, the variable text has into the brackets other special characters in order to control its behavior (|, &, !, ~). A possible solution would be for the code to check for any of these characters inside the square brackets. If there's none, then it means it's not a variable text and so it should be rendered as it is.
+
+Another option is to treat square brackets (and other characters as well) as special characters, and provide an escape mechanism. Or something like HTML special chars, whereas the string &lsqb; would be rendered as a left square bracket and the character [ would be considered a special character to be parsed.
+
+
+
+**Screenshots**
+
+![sherlock_brackets](https://user-images.githubusercontent.com/6232807/113293447-722f8f00-92fe-11eb-8e95-7cb314c730e0.png)
+
+
+
+**Versions & Platform (please complete the following information):**
+
+ - Unity version 2019.4.0f1
+
+ - Fungus Version e.g. v.3.13.5
+
+ - Editor OS: Win 10
+
+ - Build Platform Windows
+
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Text in Square brackets in Say Dialogs being parsed out due to Ink support
+
+Body:
+**Describe the bug**
+When a Say command contains a text wrapped into square brackets, that portion of text (including the brackets) is parsed out and not rendered ingame. 
+This happens due to the changes to Fungus to support Ink variable text. The responsible script is Fungus/Scripts/Utils/TextVariationHandler.cs, method TokenizeVarySections.
+
+**To Reproduce**
+1. Go to the scene 'TheExperiment' in the FungusExample 'Sherlock'
+2. Open the flowchart window, select the START block, select the first Say command
+3. Replace the text 'THE EXPERIMENT' with the text 'THE [test] EXPERIMENT'
+4. Play the game
+5. When that command is executed, you expect to read'THE [test] EXPERIMENT', instead you will read 'THE  EXPERIMENT'
+
+**Expected behavior**
+I understand this behavior is working as intended, but maybe it's possible somehow to restore the possibility of displaying text wrapped into square brackets.
+In my understanding, the variable text has into the brackets other special characters in order to control its behavior (|, &, !, ~). A possible solution would be for the code to check for any of these characters inside the square brackets. If there's none, then it means it's not a variable text and so it should be rendered as it is.
+Another option is to treat square brackets (and other characters as well) as special characters, and provide an escape mechanism. Or something like HTML special chars, whereas the string &lsqb; would be rendered as a left square bracket and the character [ would be considered a special character to be parsed.
+
+**Screenshots**
+[Image attachment — alt='sherlock_brackets']
+Description: To fix the bug, the programmer needs to address the dialogue text syntax in the "Say" command for John Watson. The current text includes a malformed tag: `{confused}! do live here, [test] you know.` This syntax error should be corrected to ensure proper rendering of the emotional state indicated by the tag. Additionally, checking the UI layout for the dialogue box would be necessary, ensuring it accommodates the transformed text without overflow or display issues. Finally, examining any associated error messages in the console could provide further insights into runtime issues related to this bug.
+[/Image]
+
+**Versions & Platform (please complete the following information):**
+ - Unity version 2019.4.0f1
+ - Fungus Version e.g. v.3.13.5
+ - Editor OS: Win 10
+ - Build Platform Windows

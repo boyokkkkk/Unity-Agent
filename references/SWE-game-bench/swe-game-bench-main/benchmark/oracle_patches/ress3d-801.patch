@@ -1,0 +1,16 @@
+diff --git a/Assets/Engine/Inventory/Container.cs b/Assets/Engine/Inventory/Container.cs
+index 10a5ce4c..2578d28c 100644
+--- a/Assets/Engine/Inventory/Container.cs
++++ b/Assets/Engine/Inventory/Container.cs
+@@ -458,9 +458,9 @@ namespace SS3D.Engine.Inventory
+         public void Dump()
+         {
+             Item[] oldItems = items.Select(x => x.Item).ToArray();
+-            foreach (var item in items)
++            for (int i = 0; i < oldItems.Length; i++)
+             {
+-                item.Item.Container = null;
++                oldItems[i].Container = null;
+             }
+             items.Clear();
+ 

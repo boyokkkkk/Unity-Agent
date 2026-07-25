@@ -1,0 +1,18 @@
+NetworkServer does not call SpawnObjects
+
+Currently NetworkManager and NetworkSceneManager are required to get scene objects to spawn.
+
+Expected behavior:
+- NetworkServer should spawn scene NetworkIdentity objects when it starts listening.
+- This should work without depending on NetworkManager.StartServer or NetworkManager.StartHost.
+- Server startup should still happen through NetworkServer.ListenAsync.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: NetworkServer does not call SpawnObjects
+
+Body:
+**Describe the bug**
+Currently NetworkManager (via StartHost/StartServer) and NetworkSceneManager (via Scene changing) are required to get objects to spawn. Adding SpawnObjects() to the Started event does not currently work as it fires too early. The server is not actually started yet.
+
+**Can you suggest a possible solution?**
+Started.Invoke() could be moved to fire later in the startup process allowing it to call SpawnObjects() once the Server is actually started. But I cannot find a location any later in NetworkServer than where it exists currently.

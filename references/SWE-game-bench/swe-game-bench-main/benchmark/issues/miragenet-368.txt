@@ -1,0 +1,6 @@
+Issue 368: Client ConnectionState not set properly in Disconnect
+
+Repository: miragenet/mirage
+
+Issue body:
+(no body)

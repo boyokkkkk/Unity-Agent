@@ -1,0 +1,90 @@
+Issue 103: Semantic SyncList events
+
+Repository: miragenet/mirage
+
+Issue body:
+Currently, synclist callback looks like this:
+
+```cs
+class Player : NetworkBehaviour {
+
+    readonly SyncListItem inventory = new SyncListItem();
+
+    // this will add the delegates on both server and client.
+    // Use OnStartClient instead if you just want the client to act upon updates
+    void Start()
+    {
+        inventory.Callback += OnInventoryUpdated;
+    }
+
+    void OnInventoryUpdated(SyncListItem.Operation op, int index, Item oldItem, Item newItem)
+    {
+        switch (op)
+        {
+            case SyncListItem.Operation.OP_ADD:
+                // index is where it got added in the list
+                // item is the new item
+                break;
+            case SyncListItem.Operation.OP_CLEAR:
+                // list got cleared
+                break;
+            case SyncListItem.Operation.OP_INSERT:
+                // index is where it got added in the list
+                // item is the new item
+                break;
+            case SyncListItem.Operation.OP_REMOVEAT:
+                // index is where it got removed in the list
+                // item is the item that was removed
+                break;
+            case SyncListItem.Operation.OP_SET:
+                // index is the index of the item that was updated
+                // item is the previous item
+                break;
+        }
+    }
+}
+```
+
+This is super gross,  index, olditem and new item mean different things depending on op,  sometimes they are used sometimes they are not,  and this is a blatant violation of SRP.
+
+A better way is to have semantic events like this:
+
+```cs
+class Player : NetworkBehaviour {
+
+    readonly SyncListItem inventory = new SyncListItem();
+
+    // this will add the delegates on both server and client.
+    // Use OnStartClient instead if you just want the client to act upon updates
+    void Start()
+    {
+        inventory.OnAdd += (index, item) => 
+       {
+           // item  was added at the end of the list
+       };
+
+      inventory.OnClear += () =>
+      {
+          // list has been cleared
+      }
+
+      inventory.OnSet += (index, prevItem, newItem) =>
+      {
+            // new item has been set at index,  prevItem is what was there before
+      }
+
+      inventory.OnRemove += (index, prevItem) =>
+      {
+            // prevItem has been removed at the given index
+      }
+
+      inventory.OnChange += () => 
+      {
+           // brand new event,  called after the list has changed 
+           // if multiple changes,  this is called after all changes are applied
+           // useful for refreshing your UI after data changes.
+      }
+    }
+
+}
+```

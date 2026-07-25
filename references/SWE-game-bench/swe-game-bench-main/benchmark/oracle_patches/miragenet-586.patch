@@ -1,0 +1,33 @@
+diff --git a/Assets/Mirage/Runtime/PlayerSpawner.cs b/Assets/Mirage/Runtime/PlayerSpawner.cs
+index a0e0f0f01..349c97f4d 100644
+--- a/Assets/Mirage/Runtime/PlayerSpawner.cs
++++ b/Assets/Mirage/Runtime/PlayerSpawner.cs
+@@ -35,7 +35,15 @@ public virtual void Start()
+             }
+             if (Client != null)
+             {
+-                SceneManager.ClientSceneChanged.AddListener(OnClientSceneChanged);
++                if(SceneManager != null)
++                {
++                    SceneManager.ClientSceneChanged.AddListener(OnClientSceneChanged);
++                }
++                else
++                {
++                    Client.Authenticated.AddListener(c => Client.Send(new AddPlayerMessage()));
++                }
++
+                 if(ClientObjectManager != null)
+                 {
+                     ClientObjectManager.RegisterPrefab(PlayerPrefab);
+@@ -57,9 +65,10 @@ public virtual void Start()
+ 
+         void OnDestroy()
+         {
+-            if (Client != null)
++            if (Client != null && SceneManager != null)
+             {
+                 SceneManager.ClientSceneChanged.RemoveListener(OnClientSceneChanged);
++                Client.Authenticated.RemoveListener(c => Client.Send(new AddPlayerMessage()));
+             }
+             if (Server != null)
+             {

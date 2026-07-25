@@ -1,0 +1,11 @@
+QoL: Ability to cycle through commands in the Inspector
+
+**Is your feature request related to a problem? Please describe.**
+It would be super useful if there was a quicker way to cycle through commands on a block. For example if I want to double check all Say commands have the correct character name, it'd be handy to have a faster way to cycle through each command in the current block.
+
+**Describe the solution you'd like**
+When pressing up/down keys, I'd like the next/previous command selected, displaying its content below like on a regular click; like this, but on up/down key presses on the keyboard instead of clicking:
+[Image (zBgnjKE9OQ): The screenshot shows a Unity-style “Commands” list with a selected green Comment line reading “…the sound of a light breeze and… water…”. Below it are timed/ordered commands: `Save Point (key: Shot1)`, `Set Active Cam - Blank = True`, `Call Music1 : Continue`, `Wait 1.1 seconds`, `Set Active Cam - 01 = True`, `Move Cam_Follow - 01 over 20 seconds`, `Set Active Cam - Blank = False`, `Wait 3.9 seconds`, `Say Sister: "Dear Brother..."`, `Wait 1 seconds`, and `Call Shot2 : Stop`. The bottom “Comment” panel shows `Comment Text` set to the same “…the sound of a light breeze and… water…” and indicates a count “(2)”, with add/duplicate/delete icons visible.]
+
+This works in the hierarchy window of Unity by default:
+[Image (AkDATq2lje): The screenshot shows Unity’s Hierarchy panel for a scene named `Ch0_00_Intro*` (asterisk indicates unsaved changes). The GameObject `Shot - 02` is selected/highlighted, and sibling objects `Shot - 01` through `Shot - 12` are listed, along with a `DontDestroyMusic` object at the top. No Console panel, errors, or stack traces are visible in this image.]

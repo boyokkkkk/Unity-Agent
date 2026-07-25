@@ -1,0 +1,28 @@
+diff --git a/Assets/Hertzole/Gold Player/Scripts/Core/Data Types/Enums.cs b/Assets/Hertzole/Gold Player/Scripts/Core/Data Types/Enums.cs
+index 70e6c05..2207692 100644
+--- a/Assets/Hertzole/Gold Player/Scripts/Core/Data Types/Enums.cs	
++++ b/Assets/Hertzole/Gold Player/Scripts/Core/Data Types/Enums.cs	
+@@ -3,4 +3,8 @@ namespace Hertzole.GoldPlayer.Core
+     public enum RunAction { FasterThanRunSpeed = 0, FasterThanRunSpeedAndPressingRun = 1 }
+     public enum GroundCheckType { Sphere, Box }
+     public enum AudioTypes { Standard = 0, Custom = 2 }
++
++    public enum RunToggleMode { Off = 0, Permanent = 1, UntilNoInput = 2 }
++
++    public enum CrouchToggleMode { Off = 0, Permanent = 1, UntilNoInput = 2 }
+ }
+diff --git a/Assets/Hertzole/Gold Player/Scripts/Core/Modules/PlayerMovement.cs b/Assets/Hertzole/Gold Player/Scripts/Core/Modules/PlayerMovement.cs
+index 26b18a3..960b594 100644
+--- a/Assets/Hertzole/Gold Player/Scripts/Core/Modules/PlayerMovement.cs	
++++ b/Assets/Hertzole/Gold Player/Scripts/Core/Modules/PlayerMovement.cs	
+@@ -166,6 +166,10 @@ namespace Hertzole.GoldPlayer.Core
+ 
+         /// <summary> Determines if the player can run. </summary>
+         public bool CanRun { get { return m_CanRun; } set { m_CanRun = value; } }
++
++        public RunToggleMode RunToggleMode { get; set; }
++
++        public CrouchToggleMode CrouchToggleMode { get; set; }
+         /// <summary> The speeds when running. </summary>
+         public MovementSpeeds RunSpeeds { get { return m_RunSpeeds; } set { m_RunSpeeds = value; if (m_IsRunning) m_MoveSpeed = value; } }
+         /// <summary> Everything related to stamina (limited running). </summary>

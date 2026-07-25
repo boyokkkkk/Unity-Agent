@@ -1,0 +1,7 @@
+Issue: Narrative Log needs a character count to prevent it from breaking all UI text in games.
+
+If a game accumulates a lot of text in the Narrative Log, Unity can hit the UI mesh vertex limit and later text fields may show garbage or become empty. The reported runtime error is:
+
+ArgumentException: Mesh can not have more than 65000 vertices
+
+Reproduction: fill the Narrative Log with enough text that the generated UI text reaches Unity's vertex limit. The Narrative Log should bound the amount of text it displays so oversized history does not break the game's UI text rendering.

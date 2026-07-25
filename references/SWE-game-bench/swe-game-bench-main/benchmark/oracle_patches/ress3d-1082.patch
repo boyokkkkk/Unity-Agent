@@ -1,0 +1,19 @@
+diff --git a/Assets/Scripts/SS3D/Systems/Screens/CameraFollow.cs b/Assets/Scripts/SS3D/Systems/Screens/CameraFollow.cs
+index 406d2165..35cc4dbb 100644
+--- a/Assets/Scripts/SS3D/Systems/Screens/CameraFollow.cs
++++ b/Assets/Scripts/SS3D/Systems/Screens/CameraFollow.cs
+@@ -116,12 +116,12 @@ namespace SS3D.Systems.Screens
+         // There are two button-type actions for snap, because MultiTap actions don't return values when performed
+         private void HandleSnapLeft(InputAction.CallbackContext context) 
+         {
+-           Snap(-1); 
++           Snap(1); 
+         }
+         
+         private void HandleSnapRight(InputAction.CallbackContext context) 
+         {
+-           Snap(1); 
++           Snap(-1); 
+         }
+         
+         private void Snap(float direction)

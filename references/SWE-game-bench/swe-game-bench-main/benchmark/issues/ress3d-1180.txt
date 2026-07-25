@@ -1,0 +1,67 @@
+Issue 1180: Fix log type display
+
+Repository: re-ss3d/ss3d
+
+Issue body:
+<!-- The notes within these arrows are for you but can be deleted. -->
+
+
+
+## Summary
+
+
+
+Currently the logs displays `typeof(PlayerSystem)`, which results in:
+
+`SS3D.Systems.PlayerControl.PlayerSystem`
+
+The correct would be `nameof(PlayerSystem)`, which results in:
+
+`PlayerSystem`
+
+
+
+![image](https://user-images.githubusercontent.com/46575243/232947454-97c448aa-770d-4078-bcb7-5a788d4df7f7.png)
+
+
+
+## Goal 
+
+
+
+Make the logs cleaner.
+
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Fix log type display
+
+Body:
+<!-- The notes within these arrows are for you but can be deleted. -->
+
+
+
+## Summary
+
+
+
+Currently the logs displays `typeof(PlayerSystem)`, which results in:
+
+`SS3D.Systems.PlayerControl.PlayerSystem`
+
+The correct would be `nameof(PlayerSystem)`, which results in:
+
+`PlayerSystem`
+
+
+
+[Image attachment — alt='image']
+Description: (image could not be described: OpenAIError: The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable)
+[/Image]
+
+
+
+## Goal 
+
+
+
+Make the logs cleaner.

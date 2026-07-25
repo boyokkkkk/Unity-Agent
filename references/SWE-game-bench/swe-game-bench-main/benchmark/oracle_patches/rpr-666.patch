@@ -1,0 +1,16 @@
+diff --git a/Assets/Scripts/Augment/AugmentImplementations/Hat/HatBarrelModel.cs b/Assets/Scripts/Augment/AugmentImplementations/Hat/HatBarrelModel.cs
+index c43a416d8..4c33996a9 100644
+--- a/Assets/Scripts/Augment/AugmentImplementations/Hat/HatBarrelModel.cs
++++ b/Assets/Scripts/Augment/AugmentImplementations/Hat/HatBarrelModel.cs
+@@ -54,9 +54,9 @@ public override void OnFire(GunStats stats)
+             isLastShot = false;
+             return;
+         }
+-            
++
+         isLastShot = stats.Ammo - 2 == 0;
+-        for (int i = stats.Ammo - 2; i < magazineSize; i++)
++        for (int i = Mathf.Max(0, stats.Ammo - 2); i < magazineSize; i++)
+         {
+             ammunition[i].SetActive(false);
+         }

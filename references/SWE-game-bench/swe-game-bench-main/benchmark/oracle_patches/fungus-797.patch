@@ -1,0 +1,20 @@
+diff --git a/Assets/Fungus/Scripts/Editor/HierarchyIcons.cs b/Assets/Fungus/Scripts/Editor/HierarchyIcons.cs
+index 61eb8bd0..0c3abcae 100644
+--- a/Assets/Fungus/Scripts/Editor/HierarchyIcons.cs
++++ b/Assets/Fungus/Scripts/Editor/HierarchyIcons.cs
+@@ -70,7 +70,7 @@ namespace Fungus
+             // place the icon to the left of the element
+             Rect r = new Rect(selectionRect);
+ #if UNITY_2019_1_OR_NEWER
+-            r.x -= r.height;
++            r.x = 0;
+ #else
+             r.x = 0;
+ #endif
+@@ -84,4 +84,4 @@ namespace Fungus
+                 GUI.Label(r, TextureIcon);
+         }
+     }
+-}
+\ No newline at end of file
++}

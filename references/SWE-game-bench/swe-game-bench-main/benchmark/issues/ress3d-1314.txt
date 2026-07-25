@@ -1,0 +1,25 @@
+Trying to delete a wallmount deletes all of them on that layer
+
+Expected behavior:
+- deleting a placed object should only clear the requested direction on that tile
+- the clear operation should not wipe every placed object on the same layer
+- keep the change limited to the tile-map clearing logic
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Trying to delete a wallmount deletes all of them on that layer
+
+Body:
+<!-- The notes within these arrows are for you but can be deleted. -->
+
+## Summary
+
+Trying to delete a wallmount deletes all of them on that layer.
+
+## Steps to Reproduce
+
+Lay multiple wallmounts on a single wall tile at different rotations.
+Try to delete just one.
+
+## Expected Behavior
+
+Only the direction the hologram is rotated should be deleted.

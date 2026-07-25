@@ -1,0 +1,29 @@
+Issue 503: ServerSceneChanged event invoked twice on server start
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+ServerSceneChanged event on NetworkSceneManager gets invoked twice when starting the server.
+
+**Repro project**
+Add a Game object to Basic example with the [following script](https://hastebin.com/ecixafalil.csharp).
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Open Basic example.
+2. Add empty game object.
+3. App [CallbackTest](https://hastebin.com/ecixafalil.csharp).
+4. Enter playmode
+
+**Expected behavior**
+ServerSceneChanged gets fired once.
+
+**Actual behavior**
+ServerSceneChanged gets fired twice.
+
+**Desktop**
+* OS: Windows 10
+* Build target: Standalone x64
+* Unity version: 2020.1
+* Mirror branch: 59.2.0

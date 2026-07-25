@@ -1,0 +1,6 @@
+# Everything in this repo is consumed inside Linux containers (entrypoint.sh,
+# .patch files applied with git apply, injected test files) — keep LF everywhere.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary

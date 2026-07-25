@@ -1,0 +1,6 @@
+Issue 104: Semantic SyncSet events
+
+Repository: miragenet/mirage
+
+Issue body:
+Create semantic events for SyncSet like synclists,  see #103

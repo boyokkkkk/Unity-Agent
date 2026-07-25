@@ -1,0 +1,3 @@
+server.Disconnected is never raised on host mode
+
+Confirmed on hostmode, not in server only mode.

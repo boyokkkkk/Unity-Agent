@@ -1,0 +1,34 @@
+diff --git a/Assets/Mirror/Runtime/ServerObjectManager.cs b/Assets/Mirror/Runtime/ServerObjectManager.cs
+index cabd9318..a7e3e70a 100644
+--- a/Assets/Mirror/Runtime/ServerObjectManager.cs
++++ b/Assets/Mirror/Runtime/ServerObjectManager.cs
+@@ -1,5 +1,6 @@
+ using System;
+ using System.Collections.Generic;
++using System.Linq;
+ using Mirror.RemoteCalls;
+ using UnityEngine;
+ 
+@@ -32,6 +33,7 @@ namespace Mirror
+             {
+                 server.Started.AddListener(SpawnOrActivate);
+                 server.Authenticated.AddListener(OnAuthenticated);
++                server.Stopped.AddListener(OnServerStopped);
+                 networkSceneManager.ServerChangeScene.AddListener(OnServerChangeScene);
+                 networkSceneManager.ServerSceneChanged.AddListener(OnServerSceneChanged);
+             }
+@@ -81,6 +83,14 @@ namespace Mirror
+             RegisterMessageHandlers(connection);
+         }
+ 
++        void OnServerStopped()
++        {
++            foreach (NetworkIdentity obj in server.Spawned.Values.Reverse())
++            {
++                DestroyObject(obj, true);
++            }
++        }
++
+         void OnServerChangeScene(string scenePath, SceneOperation sceneOperation)
+         {
+             SetAllClientsNotReady();

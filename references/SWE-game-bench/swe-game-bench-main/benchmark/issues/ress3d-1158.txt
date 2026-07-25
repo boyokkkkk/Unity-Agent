@@ -1,0 +1,25 @@
+Tilemap construction holograms are affected by physics.
+
+Some construction preview or ghost objects can fall away from the tilemap or push the player around while they are only supposed to be previews.
+
+Expected behavior:
+- Ghost construction objects should stay in place while previewed.
+- Ghost construction objects should not be affected by gravity.
+- Ghost construction objects should not physically push players.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Disable rigidbody physics for ghost items in construction mode
+
+Body:
+## Summary
+Basically sets useGravity and isKinematic of a ghost object's rigidbody to a correct states
+
+## Known issues
+Now player can get stuck or stuck someone inside of the constructions
+
+https://user-images.githubusercontent.com/13234587/229009336-cb755fba-625e-4793-924a-ce22980cd914.mp4
+
+
+## Fixes (optional)
+Closes #1076
+Closes #1105

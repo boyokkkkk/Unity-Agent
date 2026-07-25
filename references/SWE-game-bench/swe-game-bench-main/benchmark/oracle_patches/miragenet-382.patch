@@ -1,0 +1,20 @@
+diff --git a/Assets/Mirror/Runtime/NetworkBehaviour.cs b/Assets/Mirror/Runtime/NetworkBehaviour.cs
+index d7e502f3c..c6260e4a0 100644
+--- a/Assets/Mirror/Runtime/NetworkBehaviour.cs
++++ b/Assets/Mirror/Runtime/NetworkBehaviour.cs
+@@ -146,7 +146,14 @@ public NetworkIdentity NetIdentity
+                 // instead of calling unity's MonoBehaviour == operator
+                 if (((object)netIdentityCache) == null)
+                 {
+-                    netIdentityCache = GetComponentInParent<NetworkIdentity>();
++                    // GetComponentInParent doesn't works on disabled gameobjecs
++                    // and GetComponentsInParent(false)[0] isn't allocation free, so
++                    // we just drop child support in this specific case
++                    if (gameObject.activeSelf)
++                        netIdentityCache = GetComponentInParent<NetworkIdentity>();
++                    else
++                        netIdentityCache = GetComponent<NetworkIdentity>();
++
+                     // do this 2nd check inside first if so that we are not checking == twice on unity Object
+                     if (netIdentityCache == null)
+                     {

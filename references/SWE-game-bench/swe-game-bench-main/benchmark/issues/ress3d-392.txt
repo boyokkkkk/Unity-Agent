@@ -1,0 +1,17 @@
+Janitor cart items lock up hand space
+
+### Summary
+
+When grabbing an item from the janitor's cart, the item occupies the hand space, but cannot be used, or dropped.
+
+### Current Behavior
+
+The object occupies the hand space, but does not get placed into the hand.
+
+### Media
+
+[Image (bug2): description unavailable]
+
+### Expected Behavior
+
+The object should be removed from the cart and placed into the hand of the player. Then, the player should be able to drop the item.

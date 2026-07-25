@@ -1,0 +1,21 @@
+Dxt3 textures are not decoded with the correct Unity texture format.
+
+The Phoenix texture conversion helper maps PxTexture.Format.tex_B8G8R8A8 to TextureFormat.Alpha8, which loses the RGB color channels and makes affected textures render incorrectly.
+
+Expected behavior:
+- tex_B8G8R8A8 should convert to TextureFormat.RGBA32.
+- The conversion should preserve all color channels for this format.
+- Keep the change localized to the texture format mapping logic.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Dxt3 textures aren't uncompressed right
+
+Body:
+Currently when we load dxt3 textures, we transform them into uncompressed version.
+Within unity we then tell: Format.Alpha8
+
+But checking on documentation, the Phoenix r8g8b8a8 format should be more like rgba32 in unity.
+
+https://docs.unity3d.com/Manual/class-TextureImporterOverride.html
+
+Need to understand and fix it.

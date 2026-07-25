@@ -1,0 +1,62 @@
+diff --git a/Assets/Mirror/Runtime/NetworkSceneManager.cs b/Assets/Mirror/Runtime/NetworkSceneManager.cs
+index dd1f77bb..9f04f254 100644
+--- a/Assets/Mirror/Runtime/NetworkSceneManager.cs
++++ b/Assets/Mirror/Runtime/NetworkSceneManager.cs
+@@ -69,7 +69,6 @@ namespace Mirror
+             }
+             if (server != null)
+             {
+-                server.Started.AddListener(() => FinishLoadScene(NetworkScenePath, SceneOperation.Normal));
+                 server.Authenticated.AddListener(OnServerAuthenticated);
+             }
+         }
+@@ -239,6 +238,8 @@ namespace Mirror
+         /// <param name="scenePath">Path of the scene that's about to be loaded</param>
+         internal void OnServerChangeScene(string scenePath, SceneOperation operation)
+         {
++            logger.Log("OnServerChangeScene");
++
+             ServerChangeScene.Invoke(scenePath, operation);
+         }
+ 
+@@ -248,6 +249,8 @@ namespace Mirror
+         /// <param name="scenePath">The name of the new scene.</param>
+         internal void OnServerSceneChanged(string scenePath, SceneOperation operation)
+         {
++            logger.Log("OnServerSceneChanged");
++
+             server.SendToAll(new SceneReadyMessage());
+ 
+             ServerSceneChanged.Invoke(scenePath, operation);
+diff --git a/Assets/Mirror/Runtime/ServerObjectManager.cs b/Assets/Mirror/Runtime/ServerObjectManager.cs
+index 67316b65..53cbf353 100644
+--- a/Assets/Mirror/Runtime/ServerObjectManager.cs
++++ b/Assets/Mirror/Runtime/ServerObjectManager.cs
+@@ -30,6 +30,7 @@ namespace Mirror
+         {
+             if (server != null)
+             {
++                server.Started.AddListener(SpawnOrActivate);
+                 server.Authenticated.AddListener(OnAuthenticated);
+                 networkSceneManager.ServerChangeScene.AddListener(OnServerChangeScene);
+                 networkSceneManager.ServerSceneChanged.AddListener(OnServerSceneChanged);
+@@ -69,6 +70,7 @@ namespace Mirror
+ 
+         void OnDestroy()
+         {
++            server.Started.RemoveListener(SpawnOrActivate);
+             server.Authenticated.RemoveListener(OnAuthenticated);
+             networkSceneManager.ServerChangeScene.RemoveListener(OnServerChangeScene);
+             networkSceneManager.ServerSceneChanged.RemoveListener(OnServerSceneChanged);
+@@ -85,6 +87,11 @@ namespace Mirror
+         }
+ 
+         void OnServerSceneChanged(string scenePath, SceneOperation sceneOperation)
++        {
++            SpawnOrActivate();
++        }
++
++        void SpawnOrActivate()
+         {
+             // host mode?
+             if (server.LocalClientActive)

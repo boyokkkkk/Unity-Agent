@@ -1,0 +1,22 @@
+Failure to get NetworkIdentity of scene objects during OnDestroy
+
+NetworkBehaviour can fail to find the NetworkIdentity on a disabled scene object, even when the same GameObject already has one.
+
+Expected behavior:
+- A NetworkBehaviour on a disabled GameObject should still resolve its same-object NetworkIdentity.
+- Accessing NetIdentity should not log that the NetworkIdentity is missing when it exists.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Failure to get NetworkIdentity of scene objects during OnDestroy
+
+Body:
+I'm getting an error if one of my script is trying to access the NetworkIdentity of the same scene object while not connected to any server yet.
+I suspect https://github.com/MirrorNG/MirrorNG/commit/266dc8d6f2a748483d88fc09991c9309716fc69a being the cause, since GetComponent should be able to grab the NI component.
+
+Errors being "There is no NetworkIdentity on X. Please add one." (while there is one already) & the following NRE
+``Mirror.NetworkBehaviour:get_NetIdentity() (at Library/PackageCache/com.mirrorng.mirrorng@47.0.0/Runtime/NetworkBehaviour.cs:153)``
+
+**To Reproduce**
+- Create a scene object with a Network Identity component
+- Add a script which uses NetIdentity from its NetworkBehaviour to this scene object
+- Play game, stop, get errors

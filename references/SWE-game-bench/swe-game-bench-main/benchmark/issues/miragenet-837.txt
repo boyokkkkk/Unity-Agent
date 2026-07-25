@@ -1,0 +1,11 @@
+Issue 837: Stopping the server in host mode doesn't invoke Client.Disconnected on host client
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+Calling `Server.Stop()` in host mode does not lead to `Client.Disconnected` event being called for the local client, which is a regression.
+
+**To Reproduce**
+1. Call `Server.Stop()` in host mode.
+2. Observe `Client.Disconnected` not being tiriggered.

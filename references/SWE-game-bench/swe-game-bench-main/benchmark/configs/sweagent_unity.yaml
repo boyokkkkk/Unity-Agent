@@ -1,0 +1,86 @@
+agent:
+  model:
+    top_p: null
+  templates:
+    max_observation_length: 15000
+    system_template: |-
+      You are a helpful assistant that can interact with a computer to solve tasks.
+    instance_template: |-
+      <uploaded_files>
+      {{working_dir}}
+      </uploaded_files>
+      I've uploaded a C# Unity repository in the directory {{working_dir}}. Consider the following issue description:
+
+      <pr_description>
+      {{problem_statement}}
+      </pr_description>
+
+      Can you help me implement the necessary changes to the repository so that the requirements specified in the <pr_description> are met?
+      I've already taken care of all changes to any of the test files described in the <pr_description>. This means you DON'T have to modify the testing logic or any of the tests in any way!
+      Your task is to make the minimal changes to non-test production files in the {{working_dir}} directory to ensure the <pr_description> is satisfied.
+
+      IMPORTANT - this is a C# Unity project, not Python:
+      - Do NOT write Python scripts. They cannot compile or run C# and will give meaningless output.
+      - Do NOT modify any test files (files under Assets/InjectedPRTests/ or named *Tests.cs).
+      - Edit only the production .cs file(s) necessary to fix the bug.
+      - Make the smallest possible change.
+      - You already have the most relevant repository context inside the problem statement. Read that first.
+      - Locate code with targeted search: `grep -rn "Symbol" {{working_dir}}/Assets` (or `find` for a specific filename). Do NOT view or list whole directories, and do NOT run recursive full-tree scans — open specific files only.
+      - If a command's output is large it is truncated and the full text is saved to a file in the container (the observation tells you the path). Read only what you need from that file with `grep`/`sed -n` instead of re-running the broad command.
+      - If you need more context, inspect the repository as needed and identify the relevant production file yourself.
+      - Do NOT create helper scripts, scratch files, or reproduction files.
+
+      Follow these steps to resolve the issue:
+      1. Read the provided repository context carefully.
+      2. Inspect the repository as needed to identify the relevant production file.
+      3. Edit the production source file to fix the bug with a minimal change.
+      4. Review your change and make sure it is valid C# syntax and only touches the intended production file(s).
+      5. Think about edge cases and then submit promptly.
+
+      Your thinking should be thorough and so it's fine if it's very long.
+    next_step_template: |-
+      OBSERVATION:
+      {{observation}}
+    next_step_no_output_template: |-
+      Your command ran successfully and did not produce any output.
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: 'off'
+      TQDM_DISABLE: '1'
+      GIT_PAGER: cat
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/review_on_submit_m
+    registry_variables:
+      USE_FILEMAP: 'true'
+      SUBMIT_REVIEW_MESSAGES:
+        - |
+          Thank you for your work on this issue. Please carefully follow the steps below before submitting.
+
+          1. Make sure you have only edited the intended production .cs file(s) and no test files.
+          2. Make sure you have NOT created any Python scripts. If you did, remove them now.
+          3. Make sure you have NOT created helper scripts or extra files of any kind. Remove them now.
+          4. If you have modified any test files, revert them: `git checkout -- /path/to/test/file.cs`
+          5. Run the submit command again to confirm.
+
+          Here is a list of all of your changes:
+
+          <diff>
+          {{diff}}
+          </diff>
+    enable_bash_tool: true
+    parse_function:
+      type: function_calling
+  history_processors:
+    # Collapse all but the most recent observations to placeholders so token
+    # usage doesn't creep up over a long run (the instance template is always
+    # kept). Tune `n` down if the per-step input still approaches the budget;
+    # remember each kept observation can be up to max_observation_length chars.
+    - type: last_n_observations
+      n: 5
+    - type: cache_control
+      last_n_messages: 2

@@ -1,0 +1,7 @@
+Flowchart Event Handlers trigger when FlowChart MonoBehaviour is disabled
+
+If a block's event handler fires while its parent Flowchart component is disabled or invalid, the event should not continue executing.
+
+Expected behavior:
+- `EventHandler.ExecuteBlock()` should return `false` when the parent flowchart is missing or disabled.
+- It should not auto-select the parent block on a disabled flowchart.

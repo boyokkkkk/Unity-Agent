@@ -1,0 +1,40 @@
+diff --git a/Assets/Mirage/Runtime/CharacterSpawner.cs b/Assets/Mirage/Runtime/CharacterSpawner.cs
+index 6562e3a8..2de5d9e0 100644
+--- a/Assets/Mirage/Runtime/CharacterSpawner.cs
++++ b/Assets/Mirage/Runtime/CharacterSpawner.cs
+@@ -48,15 +48,7 @@ namespace Mirage
+                 else
+                 {
+                     Client.Authenticated.AddListener(OnClientAuthenticated);
+-                }
+-
+-                if (ClientObjectManager != null)
+-                {
+-                    ClientObjectManager.RegisterPrefab(PlayerPrefab);
+-                }
+-                else
+-                {
+-                    throw new InvalidOperationException("Assign a ClientObjectManager");
++                    Client.Connected.AddListener(OnClientConnected);
+                 }
+             }
+             if (Server != null)
+@@ -82,6 +74,18 @@ namespace Mirage
+             }
+         }
+ 
++        internal void OnClientConnected(INetworkPlayer player)
++        {
++            if (ClientObjectManager != null)
++            {
++                ClientObjectManager.RegisterPrefab(PlayerPrefab);
++            }
++            else
++            {
++                throw new InvalidOperationException("Assign a ClientObjectManager");
++            }
++        }
++
+         private void OnClientAuthenticated(INetworkPlayer _)
+         {
+             Client.Send(new AddCharacterMessage());

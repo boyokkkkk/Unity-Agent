@@ -1,0 +1,27 @@
+diff --git a/Assets/Mirror/Runtime/NetworkConnection.cs b/Assets/Mirror/Runtime/NetworkConnection.cs
+index f435bb0f..0d9e6e32 100644
+--- a/Assets/Mirror/Runtime/NetworkConnection.cs
++++ b/Assets/Mirror/Runtime/NetworkConnection.cs
+@@ -323,7 +323,7 @@ namespace Mirror
+             foreach (NetworkIdentity netIdentity in tmp)
+             {
+                 //dont destroy self yet.
+-                if (netIdentity != null && netIdentity != Identity)
++                if (netIdentity != null && netIdentity != Identity && Identity.ServerObjectManager != null)
+                 {
+                     Identity.ServerObjectManager.Destroy(netIdentity.gameObject);
+                 }
+diff --git a/Assets/Mirror/Runtime/ServerObjectManager.cs b/Assets/Mirror/Runtime/ServerObjectManager.cs
+index cf5490ae..b3a41e1c 100644
+--- a/Assets/Mirror/Runtime/ServerObjectManager.cs
++++ b/Assets/Mirror/Runtime/ServerObjectManager.cs
+@@ -83,7 +83,8 @@ namespace Mirror
+         {
+             foreach (NetworkIdentity obj in server.Spawned.Values.Reverse())
+             {
+-                DestroyObject(obj, true);
++                if(obj.AssetId != Guid.Empty)
++                    DestroyObject(obj, true);
+             }
+         }
+ 

@@ -1,0 +1,31 @@
+diff --git a/Assets/Mirror/Runtime/NetworkBehaviour.cs b/Assets/Mirror/Runtime/NetworkBehaviour.cs
+index fb1c780ce..c10630f4f 100644
+--- a/Assets/Mirror/Runtime/NetworkBehaviour.cs
++++ b/Assets/Mirror/Runtime/NetworkBehaviour.cs
+@@ -350,7 +350,9 @@ protected bool SyncVarNetworkIdentityEqual(NetworkIdentity newIdentity, uint net
+                 newNetId = newIdentity.NetId;
+                 if (newNetId == 0)
+                 {
+-                    logger.LogWarning("SetSyncVarNetworkIdentity NetworkIdentity " + newIdentity + " has a zero netId. Maybe it is not spawned yet?");
++                    // it has not been spawned yet,  so just consider them different
++                    // so that we call the setter
++                    return false;
+                 }
+             }
+ 
+@@ -393,9 +395,12 @@ protected NetworkIdentity GetSyncVarNetworkIdentity(uint netId, ref NetworkIdent
+                 return identityField;
+             }
+ 
+-            // client always looks up based on netId because objects might get in and out of range
+-            // over and over again, which shouldn't null them forever
+-            Client.Spawned.TryGetValue(netId, out identityField);
++            if (IsClient)
++            {
++                // client always looks up based on netId because objects might get in and out of range
++                // over and over again, which shouldn't null them forever
++                Client.Spawned.TryGetValue(netId, out identityField);
++            }
+             return identityField;
+         }
+ 

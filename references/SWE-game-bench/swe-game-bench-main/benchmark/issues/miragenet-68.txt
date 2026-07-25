@@ -1,0 +1,10 @@
+Issue 68: StopClient() is causing crash
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+When calling **StopClient()**, the entire game is crashing. Also the client isn't properly disconnected from the server.
+
+**Expected behavior**
+Client should be properly disconnected from the server, and no crash should be involved.

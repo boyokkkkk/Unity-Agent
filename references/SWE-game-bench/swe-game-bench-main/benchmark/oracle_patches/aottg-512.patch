@@ -1,0 +1,12 @@
+diff --git a/Assets/Scripts/Settings/Gamemodes/GamemodeSettings.cs b/Assets/Scripts/Settings/Gamemodes/GamemodeSettings.cs
+index 6ea3631e2..0de76fd50 100644
+--- a/Assets/Scripts/Settings/Gamemodes/GamemodeSettings.cs
++++ b/Assets/Scripts/Settings/Gamemodes/GamemodeSettings.cs
+@@ -66,6 +66,7 @@ namespace Assets.Scripts.Settings.Gamemodes
+                 Mindless = new MindlessTitanSettings()
+             };
+             Horse = new HorseSettings();
++            Horse.Enabled = false;
+             Respawn = new RespawnSettings();
+             Time = new TimeSettings();
+             TeamMode = TeamMode.Disabled;

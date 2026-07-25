@@ -1,0 +1,13 @@
+diff --git a/Assets/Scripts/SS3D/Systems/Storage/Items/Item.cs b/Assets/Scripts/SS3D/Systems/Storage/Items/Item.cs
+index f7b14952..62116d1c 100644
+--- a/Assets/Scripts/SS3D/Systems/Storage/Items/Item.cs
++++ b/Assets/Scripts/SS3D/Systems/Storage/Items/Item.cs
+@@ -196,7 +196,7 @@ namespace SS3D.Systems.Storage.Items
+ 
+         public virtual IInteraction[] CreateTargetInteractions(InteractionEvent interactionEvent)
+         {
+-            return new IInteraction[] { new PickupInteraction { Icon = _sprite } };
++            return new IInteraction[] { new PickupInteraction { Icon = null } };
+         }
+ 
+         // this creates the base interactions for an item, in this case, the drop interaction

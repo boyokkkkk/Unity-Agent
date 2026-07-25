@@ -1,0 +1,29 @@
+Network Scene Manager
+
+**Please explain the suggested feature in detail.**
+No need for a Network Scene Manager ... your current implamentaiton assumes NetworkSceneManager is not null
+
+**How exactly does this keep you from releasing your game right now?**
+In all of our projects we manage our scenes our selves and have multiple scenes loaded at any given time. Our scenes do not nessisarly translate to a physical location in the game world, each game's specific scene architecutre is unique ... this is not something that a networking tool needs to bother with and especially shouldn't be requiring to have set up.
+
+**Can you suggest a possible solution?**
+Dont assume a NetworkSceneManager is present, if its null assume the dev is handling scene management on its own
+
+**Additional context**
+Add any other context or screenshots about the feature request here.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Network Scene Manager
+
+Body:
+**Please explain the suggested feature in detail.**
+No need for a Network Scene Manager ... your current implamentaiton assumes NetworkSceneManager is not null
+
+**How exactly does this keep you from releasing your game right now?**
+In all of our projects we manage our scenes our selves and have multiple scenes loaded at any given time. Our scenes do not nessisarly translate to a physical location in the game world, each game's specific scene architecutre is unique ... this is not something that a networking tool needs to bother with and especially shouldn't be requiring to have set up.
+
+**Can you suggest a possible solution?**
+Dont assume a NetworkSceneManager is present, if its null assume the dev is handling scene management on its own
+
+**Additional context**
+Add any other context or screenshots about the feature request here.

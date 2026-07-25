@@ -1,0 +1,24 @@
+Issue 235: Client not properly changing scenes/spawning objects in Unity Editor
+
+Repository: miragenet/mirage
+
+Issue body:
+Client not properly changing scenes/spawning objects in Unity Editor
+
+**Repro project and To Reproduce**
+1. Open the ChangeScenes Example.
+2. Add the 3 scenes in the example to a build.
+3. Run that build as a Server or Host.
+4. Run the Editor as a Client and connect.
+5. use the buttons on the SERVER SIDE to change the scene.
+
+**Expected behavior**
+The client should load a new player object and the scene object from the scene. Instead more than 50% of the time it gives a spawning error and the client disconnects itself.
+
+If you run the Client in the standalone build and the Server in the editor it works fine. If you run both in standalone it works fine. If you use breakpoints on the Client while in editor it works fine.
+
+**Desktop:**
+* OS: Windows
+* Build target: Standalone
+* Unity version: 2019.3.10
+* Mirror branch: Master

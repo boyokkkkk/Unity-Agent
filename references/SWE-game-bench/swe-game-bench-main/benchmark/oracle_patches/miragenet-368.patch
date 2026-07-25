@@ -1,0 +1,34 @@
+diff --git a/Assets/Mirror/Runtime/NetworkClient.cs b/Assets/Mirror/Runtime/NetworkClient.cs
+index 7955db1d..2549a9e1 100644
+--- a/Assets/Mirror/Runtime/NetworkClient.cs
++++ b/Assets/Mirror/Runtime/NetworkClient.cs
+@@ -13,10 +13,9 @@ namespace Mirror
+ 
+     public enum ConnectState
+     {
+-        None,
++        Disconnected,
+         Connecting,
+         Connected,
+-        Disconnected
+     }
+ 
+     /// <summary>
+@@ -64,7 +63,7 @@ namespace Mirror
+         /// </summary>
+         public NetworkIdentity LocalPlayer => Connection?.Identity;
+ 
+-        internal ConnectState connectState = ConnectState.None;
++        internal ConnectState connectState = ConnectState.Disconnected;
+ 
+         /// <summary>
+         /// active is true while a client is connecting/connected
+@@ -337,7 +336,7 @@ namespace Mirror
+             isSpawnFinished = false;
+             hostServer = null;
+ 
+-            connectState = ConnectState.None;
++            connectState = ConnectState.Disconnected;
+ 
+             if (authenticator != null)
+             {

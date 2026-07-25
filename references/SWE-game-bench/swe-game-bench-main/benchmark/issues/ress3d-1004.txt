@@ -1,0 +1,28 @@
+Pick Up interaction icon changes after item is picked up and dropped
+
+Expected behavior:
+- the Pick Up interaction should always use the default white Pick Up icon
+- it should not switch to the item's generated sprite after the item has been picked up and dropped
+- keep the fix focused on the pickup interaction icon selection
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Pick Up icon changes
+
+Body:
+## Summary
+
+The 'Pick Up' interaction icon in the interaction wheel changes after you pick up an item for the first time.
+
+## Current Behavior
+
+When you go to pick it up an item for the first time it will have the white Pick Up icon, but after you drop it and go to pick it up again, it will show the item icon instead.
+
+## Steps to Reproduce
+
+1. Right click on item to open interaction wheel and notice the white pick up icon,
+2. Pick up the item and then drop it,
+3. Right click on the same item but notice the icon in question has changed.
+
+## Expected Behavior
+
+Always show the white Pick Up icon.

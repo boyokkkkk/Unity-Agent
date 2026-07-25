@@ -1,0 +1,6 @@
+Issue 105: Semantic SyncDictionary events
+
+Repository: miragenet/mirage
+
+Issue body:
+Create semantic events for SyncDictionary updates like SyncList,  see #103

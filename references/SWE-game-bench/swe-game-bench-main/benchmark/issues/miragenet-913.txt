@@ -1,0 +1,21 @@
+Issue 913: Call syncvar hooks after reading all values for initialState
+
+Repository: miragenet/mirage
+
+Issue body:
+**Please explain the suggested feature in detail.**
+
+At the moment order is:
+```
+value1 will be set
+value1 hook will be called
+value2 will be set
+value2 hook will be called
+```
+for initial state (when objects spawns) it seems like it would make more sense if all the hooks are called after all values are set
+```
+value1 will be set
+value2 will be set
+value1 hook will be called
+value2 hook will be called
+```

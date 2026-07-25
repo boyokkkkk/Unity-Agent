@@ -1,0 +1,8 @@
+Issue 984: Add weaver warning when using [Server] [Client] on Awake
+
+Repository: miragenet/mirage
+
+Issue body:
+[Server] [Client] attributes use IsServer and IsClient, which will never be true inside Awake.
+
+Would be a good idea to have weaver warn for this

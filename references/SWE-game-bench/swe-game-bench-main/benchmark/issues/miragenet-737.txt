@@ -1,0 +1,24 @@
+NetworkManager should not expose a public field named SceneManager because it collides with UnityEngine.SceneManagement.SceneManager in classes derived from Mirage.NetworkManager.
+
+When a user creates a subclass of Mirage.NetworkManager and imports UnityEngine.SceneManagement, unqualified calls such as SceneManager.GetActiveScene() should resolve to Unity's SceneManager type. In the buggy version, the inherited NetworkManager.SceneManager field hides the Unity type name and causes compile errors.
+
+Expected behavior:
+- A class derived from Mirage.NetworkManager can use UnityEngine.SceneManagement.SceneManager without name collision.
+- Mirage's network scene manager reference should use a non-conflicting field name.
+- Existing serialized data should remain compatible via FormerlySerializedAs where needed.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Naming collision for NetworkManager.SceneManager
+
+Body:
+**Describe the bug**
+`NetworkManager.SceneManager` collides with `UnityEngine.SceneManagement.SceneManager` when used in child class of `NetworkManager`
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Create child class of `NetworkManager`
+2. Use Unity's `SceneManager`
+3. See error
+
+**Expected behavior**
+No naming collision for property

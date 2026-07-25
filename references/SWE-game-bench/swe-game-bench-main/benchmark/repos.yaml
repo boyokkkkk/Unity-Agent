@@ -1,0 +1,166 @@
+# Per-repo configuration for SWEGameBench.
+#
+# prepare_steps run after every clean checkout of the base commit. A step is a
+# builtin name (string) or {name: ..., **params}. {name: hook, func: ...}
+# dispatches into benchmark/hooks/<hooks_module>.py.
+#
+# main_asmdef drives the __MAIN_ASMDEF__ placeholder in injected .asmdef
+# files: the named assembly is looked up in the checked-out commit (exact,
+# then case-insensitive, then substring excluding tests); if absent, the
+# fallback asmdef is generated.
+
+repos:
+  fungus:
+    gh_repo: snozbot/fungus
+    repo_url: https://github.com/snozbot/fungus.git
+    workdir: /tmp/snozbot_fungus
+    default_unity_bucket: "2019.4.36f1"
+    unity_buckets:
+      "2018.4.36f1": { image_tag: ubuntu-2018.4.36f1-base-3.2.1 }
+      "2019.2.21f1": { image_tag: ubuntu-2019.2.21f1-base-3.2.1 }
+      "2019.4.12f1": { image_tag: ubuntu-2019.4.12f1-base-3.2.1 }
+      "2019.4.36f1": { image_tag: ubuntu-2019.4.36f1-base-3.2.1 }
+    prepare_steps:
+      - scrub_audio
+      - { name: scrub_asmdef_platforms, blocked_platforms: [BJM] }
+    main_asmdef:
+      match_names: [Fungus]
+      fallback_name: FungusGenerated
+      fallback_path: Assets/Fungus/FungusGenerated.asmdef
+
+  aottg:
+    gh_repo: AoTTG-2/AoTTG-2
+    repo_url: https://github.com/AoTTG-2/AoTTG-2.git
+    workdir: /tmp/aottg_repo
+    default_unity_bucket: "2020.2.7f1"
+    unity_buckets:
+      "2020.1.5f1":  { image_tag: ubuntu-2020.1.5f1-base-3.2.1 }
+      "2020.2.7f1":  { image_tag: ubuntu-2020.2.7f1-base-3.2.1 }
+      "2020.3.48f1": { image_tag: ubuntu-2020.3.48f1-base-3.2.1 }
+    git_lfs_skip_smudge: true
+    hooks_module: aottg
+    prepare_steps:
+      - { name: scrub_asmdef_platforms, blocked_platforms: [BJM] }
+
+  miragenet:
+    gh_repo: MirageNet/Mirage
+    repo_url: https://github.com/MirageNet/Mirage.git
+    workdir: /tmp/mirage_repo
+    default_unity_bucket: "2020.1.17f1"
+    unity_buckets:
+      "2019.2.21f1": { image_tag: ubuntu-2019.2.21f1-base-3.2.1 }
+      "2019.3.6f1":  { image_tag: ubuntu-2019.3.6f1-base-3.2.1 }
+      "2019.3.7f1":  { image_tag: ubuntu-2019.3.7f1-base-3.2.1 }
+      "2019.3.10f1": { image_tag: ubuntu-2019.3.10f1-base-3.2.1 }
+      "2019.4.3f1":  { image_tag: ubuntu-2019.4.3f1-base-3.2.1 }
+      "2020.1.5f1":  { image_tag: ubuntu-2020.1.5f1-base-3.2.1 }
+      "2020.1.9f1":  { image_tag: ubuntu-2020.1.9f1-base-3.2.1 }
+      "2020.1.14f1": { image_tag: ubuntu-2020.1.14f1-base-3.2.1 }
+      "2020.1.17f1": { image_tag: ubuntu-2020.1.17f1-base-3.2.1 }
+    prepare_steps:
+      - scrub_audio
+      - { name: scrub_asmdef_platforms, blocked_platforms: [BJM] }
+      - name: scrub_manifest_packages
+        blocked_packages:
+          - com.unity.shadergraph
+          - com.unity.render-pipelines.high-definition
+          - com.unity.render-pipelines.high-definition-config
+
+  goldplayer:
+    gh_repo: Hertzole/gold-player
+    repo_url: https://github.com/Hertzole/gold-player.git
+    workdir: /tmp/gold_player_repo
+    default_unity_bucket: "2018.4.36f1"
+    unity_buckets:
+      "2018.4.36f1": { image_tag: ubuntu-2018.4.36f1-base-3.2.1 }
+    prepare_steps:
+      - name: scrub_manifest_packages
+        blocked_packages: [com.unity.probuilder, com.unity.progrids]
+        blocked_registry_hosts: [staging-packages.unity.com]
+
+  gothicvr:
+    gh_repo: GothicVRProject/GothicVR
+    repo_url: https://github.com/GothicVRProject/GothicVR.git
+    workdir: /tmp/gothic_vr_repo
+    # The baked mirror does not store LFS objects, so checkout uses pointers
+    # first, then materializes the small runtime/library files needed by Unity.
+    git_lfs_skip_smudge: true
+    git_lfs_include_paths:
+      - Assets/GothicVR/Dependencies/I18N.West.dll
+      - Assets/GothicVR/Dependencies/I18N.dll
+      - Assets/GothicVR/Dependencies/PxCs.dll
+      - Assets/GothicVR/Dependencies/libphoenix-shared.dll
+      - Assets/GothicVR/Dependencies/libphoenix-shared.linux.so
+      - Assets/GothicVR/Dependencies/libphoenix-shared.so
+      - Assets/Plugins/Pico OpenXR/Runtime/android/arm64/libopenxr_loader.so
+    default_unity_bucket: "2022.2.18f1"
+    unity_buckets:
+      "2022.2.18f1": { image_tag: ubuntu-2022.2.18f1-base-3.2.1 }
+    prepare_steps:
+      - { name: scrub_asmdef_platforms, blocked_platforms: [BJM] }
+      - name: scrub_manifest_packages
+        blocked_packages:
+          - com.unity.shadergraph
+          - com.unity.render-pipelines.high-definition
+          - com.unity.render-pipelines.high-definition-config
+    main_asmdef:
+      match_names: [GothicVR, GVR, Phoenix]
+      optional: true
+
+  janoarg:
+    gh_repo: FFF40/JANOARG
+    repo_url: https://github.com/FFF40/JANOARG.git
+    workdir: /tmp/janoarg_repo
+    default_unity_bucket: "2022.3.46f1"
+    unity_buckets:
+      "2022.3.46f1": { image_tag: ubuntu-2022.3.46f1-base-3.2.1 }
+    submodule_paths: [Assets/JANOARG.Shared]
+    prepare_steps:
+      - name: scrub_manifest_packages
+        blocked_packages:
+          - com.unity.shadergraph
+          - com.unity.render-pipelines.high-definition
+          - com.unity.render-pipelines.high-definition-config
+
+  moorestech:
+    gh_repo: moorestech/moorestech
+    repo_url: https://github.com/moorestech/moorestech.git
+    workdir: /tmp/moorestech_repo
+    default_unity_bucket: "2022.3.1f1"
+    unity_buckets:
+      "2022.3.1f1": { image_tag: ubuntu-2022.3.1f1-base-3.2.1 }
+    prepare_steps:
+      - name: scrub_manifest_packages
+        blocked_packages:
+          - com.unity.shadergraph
+          - com.unity.render-pipelines.high-definition
+          - com.unity.render-pipelines.high-definition-config
+
+  ress3d:
+    gh_repo: RE-SS3D/SS3D
+    repo_url: https://github.com/RE-SS3D/SS3D.git
+    workdir: /tmp/ss3d_repo
+    default_unity_bucket: "2019.3.12f1"
+    unity_buckets:
+      "2019.3.12f1": { image_tag: ubuntu-2019.3.12f1-base-3.2.1 }
+      "2019.4.30f1": { image_tag: ubuntu-2019.4.30f1-base-3.2.1 }
+      "2021.3.0f1":  { image_tag: ubuntu-2021.3.0f1-base-3.2.1 }
+      "2021.3.15f1": { image_tag: ubuntu-2021.3.15f1-base-3.2.1 }
+    hooks_module: ress3d
+    prepare_steps:
+      - { name: scrub_asmdef_platforms, blocked_platforms: [BJM] }
+      - name: scrub_manifest_packages
+        blocked_packages:
+          - com.unity.shadergraph
+          - com.unity.render-pipelines.high-definition
+          - com.unity.render-pipelines.high-definition-config
+      - { name: hook, func: scrub_fishnet_prefab_generator }
+
+  rpr:
+    gh_repo: hackerspace-ntnu/Red-Planet-Rampage
+    repo_url: https://github.com/hackerspace-ntnu/Red-Planet-Rampage.git
+    workdir: /tmp/rpr_repo
+    default_unity_bucket: "2022.2.15f1"
+    unity_buckets:
+      "2022.2.15f1": { image_tag: ubuntu-2022.2.15f1-base-3.2.1 }
+    prepare_steps: []

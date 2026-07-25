@@ -1,0 +1,27 @@
+diff --git a/Assets/Mirage/Editor/NetworkMenu.cs b/Assets/Mirage/Editor/NetworkMenu.cs
+index fcf685fa9..cbde0eef5 100644
+--- a/Assets/Mirage/Editor/NetworkMenu.cs
++++ b/Assets/Mirage/Editor/NetworkMenu.cs
+@@ -36,7 +36,7 @@ public static GameObject CreateNetworkManager()
+             networkManager.Server = networkServer;
+             networkManager.ServerObjectManager = serverObjectManager;
+             networkManager.ClientObjectManager = clientObjectManager;
+-            networkManager.SceneManager = nsm;
++            networkManager.NetworkSceneManager = nsm;
+ 
+             CharacterSpawner playerSpawner = go.GetComponent<CharacterSpawner>();
+             playerSpawner.Client = networkClient;
+diff --git a/Assets/Mirage/Runtime/NetworkManager.cs b/Assets/Mirage/Runtime/NetworkManager.cs
+index f3252eab3..b01d6bc35 100644
+--- a/Assets/Mirage/Runtime/NetworkManager.cs
++++ b/Assets/Mirage/Runtime/NetworkManager.cs
+@@ -16,7 +16,8 @@ public class NetworkManager : MonoBehaviour
+         [FormerlySerializedAs("client")]
+         public NetworkClient Client;
+         [FormerlySerializedAs("sceneManager")]
+-        public NetworkSceneManager SceneManager;
++        [FormerlySerializedAs("SceneManager")]
++        public NetworkSceneManager NetworkSceneManager;
+         [FormerlySerializedAs("serverObjectManager")]
+         public ServerObjectManager ServerObjectManager;
+         [FormerlySerializedAs("clientObjectManager")]

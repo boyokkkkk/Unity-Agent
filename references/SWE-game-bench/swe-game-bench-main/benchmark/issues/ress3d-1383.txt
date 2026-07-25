@@ -1,0 +1,31 @@
+Search text remains in tilemap menu after close and reopen
+
+Expected behavior:
+- when the tilemap menu is closed, clear any text typed into the search input field
+- reopening the tilemap menu should not show stale search text from the previous open
+- keep the fix focused on the tilemap menu search input close/reopen behavior
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Search text remain in tilemap menu when reopen and not display search result
+
+Body:
+## Summary
+
+Search text remain in tilemap menu when reopen and not display search result
+
+## Current Behavior
+
+The search text typed in search bar does not be cleared or applied when reopen the tilemap menu
+
+## Steps to Reproduce
+
+1. Open the tilemap menu using `b` and type any text in the search bar
+2. Close and reopen the tilemap menu
+
+## Expected Behavior
+
+Clear the search text or display the search result
+
+## Possible Solution
+
+Clear the input field when open the menu, or apply search if text not empty

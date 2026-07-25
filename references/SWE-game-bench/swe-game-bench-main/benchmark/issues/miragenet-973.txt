@@ -1,0 +1,13 @@
+Nested NetworkIdentity find NetworkBehaviours that belong to other objects
+
+If there are Nested NetworkBehaviours and NetworkIdentity then there can be a problem where the parent NetworkIdentity will find Behaviour that belong to another child NetworkIdentity.
+
+also see: #969 #970
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Nested NetworkIdentity find NetworkBehaviours that belong to other objects
+
+Body:
+If there are Nested NetworkBehaviours and NetworkIdentity then there can be a problem where the parent NetworkIdentity will find Behaviour that belong to another child NetworkIdentity.
+
+also see: #969 #970

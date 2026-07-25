@@ -1,0 +1,31 @@
+Chat is 'hackable': Round Two!
+
+## Summary
+
+Despite efforts to prevent users from customizing their text in the chat, it is still possible. Users should not be able to apply custom formatting to their chat text.
+
+## Current Behavior
+
+Issue #762 described the ability to hack the chat text. PR #779 made it less convenient for users to do so by applying the 'noparse' tags to the chat. However, it is possible to circumvent that measure by closing that tag within the message, then applying the formatting.
+
+The open source nature of SS3D makes us vulnerable to people exploiting our code. We need to ensure that players cannot circumvent our defences *despite* them knowing what measures have been implemented.
+
+## Steps to Reproduce
+
+- While in-game, open the chat window by clicking the chat (speech bubble) icon in the bottom right area of the screen.
+- Begin your text with < /noparse > (**without** the spaces), then apply other tags to your chat as described in #762
+- Observe that the formatting can be customized.
+
+[Image (Chat is hackable Round Two): description unavailable]
+
+## Expected Behavior
+
+All user chat should be in the predefined font, colour and size. However, the ability for custom formatting must be maintained for server announcements, events etc.
+
+## Possible Solution
+
+Possibly use a regular expression (regex) to identify and sanitize tags within user input.
+
+## Context
+
+Issue is present in version 0.3.95g

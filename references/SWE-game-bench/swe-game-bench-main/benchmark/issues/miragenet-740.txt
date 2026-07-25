@@ -1,0 +1,16 @@
+Issue 740: members missing from Mirror Migration guide
+
+Repository: miragenet/mirage
+
+Issue body:
+List of member that are in mirror but have been changed or removed in mirage. These items should be added to https://github.com/MirageNet/Mirage/blob/master/doc/Articles/Guides/MirrorMigration.md
+
+**NetworkManager**
+| Mirror                    | Mirage   | notes  |
+|---------------------------------|---|--- 
+| override OnStartClient          |   |   |
+| override OnStopClient           |   |   |
+| field autoStartServerBuild      |  HeadlessAutoStart | starts server when null graphicsDeviceType  |
+| method ConfigureServerFrameRate |  HeadlessFrameLimiter | Sets frame rate when null graphicsDeviceType |
+| field _networkAddress           |   |   |
+| field mode (NetworkManagerMode) |   |   |

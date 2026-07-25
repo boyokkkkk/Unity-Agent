@@ -1,0 +1,23 @@
+diff --git a/Assets/Mirror/Runtime/NetworkClient.cs b/Assets/Mirror/Runtime/NetworkClient.cs
+index bf07b37d2..f1c23f3c7 100644
+--- a/Assets/Mirror/Runtime/NetworkClient.cs
++++ b/Assets/Mirror/Runtime/NetworkClient.cs
+@@ -271,8 +271,6 @@ public void OnAuthenticated(NetworkConnectionToServer conn)
+         /// </summary>
+         public void Disconnect()
+         {
+-            connectState = ConnectState.Disconnected;
+-
+             // local or remote connection?
+             if (isLocalClient)
+             {
+@@ -290,6 +288,9 @@ public void Disconnect()
+                     RemoveTransportHandlers();
+                 }
+             }
++            // set connectState as Disconnected after, otherwise Disconnected event is never raised
++            connectState = ConnectState.Disconnected;
++
+             HandleClientDisconnect();
+         }
+ 

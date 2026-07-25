@@ -1,0 +1,13 @@
+GameUpdater's internal Subject is not disposed when the server is destroyed.
+
+Expected behavior:
+- When the server starter is destroyed, it should clean up the server update thread.
+- It should clean up the game update thread.
+- It should cancel auto-save.
+- It should also dispose the GameUpdater update stream so no leftover Subject remains alive.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: GameUpdaterの中身のSubjectをDisposeしていない
+
+Body:
+ごめん!!!!

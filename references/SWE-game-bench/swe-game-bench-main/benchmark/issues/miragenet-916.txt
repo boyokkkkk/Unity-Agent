@@ -1,0 +1,50 @@
+Issue 916: Custom Reader/Writer not active for NetworkMessages, but for SyncVars
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+When adding a custom reader/writer for an abstract class, it works for synchronizing SyncVars, but when adding the abstract class as a field to a network message, an error message is produced after a recompile.
+
+The error message: Error: (0,0): error Cannot generate read function for abstract class Foo. Use a supported type or provide a custom read function
+
+**Repro project**
+```cs
+[NetworkMessage]
+public struct FooMessage
+{
+  public Foo Foo;
+}
+
+public abstract class Foo {}
+public class FooBar : Foo {}
+
+public static class FooReaderWriter
+{
+  public static Foo ReadFoo(this NetworkReader reader)
+  {
+    var fooValue = reader.ReadInt32();
+    return new FooBar();
+  }
+
+  public static void WriteFoo(this NetworkWriter writer, Foo foo)
+  {
+    writer.WriteInt32(0);
+  }
+}
+```
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Copy the attached code into a new cs file inside the project
+2. Compile
+3. See error
+
+**Expected behavior**
+Custom reader/writer should also work correctly for network messages.
+
+**Desktop (please complete the following information):**
+* OS: Windows 10 Pro
+* Build target: PC, Mac & Linux Standalone
+* Unity version: 2020.3.16f1 (LTS)
+* Mirage version: 102.0.0

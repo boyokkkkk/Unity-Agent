@@ -1,0 +1,31 @@
+Issue 222: NetworkClient spawn handlers are not being called
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+Registering a spawn handler on NetworkClient using the `RegisterPrefab` method will not call the spawn handler when it needs to. 
+
+**To Reproduce**
+1. Create a script and register a prefab with a spawn handler and an unspawn handler to the NetworkClient in the scene.
+2. Add a Debug.Log message for each handler.
+3. Add a way to spawn said prefab.
+4. Build the project and start a server.
+5. Connect through the editor and notice how it doesn't log a message when you spawn an object.
+
+**Expected behavior**
+The spawn handler method should be called.
+
+**Desktop (please complete the following information):**
+* OS: Windows 64-bit
+* Build target: Windows 64-bit
+* Unity version: 2020.1b12
+* Mirror branch: UPM
+
+**Additional context**
+**This is the important part!** I've already found a way to seemingly solve the issue. In the `SpawnPrefab` method in NetworkClient it tries to get the prefab first using the `GetPrefab` method. If it succeeds, it will return and stop there. If it doesn't succeed it will go to the spawn handler. Most of the time it will succeed and never call the spawn handler. If you switch the two ifs around so the  
+`if (spawnHandlers.TryGetValue(...`   
+is first the spawn handler will be called. If there's no spawn handler it should spawn the object like normal.   
+Usually, when you provide a spawn handler you want it to be called, so I don't see an issue with checking for the spawn handler first.
+
+Since the solution and issue have already been figured out I didn't provide a project to reproduce it with.

@@ -1,0 +1,28 @@
+Issue Title: Cliente can't host after quitting server
+
+Issue Body:
+### Summary
+
+First, the disconnect button doesn't work for the clients, just for the Host.
+Second, after a host closes the server, all the clients become unable to host, they will open a server but won't be able to load the map.
+
+### Steps to Reproduce
+
+1 - Start a game with 2 instances
+2 - Connect to the game with the client
+3 - Close the game or disconnect from the host instance
+4 - Host a server in the client instance
+5 - Go to admin tab
+6 - Click Load Map
+
+### Expected Behavior
+
+The client should be able to quit a server without closing the game, also should be able to host regardless of the situation.
+
+### Possible Solution
+
+The game doesn't freeze or crash or anything, so it's possible that the map is simple loaded to the client, so it won't work when he tries to load another.
+
+### Media
+
+Stays stuck at the "loading..." forever.

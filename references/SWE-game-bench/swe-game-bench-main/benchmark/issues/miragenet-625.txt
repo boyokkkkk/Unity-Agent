@@ -1,0 +1,14 @@
+Issue 625: PlayerSpawner
+
+Repository: miragenet/mirage
+
+Issue body:
+**Please explain the suggested feature in detail.**
+A way to disable auto spawning
+**How exactly does this keep you from releasing your game right now?**
+player spawner is in packages, therefore i cannot edit it myself.
+**Can you suggest a possible solution?**
+a bool to disable auto spawn
+**Additional context**
+Add any other context or screenshots about the feature request here.
+and a simple way to spawn it would be nice too

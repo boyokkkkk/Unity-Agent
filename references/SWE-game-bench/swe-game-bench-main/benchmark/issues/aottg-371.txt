@@ -1,0 +1,21 @@
+Unity Tool: GameObject to Prefab
+
+Add a Unity editor tool that can convert selected GameObjects into a prefab instance.
+
+Expected behavior:
+- The tool should be available from the Unity editor.
+- It should preserve transform information when replacing objects with the chosen prefab.
+- It should support applying a scale multiplier during conversion.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Unity Tool: GameObject to Prefab
+
+Body:
+**How will this enhancement improve the game?**
+Mapping Team would like to have the option to convert GameObjects to Prefabs, while keeping transform information (position, rotation and scale)
+
+**Describe the solution you'd like**
+A new window in the Unity Editor in which a prefab can be loaded. Based on the selected objects in the scene hierarchy, and the press of a button, all of those will be replaced by
+
+**Describe alternatives you've considered**
+Alternative would be that mappers have to replace objects one by one, but tsk, we can automate stuff 😎

@@ -1,0 +1,12 @@
+diff --git a/Assets/Scripts/Characters/Titan/Configuration/TitanConfiguration.cs b/Assets/Scripts/Characters/Titan/Configuration/TitanConfiguration.cs
+index 67bf34b65..b978a55e9 100644
+--- a/Assets/Scripts/Characters/Titan/Configuration/TitanConfiguration.cs
++++ b/Assets/Scripts/Characters/Titan/Configuration/TitanConfiguration.cs
+@@ -85,6 +85,7 @@ namespace Assets.Scripts.Characters.Titan.Configuration
+             {
+                 case MindlessTitanType.Normal:
+                     AnimationWalk = "run_walk";
++                    AnimationDeath = "die_front";
+                     Attacks.Add(new ComboAttack());
+                     Focus = 10f;
+                     break;

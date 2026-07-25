@@ -1,0 +1,33 @@
+diff --git a/Assets/Mirage/Runtime/NetworkSceneManager.cs b/Assets/Mirage/Runtime/NetworkSceneManager.cs
+index fc93ec99a..cfab22647 100644
+--- a/Assets/Mirage/Runtime/NetworkSceneManager.cs
++++ b/Assets/Mirage/Runtime/NetworkSceneManager.cs
+@@ -26,6 +26,11 @@ public class NetworkSceneManager : MonoBehaviour, INetworkSceneManager
+         [FormerlySerializedAs("server")]
+         public NetworkServer Server;
+ 
++        /// <summary>
++        /// Sets the NetworksSceneManagers GameObject to DontDestroyOnLoad. Default = true.
++        /// </summary>
++        public bool DontDestroy = true;
++
+         [Header("Events")]
+         /// <summary>
+         /// Event fires when the Client starts changing scene.
+@@ -65,7 +70,8 @@ public class NetworkSceneManager : MonoBehaviour, INetworkSceneManager
+ 
+         public void Start()
+         {
+-            DontDestroyOnLoad(gameObject);
++            if(DontDestroy)
++                DontDestroyOnLoad(gameObject);
+ 
+             if (Client != null)
+             {
+@@ -355,4 +361,4 @@ internal void FinishLoadScene(string scenePath, SceneOperation sceneOperation)
+             }
+         }
+     }
+-}
+\ No newline at end of file
++}

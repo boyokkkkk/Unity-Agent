@@ -1,0 +1,33 @@
+[BUG] Breaking /pause is my passion
+
+The pause flow breaks if the game is paused again while it is already in the process of unpausing.
+
+Expected behavior:
+- Re-pausing during the unpause transition should put the game fully back into a paused state.
+- Internal pause timers and state should reflect that the game is paused again.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] Breaking /pause is my passion
+
+Body:
+**Describe the bug**
+Since the old pause bugs have been fixed, here's a new one. Note, technically this issue doesn't exists on any official Alpha builds yet since none have been made with the /pause fixes, but these fixes are present in some of the individual issue builds which is where I tested this.
+This one is pretty simple though - you can no longer re-pause the game. Previously and in AoTTG1, when you the timer for the game to unpause is ticking down (after pausing then unpausing), you could type /pause again to re-pause the game. Since the pause fixes, this now simply resets the unpause timer back to its starting point.
+
+**To Reproduce**
+1. Create a multiplayer server
+2. Type /pause
+3. Type /pause again to being the countdown timer for the game to unpause
+4. Before this timer reaches 0, type /pause again
+5. Notice it doesn't actually pause the game, but just restarts the timer
+
+**Expected behavior**
+Using /pause while the unpause timer is ticking down should pause the game.
+
+**Screenshots**
+https://youtu.be/4Ey3M809MLQ
+
+**Contributor instructions**
+1. Try to recreate the bug via the reported reproduction steps. If the bug can be reproduced, remove the investigation label. If the bug cannot be reproduced, please add a comment, attach "On Hold" label and inform the submitter that the bug cannot be reproduced. If there is no reply after 2 weeks, the issue can be closed.
+2. Follow the default development team procedures (Create a new branch, apply your fix, create a pull request, submit new builds for testing team in dev squad)
+3. Once testing team has confirmed the issue is resolved and the pull request is accepted, the issue can be closed.

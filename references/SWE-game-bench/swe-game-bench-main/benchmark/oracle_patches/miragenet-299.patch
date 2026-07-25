@@ -1,0 +1,35 @@
+diff --git a/Assets/Mirror/Runtime/NetworkManager.cs b/Assets/Mirror/Runtime/NetworkManager.cs
+index 0f0fe8039..e5cf9a157 100644
+--- a/Assets/Mirror/Runtime/NetworkManager.cs
++++ b/Assets/Mirror/Runtime/NetworkManager.cs
+@@ -98,8 +98,6 @@ async Task SetupServer()
+         public async Task StartServer()
+         {
+             await SetupServer();
+-
+-            server.SpawnObjects();
+         }
+ 
+         /// <summary>
+@@ -158,9 +156,6 @@ public async Task StartHost()
+         //       host version is enough.
+         void FinishStartHost()
+         {
+-            // server scene was loaded. now spawn all the objects
+-            server.SpawnObjects();
+-
+             // connect client and call OnStartClient AFTER server scene was
+             // loaded and all objects were spawned.
+             // DO NOT do this earlier. it would cause race conditions where a
+diff --git a/Assets/Mirror/Runtime/NetworkServer.cs b/Assets/Mirror/Runtime/NetworkServer.cs
+index 553cbb1b2..0b972b3e6 100644
+--- a/Assets/Mirror/Runtime/NetworkServer.cs
++++ b/Assets/Mirror/Runtime/NetworkServer.cs
+@@ -188,6 +188,7 @@ public async Task ListenAsync()
+             //       before OnStartServer() because this all runs in one thread
+             //       and we don't start processing connects until Update.
+             Started.Invoke();
++            SpawnObjects();
+ 
+             _ = AcceptAsync();
+         }

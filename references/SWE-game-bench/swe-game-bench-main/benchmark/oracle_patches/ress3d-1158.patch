@@ -1,0 +1,16 @@
+diff --git a/Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/GhostManager.cs b/Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/GhostManager.cs
+index 803a700e..88874373 100644
+--- a/Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/GhostManager.cs
++++ b/Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/GhostManager.cs
+@@ -32,6 +32,11 @@ namespace SS3D.Systems.Tile.TileMapCreator
+             {
+                 _ghostObject = Instantiate(prefab);
+ 
++                if (_ghostObject.TryGetComponent<Rigidbody>(out var ghostRigidbody))
++                {
++                    ghostRigidbody.useGravity = false;
++                    ghostRigidbody.isKinematic = true;
++                }
+                 var colliders = _ghostObject.GetComponents<Collider>();
+                 foreach (Collider col in colliders)
+                 {

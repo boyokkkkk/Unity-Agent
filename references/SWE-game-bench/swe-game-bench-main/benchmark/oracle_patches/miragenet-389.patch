@@ -1,0 +1,40 @@
+diff --git a/Assets/Mirror/Runtime/NetworkIdentity.cs b/Assets/Mirror/Runtime/NetworkIdentity.cs
+index bed6a369215..daf2c811831 100644
+--- a/Assets/Mirror/Runtime/NetworkIdentity.cs
++++ b/Assets/Mirror/Runtime/NetworkIdentity.cs
+@@ -113,7 +113,7 @@ public sealed class NetworkIdentity : MonoBehaviour
+         /// <summary>
+         /// Returns true if running as a client and this object was spawned by a server.
+         /// </summary>
+-        public bool IsClient => Client != null && Client.Active && NetId != 0 && !serverOnly;
++        public bool IsClient => Client != null && Client.Active && NetId != 0;
+ 
+         /// <summary>
+         /// Returns true if NetworkServer.active and server is not stopped.
+@@ -157,12 +157,6 @@ public sealed class NetworkIdentity : MonoBehaviour
+         [FormerlySerializedAs("m_SceneId"), HideInInspector]
+         public ulong sceneId;
+ 
+-        /// <summary>
+-        /// Flag to make this object only exist when the game is running as a server (or host).
+-        /// </summary>
+-        [FormerlySerializedAs("m_ServerOnly")]
+-        public bool serverOnly;
+-
+         /// <summary>
+         /// The NetworkServer associated with this NetworkIdentity.
+         /// </summary>
+diff --git a/Assets/Mirror/Runtime/ServerObjectManager.cs b/Assets/Mirror/Runtime/ServerObjectManager.cs
+index e41fe123647..86c08b11492 100644
+--- a/Assets/Mirror/Runtime/ServerObjectManager.cs
++++ b/Assets/Mirror/Runtime/ServerObjectManager.cs
+@@ -410,9 +410,6 @@ internal void SpawnObject(GameObject obj, INetworkConnection ownerConnection)
+ 
+         internal void SendSpawnMessage(NetworkIdentity identity, INetworkConnection conn)
+         {
+-            if (identity.serverOnly)
+-                return;
+-
+             // for easier debugging
+             if (logger.LogEnabled()) logger.Log("Server SendSpawnMessage: name=" + identity.name + " sceneId=" + identity.sceneId.ToString("X") + " netid=" + identity.NetId);
+ 

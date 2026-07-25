@@ -1,0 +1,17 @@
+Udp socket startup should not crash when the NanoSockets native library is unavailable on a desktop platform.
+
+When automatic UDP socket selection cannot load the native NanoSockets library, startup should fall back to the managed C# UDP implementation instead of throwing a native DLL load error.
+
+Expected behavior:
+- Missing native NanoSockets library should not throw during UDP socket factory startup.
+- Automatic socket selection should fall back to the managed UDP path.
+- Existing unsupported-platform checks should remain unchanged.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: No Error when building 32 bit windows with Nanosockets
+
+Body:
+**Describe the bug**
+Nanosockets only as a 64 bit dll. if a 32 bit build is made then it will give an error: `DllNotFoundException: nanosockets`
+
+We should give a build error if Nanosockets is used in 32 bit build

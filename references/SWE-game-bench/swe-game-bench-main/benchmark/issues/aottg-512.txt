@@ -1,0 +1,39 @@
+[BUG] Getting the horse to follow you across maps/gamemodes
+
+Horses can remain enabled after switching away from a map/gamemode where horses are allowed.
+
+Expected behavior:
+- New gamemode settings should not keep horses enabled by default.
+- Horses should only appear in gamemodes where they are explicitly allowed.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] Getting the horse to follow you across maps/gamemodes
+
+Body:
+**Describe the bug**
+If you go to Outside the Walls, then open the pause menu with escape and switch maps, the horse will follow you to other gamemodes once you've restarted the round.
+
+**To Reproduce**
+1. Go to Outside the Walls
+2. Spawn in as a Human
+3. Press escape
+4. Click on Game Settings
+5. Change the map to something else (not Trost)
+6. Click change
+7. Exit out of the menu and type /restart (or T if on singleplayer)
+
+**Expected behavior**
+The horse should only appear on gamemodes where it is allowed.
+
+**Screenshots**
+[Image attachment — alt='Screenshot (526)']
+Description: (image could not be described: OpenAIError: Missing credentials. Please pass an `api_key`, `workload_identity`, `admin_api_key`, or set the `OPENAI_API_KEY` or `OPENAI_ADMIN_KEY` environment variable.)
+[/Image]
+
+**Log file**
+https://www.dropbox.com/s/s6px6hgzou3786p/Horse%20across%20maps.txt?dl=0
+
+**Contributor instructions**
+1. Try to recreate the bug via the reported reproduction steps. If the bug can be reproduced, remove the investigation label. If the bug cannot be reproduced, please add a comment, attach "On Hold" label and inform the submitter that the bug cannot be reproduced. If there is no reply after 2 weeks, the issue can be closed.
+2. Follow the default development team procedures (Create a new branch, apply your fix, create a pull request, submit new builds for testing team in dev squad)
+3. Once testing team has confirmed the issue is resolved and the pull request is accepted, the issue can be closed.

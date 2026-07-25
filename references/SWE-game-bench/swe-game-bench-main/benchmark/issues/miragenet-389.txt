@@ -1,0 +1,34 @@
+Legacy server-only object option breaks normal spawned object behavior.
+
+Some networked objects can still carry an old server-only setting. That setting should no longer suppress client-side spawned-object state or prevent ready clients from receiving spawn messages.
+
+Expected behavior:
+- A spawned identity with a valid client and netId should report itself as a client object.
+- Ready clients should still receive spawn messages for spawned objects.
+- The old server-only behavior should not block normal client visibility or synchronization.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: bug: ServerOnly still sends data to Client
+
+Body:
+NetworkIdeneity set to ServerOnly will still send SyncVars to clients. Repro via the ChangeScene example where the client is in editor (to easily view the warnigns) and the server is in standalone.
+
+[Image attachment — alt='image']
+Description: (image could not be described: AuthenticationError: Error code: 401 - {'error': {'message': 'Incorrect API key provided: "sk-proj**********************************************************************************************************************************************************pgA". You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}})
+[/Image]
+
+ServerOnly only checked in 2 places:
+
+[Image attachment — alt='image']
+Description: (image could not be described: AuthenticationError: Error code: 401 - {'error': {'message': 'Incorrect API key provided: "sk-proj**********************************************************************************************************************************************************pgA". You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_api_key'}})
+[/Image]
+
+NetowkrIdentity.cs:116
+`public bool IsClient => Client != null && Client.Active && NetId != 0 && !serverOnly;`
+
+NetworkServer.cs:914
+```
+internal void SendSpawnMessage(NetworkIdentity identity, INetworkConnection conn)
+{
+    if (identity.serverOnly)
+```

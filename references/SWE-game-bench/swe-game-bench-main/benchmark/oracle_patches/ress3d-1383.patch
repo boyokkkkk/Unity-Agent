@@ -1,0 +1,12 @@
+diff --git a/Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/TileMapMenu.cs b/Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/TileMapMenu.cs
+index 8b74e058..7b432a7b 100644
+--- a/Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/TileMapMenu.cs
++++ b/Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/TileMapMenu.cs
+@@ -119,6 +119,7 @@ namespace SS3D.Systems.Tile.TileMapCreator
+                 // Detach the tab from a movable panel. It's necessary to prevent disabling all tabs in the panel.
+                 _tab.Detach();
+                 _hologramManager.DestroyHolograms();
++                _inputField.text = string.Empty;
+             }
+             _tab.Panel.gameObject.SetActive(isShow);
+             _menuRoot.SetActive(isShow);

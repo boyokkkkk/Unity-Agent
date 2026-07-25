@@ -1,0 +1,17 @@
+feat: optional dontdestroyonload for networkscenemanager
+
+related to #587.
+
+Without cutting any deeper I am ok with adding the option but defaulting it to enabled for now. I still think the current behavior is what most people would use. If not its a simple check box to change it :)
+
+!!!NOTE: If you disable the DDOL setting for NetworkSceneManager and do a Normal (non additive) scene change you will need to take extra steps to ensure your Network containing GameObject is not destroyed in that operation!!!
+
+--- Original GitHub issue (auto-fetched) ---
+Title: feat: optional dontdestroyonload for networkscenemanager
+
+Body:
+related to #587.
+
+Without cutting any deeper I am ok with adding the option but defaulting it to enabled for now. I still think the current behavior is what most people would use. If not its a simple check box to change it :)
+
+!!!NOTE: If you disable the DDOL setting for NetworkSceneManager and do a Normal (non additive) scene change you will need to take extra steps to ensure your Network containing GameObject is not destroyed in that operation!!!

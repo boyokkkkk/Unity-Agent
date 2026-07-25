@@ -1,0 +1,20 @@
+diff --git a/Assets/Fungus/Scripts/Utils/TextVariationHandler.cs b/Assets/Fungus/Scripts/Utils/TextVariationHandler.cs
+index 5c2111f8..15b341b9 100644
+--- a/Assets/Fungus/Scripts/Utils/TextVariationHandler.cs
++++ b/Assets/Fungus/Scripts/Utils/TextVariationHandler.cs
+@@ -168,6 +168,15 @@ namespace Fungus
+                 }
+             }
+ 
++            // As per issue #963 this should just return as if no variation 
++            if(varyingSections.Count == 1)
++            {
++                if (varyingSections[0].type == Section.VaryType.Sequence &&
++                    varyingSections[0].elements.Count == 0)
++                    return false;
++            }
++
++
+             return varyingSections.Count > 0;
+         }
+ 

@@ -1,0 +1,30 @@
+diff --git a/Assets/Mirage/Runtime/Sockets/Udp/UdpSocketFactory.cs b/Assets/Mirage/Runtime/Sockets/Udp/UdpSocketFactory.cs
+index 44337c071..b5dac68c0 100644
+--- a/Assets/Mirage/Runtime/Sockets/Udp/UdpSocketFactory.cs
++++ b/Assets/Mirage/Runtime/Sockets/Udp/UdpSocketFactory.cs
+@@ -45,12 +45,21 @@ void Awake()
+         {
+             if (!useNanoSocket) return;
+ 
+-            if (initCount == 0)
++            try
+             {
+-                UDP.Initialize();
+-            }
++                if (initCount == 0)
++                {
++                    UDP.Initialize();
++                }
+ 
+-            initCount++;
++                initCount++;
++            }
++            catch (DllNotFoundException)
++            {
++                Debug.LogWarning("Nanosocket dll not found, Using c# Managed Socket instead");
++                SocketLib = SocketLib.Managed;
++                return;
++            }
+         }
+ 
+         void OnDestroy()

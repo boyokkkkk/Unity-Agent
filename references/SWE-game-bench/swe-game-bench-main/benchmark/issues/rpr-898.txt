@@ -1,0 +1,13 @@
+Telescope should not apply zoom behavior to the boombardier/dynamite barrel.
+
+Combining telescope with the dynamite barrel can create phantom dynamite behavior because telescope still wires scope/zoom behavior onto a barrel that uses zoom input for detonation.
+
+Expected behavior:
+- If the gun has a DynamiteBarrel, Telescope should early-return.
+- Telescope should not change player zoom FOV or zoom speed for dynamite-barrel guns.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Fix phantome dynamites with boombardier + telescope
+
+Body:
+(no body on the GitHub issue)

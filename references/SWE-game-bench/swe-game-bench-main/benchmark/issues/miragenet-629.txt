@@ -1,0 +1,38 @@
+NetworkBehaviour-derived parameters in RPC methods generate IL that is not safe for IL2CPP.
+
+When an RPC method takes a specific NetworkBehaviour subclass as a parameter, the generated reader should return that exact subclass type instead of leaving only the base NetworkBehaviour value on the stack.
+
+Expected behavior:
+- RPCs with NetworkBehaviour-derived parameters should produce IL that is valid for IL2CPP.
+- The generated reader path should safely convert the base network behaviour value to the requested derived type.
+- Normal Mono execution should not be the only environment where the generated RPC code works.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: IL2CPP build fails when using parameters inherited from NetworkBehaviour in ClientRpc
+
+Body:
+**Describe the bug**
+As the title suggests, having types inheriting from `NetworkBehaviour` as Rpc parameters, IL2CPP build fails with an error saying it cannot convert from NetworkBehaviour to that inherited type. Can't provide an exact error stack because it is in my native language for some reason.
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Run any Mirage sample.
+2. Add this sort of code:
+```cs
+class Player : NetworkBehaviour {}
+
+[ClientRpc]
+void SomeRpc(Player player) {}
+```
+
+3. Build for IL2CPP in WIn64 for example.
+4.  See errors in the console.
+
+**Expected behavior**
+IL2CPP build passes without errors.
+
+**Desktop (please complete the following information):**
+* OS: Win 10 x64 latest
+* Build target: Win64
+* Unity version: 2020.2.5f1
+* Mirage: Latest

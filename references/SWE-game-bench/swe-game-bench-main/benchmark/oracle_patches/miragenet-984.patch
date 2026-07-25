@@ -1,0 +1,26 @@
+diff --git a/Assets/Mirage/Weaver/Processors/AttributeProcessor.cs b/Assets/Mirage/Weaver/Processors/AttributeProcessor.cs
+index 813937bd..e2613a39 100644
+--- a/Assets/Mirage/Weaver/Processors/AttributeProcessor.cs
++++ b/Assets/Mirage/Weaver/Processors/AttributeProcessor.cs
+@@ -7,7 +7,7 @@ namespace Mirage.Weaver
+     /// <summary>
+     /// Processes methods and fields to check their attrbiutes to make sure they are allowed on the type
+     /// <para>
+-    /// Injects server/client active checks for [Server/Client] attributes 
++    /// Injects server/client active checks for [Server/Client] attributes
+     /// </para>
+     /// </summary>
+     class AttributeProcessor
+@@ -135,6 +135,12 @@ namespace Mirage.Weaver
+                 return;
+             }
+ 
++            if (md.Name == "Awake" && !md.HasParameters)
++            {
++                logger.Error($"{attribute.AttributeType.Name} will not work on the Awake method.", md);
++                return;
++            }
++
+             // dont need to set modified for errors, so we set it here when we start doing ILProcessing
+             modified = true;
+ 

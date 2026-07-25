@@ -1,6 +1,13 @@
 .venv/
 .runtime/
-references/
+references/GameDevBench/.git/
+references/**/.git/
+references/GameDevBench/tasks/
+references/GameDevBench/tasks_gt/
+references/GameDevBench/.venv/
+references/GameDevBench/__pycache__/
+references/SWE-game-bench/__MACOSX/
+references/swe-game-bench-main.zip
 baseline/Unity2D/Library/
 baseline/Unity2D/Temp/
 baseline/Unity2D/Logs/

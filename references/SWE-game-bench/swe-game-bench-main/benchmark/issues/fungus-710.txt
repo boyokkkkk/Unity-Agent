@@ -1,0 +1,9 @@
+Beeps in WriterAudio ignores last sound in array
+
+On line 231 of WriterAudio.cs, the system selects a random 'beep' audioClip from the array. 
+
+`targetAudioSource.clip` = beepSounds[Random.Range(0, beepSounds.Count - 1)];` [1,10,15]
+
+But Random.Range is exclusive of the upper bound parameter, so this prevents the last audioClip from ever being played. It ought to be
+
+`targetAudioSource.clip = beepSounds[Random.Range(0, beepSounds.Count)];`

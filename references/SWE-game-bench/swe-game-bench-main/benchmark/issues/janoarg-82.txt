@@ -1,0 +1,17 @@
+SongSortCriteria.Title uses SongArtist instead of SongName in SongSelectListView
+
+Currently, Name sorting was based on Song Artist Name 
+Line 182 should be `? song.Value.SongName` 
+
+Sorry, I'm MEGA late testing the sorting since I'm the only one developing our system in our capstone project. 
+```
+case SongSortCriteria.Title:
+                    {
+                        var songs = SongSelectScreen.sMain.PlayableSongByID.Select(song => (
+                            Key: song.Key,
+                            Value: GameConditional.TestAll(SongSelectScreen.sMain.PlaylistSongByID[song.Key].UnlockConditions) 
+                                ? song.Value.SongArtist
+                                : ""
+                        )).ToArray();
+                        Array.Sort(songs, (x, y) => x.Value.CompareTo(y.Value) * sortDirection);
+```

@@ -1,0 +1,13 @@
+diff --git a/Assets/Scripts/Gamestate/Round.cs b/Assets/Scripts/Gamestate/Round.cs
+index 67fbeb54..ee88d993 100644
+--- a/Assets/Scripts/Gamestate/Round.cs
++++ b/Assets/Scripts/Gamestate/Round.cs
+@@ -111,7 +111,7 @@ public class Round
+         // If it was a suicide, we should give the surviving player the win if there's only one
+         else if (livingPlayers.Count < 2)
+         {
+-            CheckWinCondition(livingPlayers.First());
++            CheckWinCondition(livingPlayers.FirstOrDefault());
+         }
+     }
+ 

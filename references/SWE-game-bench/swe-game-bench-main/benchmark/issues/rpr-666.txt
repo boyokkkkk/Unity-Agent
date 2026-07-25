@@ -1,0 +1,21 @@
+Firing the hat barrel may cause a disconnect-level crash in builds
+
+The hat barrel animation can try to hide ammunition using a negative list index when the current ammo count is very low.
+Firing with zero/low ammo should not throw from the visual ammunition update.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Firing the hat barrel may cause disconnect-level crash in builds
+
+Body:
+Stacktrace from a match against AIs where one AI had the hat barrel:
+
+```
+Disconnecting connection: connection(0) because handling a message of type Mirror.RpcMessage caused an Exception. This can happen if the other side accidentally (or an attacker intentionally) sent invalid data. Reason: System.ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+  at System.Collections.Generic.List`1[T].get_Item (System.Int32 index) [0x00009] in <cbc72d4a9767498db39486e941a498e3>:0 
+  at HatBarrelModel.OnFire (GunStats stats) [0x0003e] in <912f8d6f363c4562a12a2363c79374ca>:0 
+  at MeshProjectileController.InitializeProjectile (GunStats stats) [0x00023] in <912f8d6f363c4562a12a2363c79374ca>:0 
+  at GunController.ActuallyFire () [0x0000c] in <912f8d6f363c4562a12a2363c79374ca>:0 
+  at GunController.UserCode_RpcFire__Quaternion (UnityEngine.Quaternion rotation) [0x00036] in <912f8d6f363c4562a12a2363c79374ca>:0 
+(...)
+```

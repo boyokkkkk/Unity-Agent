@@ -1,0 +1,35 @@
+diff --git a/Assets/Mirage/Editor/NetworkScenePostProcess.cs b/Assets/Mirage/Editor/NetworkScenePostProcess.cs
+index 6952fe6f67b..cf5ce62a182 100644
+--- a/Assets/Mirage/Editor/NetworkScenePostProcess.cs
++++ b/Assets/Mirage/Editor/NetworkScenePostProcess.cs
+@@ -67,8 +67,6 @@ static void PrepareSceneObject(NetworkIdentity identity)
+             // set scene hash
+             identity.SetSceneIdSceneHashPartInternal();
+ 
+-            identity.gameObject.SetActive(false);
+-
+             // safety check for prefabs with more than one NetworkIdentity
+             GameObject prefabGO = PrefabUtility.GetCorrespondingObjectFromSource(identity.gameObject);
+ 
+diff --git a/Assets/Mirage/Runtime/ServerObjectManager.cs b/Assets/Mirage/Runtime/ServerObjectManager.cs
+index 63402b8993b..754d1b86a19 100644
+--- a/Assets/Mirage/Runtime/ServerObjectManager.cs
++++ b/Assets/Mirage/Runtime/ServerObjectManager.cs
+@@ -694,8 +694,7 @@ public int Compare(NetworkIdentity x, NetworkIdentity y)
+         /// <summary>
+         /// This causes NetworkIdentity objects in a scene to be spawned on a server.
+         /// <para>
+-        ///     NetworkIdentity objects in a scene are disabled by default.
+-        ///     Calling SpawnObjects() causes these scene objects to be enabled and spawned.
++        ///     Calling SpawnObjects() causes all scene objects to be spawned.
+         ///     It is like calling NetworkServer.Spawn() for each of them.
+         /// </para>
+         /// </summary>
+@@ -714,7 +713,6 @@ public void SpawnObjects()
+                 if (ValidateSceneObject(identity))
+                 {
+                     if (logger.LogEnabled()) logger.Log("SpawnObjects sceneId:" + identity.sceneId.ToString("X") + " name:" + identity.gameObject.name);
+-                    identity.gameObject.SetActive(true);
+ 
+                     Spawn(identity.gameObject);
+                 }

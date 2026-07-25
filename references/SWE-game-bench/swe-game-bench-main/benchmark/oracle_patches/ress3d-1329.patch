@@ -1,0 +1,41 @@
+diff --git a/Assets/Scripts/SS3D/Systems/Interactions/InteractionController.cs b/Assets/Scripts/SS3D/Systems/Interactions/InteractionController.cs
+index 5a4ce2b4d9..959194d465 100644
+--- a/Assets/Scripts/SS3D/Systems/Interactions/InteractionController.cs
++++ b/Assets/Scripts/SS3D/Systems/Interactions/InteractionController.cs
+@@ -170,7 +170,7 @@ void handleInteractionSelected(IInteraction interaction, RadialInteractionButton
+         /// <param name="source">The current selected item or the hands</param>
+         /// <param name="showMenu">If a selection menu should be shown</param>
+         [Client]
+-        private void InteractInHand(GameObject target, GameObject sourceObject, bool showMenu = false)
++        public void InteractInHand(GameObject target, GameObject sourceObject, bool showMenu = false)
+         {
+             if (!sourceObject.TryGetComponent(out IInteractionSource source))
+             {
+diff --git a/Assets/Scripts/SS3D/Systems/Inventory/Containers/HumanInventory.cs b/Assets/Scripts/SS3D/Systems/Inventory/Containers/HumanInventory.cs
+index 74043b06e8..e8c5a6b87b 100644
+--- a/Assets/Scripts/SS3D/Systems/Inventory/Containers/HumanInventory.cs
++++ b/Assets/Scripts/SS3D/Systems/Inventory/Containers/HumanInventory.cs
+@@ -17,6 +17,7 @@
+ using FishNet.Object.Synchronizing;
+ using System.ComponentModel;
+ using static UnityEngine.GraphicsBuffer;
++using SS3D.Systems.Interactions;
+ 
+ namespace SS3D.Systems.Inventory.Containers
+ {
+@@ -343,8 +344,14 @@ public void ClientInteractWithContainerSlot(AttachedContainer container, Vector2
+             {
+                 return;
+             }
+-
+             Item item = container.ItemAt(position);
++
++            if(container == Hands.SelectedHand.Container && item != null)
++            {
++                GetComponent<InteractionController>().InteractInHand(item.gameObject, Hands.SelectedHand.gameObject);
++                return;
++            }
++
+             // If selected hand is empty and an item is present on the slot position in the container, transfer it to hand.
+             if (Hands.SelectedHand.IsEmpty())
+             {

@@ -1,0 +1,47 @@
+diff --git a/Assets/Fungus/Scripts/Components/NarrativeLog.cs b/Assets/Fungus/Scripts/Components/NarrativeLog.cs
+index 393a55f2..54749a85 100644
+--- a/Assets/Fungus/Scripts/Components/NarrativeLog.cs
++++ b/Assets/Fungus/Scripts/Components/NarrativeLog.cs
+@@ -35,6 +35,7 @@ namespace Fungus
+         /// </summary>
+         public static event NarrativeAddedHandler OnNarrativeAdded;
+         public delegate void NarrativeAddedHandler(NarrativeLogEntry data);
++        public static int maxSize {get; set;} = 10000;
+         public static void DoNarrativeAdded(NarrativeLogEntry data)
+         {
+             if (OnNarrativeAdded != null)
+@@ -140,6 +141,12 @@ namespace Fungus
+                 output += "<b>" + history.entries[i].name + "</b>\n";
+                 output += history.entries[i].text + "\n\n";
+             }
++
++            if (output.Length > maxSize)
++            {
++                output =  "... " + output.Substring(output.Length - maxSize, maxSize);
++            }
++
+             return output;
+         }
+ 
+diff --git a/Assets/Fungus/Scripts/Components/NarrativeLogMenu.cs b/Assets/Fungus/Scripts/Components/NarrativeLogMenu.cs
+index 36c42669..be872d0f 100644
+--- a/Assets/Fungus/Scripts/Components/NarrativeLogMenu.cs
++++ b/Assets/Fungus/Scripts/Components/NarrativeLogMenu.cs
+@@ -26,6 +26,9 @@ namespace Fungus
+         [Tooltip("A scrollable text field used for displaying conversation history.")]
+         [SerializeField] protected ScrollRect narrativeLogView;
+ 
++        [Tooltip("Limit characters to be shown in Narrative Log")]
++        [SerializeField] protected int maxCharacters = 10000;
++
+         protected TextAdapter narLogViewtextAdapter = new TextAdapter();
+         
+         [Tooltip("The CanvasGroup containing the save menu buttons")]
+@@ -132,6 +135,7 @@ namespace Fungus
+         {
+             if (narrativeLogView.enabled)
+             {
++                NarrativeLog.maxSize = maxCharacters;
+                 narLogViewtextAdapter.Text = FungusManager.Instance.NarrativeLog.GetPrettyHistory();
+                 
+                 Canvas.ForceUpdateCanvases();

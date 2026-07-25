@@ -1,0 +1,31 @@
+Weaver does not appear to run in-editor after PR #537
+
+**Describe the bug**
+PR #537 breaks custom network messages in the editor
+
+**Repro project**
+https://github.com/VirtualBrightPlayz/MirrorNGBug
+
+**To Reproduce**
+Steps to reproduce the behavior:
+Install `com.unity.nuget.mono-cecil` via git URL
+Install `UniTask via git URL.` via git URL.
+Install MirrorNG from source.
+Send a custom message struct.
+An error or two should then be outputted to the console.
+
+**Expected behavior**
+Custom network messages send without error.
+
+**Screenshots**
+[Image (image): The console shows an error at **[17:55:04]**: **“No writer found for BuggedNetAuth+PasswordMessage. See https://mirrorng.github.io/MirrorNG/Articles/General/Troubleshooting.html”** followed by **UnityEngine.Debug:AssertFormat(Boolean, String, Object[])**. Immediately after, another log at **[17:55:04]** reports a **NullReferenceException: Object reference not set to an instance of an object** in **Mirror.NetworkWriter.Write[T](T value)** at **Assets/Mirror/Runtime/NetworkWriter.cs:183**. Both messages are shown as red error entries in the console.]
+
+
+**Desktop (please complete the following information):**
+* OS: Windows 10 64-bit
+* Build target: Standalone
+* Unity version: 2020.1.17
+* Mirror branch: master/any version after PR #537
+
+**Additional context**
+Setting line 51 of MirrorILPostProcessor.cs to `return usesMirror;` instead of `return usesMirror && !usesMirrorEditor;` seems to fix the issue.

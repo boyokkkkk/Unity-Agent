@@ -1,0 +1,41 @@
+Load Variable does not work properly for integers
+
+**Describe the bug**
+When you try to load an integer variable, and the key doesn't exist, the variable gets set to 0 instead of being unmodified.
+
+**To Reproduce**
+1. Create a new scene
+2. Create a flowchart in there with an integer variable set to some number other than 0
+3. Have a Game Started block that tries to load the integer variable with some key that wasn't registered
+4. See as the variable gets set to 0
+
+**Expected behavior**
+The variable to be unmodified, as the CommandInfo says.
+
+**Versions & Platform**
+ - Unity version: 2019.4.9f1
+ - Fungus Version: 3.13
+ - Editor OS: Windows 10
+ - Build Platform: Desktop Standalone
+
+**Additional context**
+I could fix this myself and submit a PR, but rebasing the develop branch might undo the work I've done on another PR I have pending. I suggest changing OnEnter like so:
+
+```
+if (key == "" || // Old code. Remove this
+            variable == null)
+{
+    Continue();
+    return;
+}
+
+// The following should fix the problem
+var flowchart = GetFlowchart(); // This chunk was moved from a bit later in OnEnter.
+// Prepend the current save profile (if any)
+string prefsKey = SetSaveProfile.SaveProfile + "_" + flowchart.SubstituteVariables(key);
+if (key == "" || variable == null || !PlayerPrefs.HasKey(prefsKey)) 
+{
+    Continue();
+    return;
+}
+```

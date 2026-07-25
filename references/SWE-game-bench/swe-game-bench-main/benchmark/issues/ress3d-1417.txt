@@ -1,0 +1,6 @@
+Corpses fly in a funny way when they hold an item.
+
+## Summary
+
+Afterlife breakdancing is not allowed.
+This is potentially caused by collision between items and hands. Need to look more into it.

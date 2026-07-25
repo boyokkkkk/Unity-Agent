@@ -1,0 +1,16 @@
+diff --git a/Assets/Mirror/Runtime/NetworkSceneManager.cs b/Assets/Mirror/Runtime/NetworkSceneManager.cs
+index 31e559c4..f30a00e3 100644
+--- a/Assets/Mirror/Runtime/NetworkSceneManager.cs
++++ b/Assets/Mirror/Runtime/NetworkSceneManager.cs
+@@ -214,7 +214,10 @@ namespace Mirror
+ 
+         internal void ClientSceneMessage(INetworkConnection conn, SceneMessage msg)
+         {
+-            if (!client.IsConnected || server.LocalClientActive)
++            if (!client.IsConnected)
++                return;
++
++            if (server && server.LocalClient)
+                 return;
+                 
+             if (string.IsNullOrEmpty(msg.sceneName))

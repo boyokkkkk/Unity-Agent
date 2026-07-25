@@ -1,0 +1,7 @@
+Portrait Dim error
+
+https://youtu.be/EL9uNAxR6CU
+This problem happens because, for some reason, if the first image is the same as the final, The final image doesn't show properly. The only solutión that I found is a fake solution. I made a copy of the image and rename it. By that way Fungus take it as a different image. But is only a patch, The error is still there. This bug is present in the "Sherlock" example after you decide don't drink the coffee.
+
+To reproduce the error you only need to play.
+https://drive.google.com/file/d/1Zc_yRLMaRSBWQ88PZ-0U2XQ0AcO-MzHx/view?usp=sharing

@@ -1,0 +1,13 @@
+Camera snap rotates in the wrong direction.
+
+The camera can rotate left and right normally, but double-tap snapping moves to the opposite cardinal direction from the key that was pressed.
+
+Expected behavior:
+- Snap-left should snap in the left rotation direction.
+- Snap-right should snap in the right rotation direction.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Fix camera rotation
+
+Body:
+Closes #1074

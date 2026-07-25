@@ -1,0 +1,28 @@
+diff --git a/Assets/GothicVR/Scripts/Phoenix/Util/PxTextureDataExtension.cs b/Assets/GothicVR/Scripts/Phoenix/Util/PxTextureDataExtension.cs
+index a1d93d4d..7cc8d003 100644
+--- a/Assets/GothicVR/Scripts/Phoenix/Util/PxTextureDataExtension.cs
++++ b/Assets/GothicVR/Scripts/Phoenix/Util/PxTextureDataExtension.cs
+@@ -1,4 +1,5 @@
+ ﻿using PxCs.Interface;
++using System;
+ using UnityEngine;
+ 
+ namespace GVR.Phoenix.Util
+@@ -14,13 +15,11 @@ namespace GVR.Phoenix.Util
+                 case PxTexture.Format.tex_dxt5:
+                     return TextureFormat.DXT5;
+                 case PxTexture.Format.tex_B8G8R8A8:
+-                    return TextureFormat.Alpha8;
++                    return TextureFormat.RGBA32;
+                 default:
+-                    return 0;
+-                    //throw new NotSupportedException(
+-                    //    "Format is not supported or not yet tested to work with Unity: "
+-                    //    + Enum.GetName(typeof(PxTexture.Format), obj.format)
+-                    //);
++                    throw new NotSupportedException(
++                        $"Format >{format}< is not supported or not yet tested to work with Unity."
++                    );
+             }
+         }
+     }

@@ -1,0 +1,49 @@
+[BUG] Capture game mode ignores character choice and can also create ghosts
+
+In Capture mode, the selected character is ignored. The player spawns as whichever character
+they previously played as. Outfit and loadout selections only work if they are valid for
+that previously selected character. If Capture is the first mode played after launching,
+attempting to spawn as a non-Levi character can create invisible, floating, collisionless
+ghost characters that mirror player input.
+
+Steps to reproduce:
+1. Launch the game and go to City on Titans mode.
+2. Spawn as Levi, then leave the lobby.
+3. Go to Outside the Walls or any Capture-mode map.
+4. Try to spawn as a character that is not Levi.
+
+Expected behavior:
+- Capture mode should respect the selected character the same way other gamemodes do.
+- The selected CharacterPreset should be passed to the SpawnPlayer call for Capture mode.
+- Capture mode should not use the old two-argument SpawnPlayer path that ignores character choice.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] Capture game mode ignores character choice and can also sorta create ghosts
+
+Body:
+**Describe the bug**
+When playing on the Capture game mode, which character you attempt to play as is ignored, instead you will always spawn as whichever character you had previously played as. Outfit and Loadout selections still work normally so long as the preferences you select are on the character you will spawn as. If Capture is the first game mode you're playing since launching the game, you will be unable to spawn as any character other than Levi, and for each attempt you try and do so, an invisible, floating, collisionless character that mirrors your inputs will spawn on the map... don't think about it too much.
+
+**To Reproduce**
+1. Launch the game and go to City on the Titans game mode
+2. Spawn in as Levi then leave the lobby
+3. Go to Outside the Walls (or any map on the Capture game mode)
+4. Try to spawn in as a character that is not Levi
+
+**Expected behavior**
+Character choice should work the same regardless of game mode.
+
+**Video**
+Capture game mode ignoring character choice:
+https://youtu.be/cinnBVY6Bn0
+
+If Capture is your first game mode you attempt to play since launching, and you then attempt to spawn as a non-Levi character: https://youtu.be/3A3DhH7M-Go
+
+**Log file**
+For when Capture is your first mode, as the other issue gives no error:
+https://www.dropbox.com/s/f0rxhv9eavt8wmw/invis%20character.txt?dl=0
+
+**Contributor instructions**
+1. Try to recreate the bug via the reported reproduction steps. If the bug can be reproduced, remove the investigation label. If the bug cannot be reproduced, please add a comment, attach "On Hold" label and inform the submitter that the bug cannot be reproduced. If there is no reply after 2 weeks, the issue can be closed.
+2. Follow the default development team procedures (Create a new branch, apply your fix, create a pull request, submit new builds for testing team in dev squad)
+3. Once testing team has confirmed the issue is resolved and the pull request is accepted, the issue can be closed.

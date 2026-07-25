@@ -1,0 +1,8 @@
+Issue 998: Pool Max Size reached spam when at high player counts
+
+Repository: miragenet/mirage
+
+Issue body:
+`Pool Max Size reached` spams the logs when at high player counts for each message sent over the count
+
+Would be better to only log once when it goes over, and maybe again over a threshold

@@ -1,0 +1,1383 @@
+[
+  {
+    "instance_id": "aottg-263",
+    "repo": "aottg",
+    "issue_number": 263,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/263",
+    "base_sha": "d7c50fcc57f48395802493ddefced5ac5e23a577",
+    "fix_sha": "31d599c8fa01d943c62710898dd9e45964011a8d",
+    "target_files": [
+      "Assets/Scripts/Characters/Humans/Hero.cs"
+    ],
+    "test_class": "HeroGasBurstCooldownTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1",
+    "extra_prepare_steps": [
+      {
+        "name": "scrub_manifest_packages",
+        "blocked_packages": [
+          "com.unity.shadergraph",
+          "com.unity.render-pipelines.core",
+          "com.unity.render-pipelines.universal",
+          "com.unity.render-pipelines.high-definition",
+          "com.unity.render-pipelines.high-definition-config",
+          "com.unity.ui.builder"
+        ],
+        "blocked_asmdef_refs": [
+          "Unity.RenderPipelines.Universal.Runtime"
+        ]
+      },
+      {
+        "name": "hook",
+        "func": "scrub_urp_only_source"
+      }
+    ]
+  },
+  {
+    "instance_id": "aottg-275",
+    "repo": "aottg",
+    "issue_number": 275,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/275",
+    "base_sha": "4276eedd41a28a0c7fc4dbb6702ae3e806470b91",
+    "fix_sha": "8133bd8bae29b82e4c7603de93dc80d6d622f30d",
+    "target_files": [
+      "Assets/Scripts/UI/InGame/ServerSettingsPage.cs",
+      "Assets/Scripts/FengGameManagerMKII.cs"
+    ],
+    "test_class": "ServerSettingsNonMasterSyncTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.5f1"
+  },
+  {
+    "instance_id": "aottg-343",
+    "repo": "aottg",
+    "issue_number": 343,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/343",
+    "base_sha": "61cbcbc9fb83465f8fa0567fb2c82c1e9710024b",
+    "fix_sha": "28b320b649bd71f6a926c4d2300568c737591887",
+    "target_files": [
+      "Assets/Scripts/Services/PauseService.cs"
+    ],
+    "test_class": "PauseServiceTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1"
+  },
+  {
+    "instance_id": "aottg-371",
+    "repo": "aottg",
+    "issue_number": 371,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/371",
+    "base_sha": "0d91f63b12c6f9a71f47e914546046d12d0cf76a",
+    "fix_sha": "4cef72fff97e2bbbede66cb703cc9cc695a60597",
+    "target_files": [
+      "Assets/Editor/GameObjectToPrefabConverter.cs"
+    ],
+    "test_class": "GameObjectToPrefabConverterTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1"
+  },
+  {
+    "instance_id": "aottg-512",
+    "repo": "aottg",
+    "issue_number": 512,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/512",
+    "base_sha": "083f550fd58b0cf09d7c253301ff472776d05f5b",
+    "fix_sha": "7411ca40b51e70e4a08d9dd530180b7def0408b5",
+    "target_files": [
+      "Assets/Scripts/Settings/Gamemodes/GamemodeSettings.cs"
+    ],
+    "test_class": "GamemodeHorseDefaultsTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1",
+    "extra_prepare_steps": [
+      {
+        "name": "scrub_manifest_packages",
+        "blocked_packages": [
+          "com.unity.shadergraph",
+          "com.unity.render-pipelines.core",
+          "com.unity.render-pipelines.universal",
+          "com.unity.render-pipelines.high-definition",
+          "com.unity.render-pipelines.high-definition-config",
+          "com.unity.ui.builder"
+        ],
+        "blocked_asmdef_refs": [
+          "Unity.RenderPipelines.Universal.Runtime"
+        ]
+      },
+      {
+        "name": "hook",
+        "func": "scrub_urp_only_source"
+      }
+    ]
+  },
+  {
+    "instance_id": "aottg-525",
+    "repo": "aottg",
+    "issue_number": 525,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/525",
+    "base_sha": "a29f4a49679c637f03bc2e9af0addca5c28649d8",
+    "fix_sha": "27f60d4e57ada4717dce39005bcbb9ab1d852a7d",
+    "target_files": [
+      "Assets/Scripts/Room/Chat/InRoomChat.cs"
+    ],
+    "test_class": "MarkupIsOkTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1"
+  },
+  {
+    "instance_id": "aottg-562",
+    "repo": "aottg",
+    "issue_number": 562,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/562",
+    "base_sha": "bf3b24988662f07381a903995b12befcfb9f3b5b",
+    "fix_sha": "66ce75668b638850e7211e2ab3815b51b9180a42",
+    "target_files": [
+      "Assets/Scripts/Services/PauseService.cs"
+    ],
+    "test_class": "PauseServiceRePauseTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1",
+    "post_patch_steps": [
+      {
+        "name": "hook",
+        "func": "make_chat_public"
+      }
+    ]
+  },
+  {
+    "instance_id": "aottg-623",
+    "repo": "aottg",
+    "issue_number": 623,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/623",
+    "base_sha": "9469987c903dbe4c0c9016daccd89c47258be323",
+    "fix_sha": "cdfe087b6cba5e07cea96d2572efc6e3b8a674de",
+    "target_files": [
+      "Assets/Scripts/Gamemode/WaveGamemode.cs",
+      "Assets/Scripts/Settings/Gamemodes/WaveGamemodeSettings.cs"
+    ],
+    "test_class": "WaveGamemodeSpawnCountTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1",
+    "extra_prepare_steps": [
+      {
+        "name": "scrub_manifest_packages",
+        "blocked_packages": [
+          "com.unity.shadergraph",
+          "com.unity.render-pipelines.core",
+          "com.unity.render-pipelines.universal",
+          "com.unity.render-pipelines.high-definition",
+          "com.unity.render-pipelines.high-definition-config",
+          "com.unity.ui.builder"
+        ],
+        "blocked_asmdef_refs": [
+          "Unity.RenderPipelines.Universal.Runtime"
+        ]
+      },
+      {
+        "name": "hook",
+        "func": "scrub_urp_only_source"
+      }
+    ]
+  },
+  {
+    "instance_id": "aottg-641",
+    "repo": "aottg",
+    "issue_number": 641,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/641",
+    "base_sha": "15487d3c85a1b241cce847f327dd4f5ec71f5439",
+    "fix_sha": "4d1c687438542637ed85b67e35b0f8cb2a905a92",
+    "target_files": [
+      "Assets/Scripts/UI/InGame/SpawnMenuV2.cs"
+    ],
+    "test_class": "CaptureSpawnCharacterChoiceTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1",
+    "extra_prepare_steps": [
+      {
+        "name": "scrub_manifest_packages",
+        "blocked_packages": [
+          "com.unity.shadergraph",
+          "com.unity.render-pipelines.core",
+          "com.unity.render-pipelines.universal",
+          "com.unity.render-pipelines.high-definition",
+          "com.unity.render-pipelines.high-definition-config",
+          "com.unity.ui.builder"
+        ],
+        "blocked_asmdef_refs": [
+          "Unity.RenderPipelines.Universal.Runtime"
+        ]
+      },
+      {
+        "name": "hook",
+        "func": "scrub_urp_only_source"
+      }
+    ]
+  },
+  {
+    "instance_id": "aottg-649",
+    "repo": "aottg",
+    "issue_number": 649,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/649",
+    "base_sha": "ea8546229c99a6884b04cb0196311bef94db6b79",
+    "fix_sha": "feff7d9e4dc6ad6bdb79854b0cb124112dffc06f",
+    "target_files": [
+      "Assets/Scripts/Characters/Titan/Configuration/TitanConfiguration.cs"
+    ],
+    "test_class": "NormalTitanDeathAnimationTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.3.48f1",
+    "extra_prepare_steps": [
+      {
+        "name": "scrub_manifest_packages",
+        "blocked_packages": [
+          "com.unity.shadergraph",
+          "com.unity.render-pipelines.core",
+          "com.unity.render-pipelines.universal",
+          "com.unity.render-pipelines.high-definition",
+          "com.unity.render-pipelines.high-definition-config",
+          "com.unity.ui.builder"
+        ],
+        "blocked_asmdef_refs": [
+          "Unity.RenderPipelines.Universal.Runtime"
+        ]
+      },
+      {
+        "name": "hook",
+        "func": "scrub_urp_only_source"
+      }
+    ]
+  },
+  {
+    "instance_id": "aottg-662",
+    "repo": "aottg",
+    "issue_number": 662,
+    "issue_url": "https://github.com/AoTTG-2/AoTTG-2/issues/662",
+    "base_sha": "3d96db0179184a0712bfde501719e8961dd6c7a5",
+    "fix_sha": "45570498a29d59a104fe6f9bf3900ed98ef59557",
+    "target_files": [
+      "Assets/Scripts/UI/InGame/HUD/HUD.cs"
+    ],
+    "test_class": "ScaleDamageTextTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.2.7f1"
+  },
+  {
+    "instance_id": "fungus-679",
+    "repo": "fungus",
+    "issue_number": 679,
+    "issue_url": "https://github.com/snozbot/fungus/issues/679",
+    "base_sha": "56664223b5c50a86fbfcaa3f82a726a8efa86ddd",
+    "fix_sha": "cbbec4f901e35af7eb68bf8b3c564e58b21ccc8c",
+    "target_files": [
+      "Assets/Fungus/Scripts/Components/EventHandler.cs"
+    ],
+    "test_class": "EventHandlerDisabledFlowchartTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2018.4.36f1"
+  },
+  {
+    "instance_id": "fungus-710",
+    "repo": "fungus",
+    "issue_number": 710,
+    "issue_url": "https://github.com/snozbot/fungus/issues/710",
+    "base_sha": "a9204fad39b95c7dd4a5a798099d69e467264bf8",
+    "fix_sha": "7a040478dee27456c34fda3a5063c78b10b85c1e",
+    "target_files": [
+      "Assets/Fungus/Scripts/Components/WriterAudio.cs"
+    ],
+    "test_class": "WriterAudioRandomRangeTests",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2018.4.36f1"
+  },
+  {
+    "instance_id": "fungus-734",
+    "repo": "fungus",
+    "issue_number": 734,
+    "issue_url": "https://github.com/snozbot/fungus/issues/734",
+    "base_sha": "15b47a6013a05931c418713a7ca5b389f14c896e",
+    "fix_sha": "852df4403065a7d03050315e715bb912988b4c65",
+    "target_files": [
+      "Assets/Fungus/Scripts/Editor/EditorExtensions.cs"
+    ],
+    "test_class": "FindDerivedTypesAllAssembliesTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.2.21f1"
+  },
+  {
+    "instance_id": "fungus-772",
+    "repo": "fungus",
+    "issue_number": 772,
+    "issue_url": "https://github.com/snozbot/fungus/issues/772",
+    "base_sha": "2a546840550c186fb7b6c62a73666a20b3c13d23",
+    "fix_sha": "ec2cbd7a41824245998f9a13a96c6e47ccc1ba98",
+    "target_files": [
+      "Assets/Fungus/Scripts/Editor/CommandListAdaptor.cs"
+    ],
+    "test_class": "CommandListAdaptorNegativeRectTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.2.21f1"
+  },
+  {
+    "instance_id": "fungus-797",
+    "repo": "fungus",
+    "issue_number": 797,
+    "issue_url": "https://github.com/snozbot/fungus/issues/797",
+    "base_sha": "0fb320f36485be2ce48bcd03278c4ac21bbf89cb",
+    "fix_sha": "22e8063497827126e5f83d2c9ac323cd25ecd584",
+    "target_files": [
+      "Assets/Fungus/Scripts/Editor/HierarchyIcons.cs"
+    ],
+    "test_class": "HierarchyIconsPlacementTests_PR800",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.2.21f1"
+  },
+  {
+    "instance_id": "fungus-867",
+    "repo": "fungus",
+    "issue_number": 867,
+    "issue_url": "https://github.com/snozbot/fungus/issues/867",
+    "base_sha": "fa941241c6386f84c2c2b4915943553b77dc9ebc",
+    "fix_sha": "0c875222f1705c81673ac216bed00e644f7647b9",
+    "target_files": [
+      "Assets/Fungus/Scripts/Commands/LoadVariable.cs"
+    ],
+    "test_class": "LoadVariableKeyCheckTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.4.36f1"
+  },
+  {
+    "instance_id": "fungus-879",
+    "repo": "fungus",
+    "issue_number": 879,
+    "issue_url": "https://github.com/snozbot/fungus/issues/879",
+    "base_sha": "8cfb822ddfc263f41aff2b4b1752cd5c5924cd56",
+    "fix_sha": "485f6b2fbf4bf8c5dbbc631e7fe609b62d4d608e",
+    "target_files": [
+      "Assets/Fungus/Scripts/Editor/BlockEditor.cs"
+    ],
+    "test_class": "BlockEditorArrowKeyNavigationTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.4.36f1"
+  },
+  {
+    "instance_id": "fungus-922",
+    "repo": "fungus",
+    "issue_number": 922,
+    "issue_url": "https://github.com/snozbot/fungus/issues/922",
+    "base_sha": "9d8eb35c5b159909119067f5790a638f9ffa22c0",
+    "fix_sha": "c258940d558100ceef8b7bdd2b7f1386da9b8e94",
+    "target_files": [
+      "Assets/Fungus/Scripts/Components/PortraitController.cs"
+    ],
+    "test_class": "PortraitControllerColorFixTests",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2019.4.36f1"
+  },
+  {
+    "instance_id": "fungus-945",
+    "repo": "fungus",
+    "issue_number": 945,
+    "issue_url": "https://github.com/snozbot/fungus/issues/945",
+    "base_sha": "7f27064fae87c59623fc88b041f11bb6087e9ed6",
+    "fix_sha": "491cf15b07b85e473a2ae8fd814f46a3aab78f6f",
+    "target_files": [
+      "Assets/Fungus/Scripts/Components/NarrativeLog.cs",
+      "Assets/Fungus/Scripts/Components/NarrativeLogMenu.cs"
+    ],
+    "test_class": "NarrativeLogCharacterLimitTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.4.36f1"
+  },
+  {
+    "instance_id": "goldplayer-18",
+    "repo": "goldplayer",
+    "issue_number": 18,
+    "issue_url": "https://github.com/Hertzole/gold-player/issues/18",
+    "base_sha": "10c6b8001c54faf561156d7ce819924f7925300a",
+    "fix_sha": "295e3489833ad5c19b7a6031464f140d52663160",
+    "target_files": [
+      "Assets/Hertzole/Gold Player/Scripts/Core/Data Types/Enums.cs",
+      "Assets/Hertzole/Gold Player/Scripts/Core/Modules/PlayerMovement.cs"
+    ],
+    "test_class": "PlayerMovementToggleModeTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2018.4.36f1"
+  },
+  {
+    "instance_id": "gothicvr-83",
+    "repo": "gothicvr",
+    "issue_number": 83,
+    "issue_url": "https://github.com/GothicVRProject/GothicVR/issues/83",
+    "base_sha": "435dbd7e149da8161eac6b4ae7df7e88126a21b2",
+    "fix_sha": "f4ee71235b3007aad2acccecda7f202b1f760a12",
+    "target_files": [
+      "Assets/GothicVR/Scripts/Phoenix/Util/PxTextureDataExtension.cs"
+    ],
+    "test_class": "PxTextureFormatTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.2.18f1"
+  },
+  {
+    "instance_id": "janoarg-66",
+    "repo": "janoarg",
+    "issue_number": 66,
+    "issue_url": "https://github.com/FFF40/JANOARG/issues/66",
+    "base_sha": "fc86a659bf0b871da17dae725ee5b6c116486526",
+    "fix_sha": "7996c7040221fa507c6f783e7eb4a29fef0e558d",
+    "target_files": [
+      "Assets/JANOARG.Client/Scripts/Behaviors/Player/PlayerScreen.cs"
+    ],
+    "test_class": "PlayerScreenNegativeVisualTimeTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.3.46f1"
+  },
+  {
+    "instance_id": "janoarg-82",
+    "repo": "janoarg",
+    "issue_number": 82,
+    "issue_url": "https://github.com/FFF40/JANOARG/issues/82",
+    "base_sha": "92ebfde291a975e9aca1fc4a6748ecca7afe2222",
+    "fix_sha": "d4c8585a6f6b70280e44a1ff1bc3215e0b381c56",
+    "target_files": [
+      "Assets/JANOARG.Client/Scripts/Behaviors/SongSelect/List/SongSelectListView.cs"
+    ],
+    "test_class": "SongSelectListViewSortingTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.3.46f1"
+  },
+  {
+    "instance_id": "miragenet-128",
+    "repo": "miragenet",
+    "issue_number": 128,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/128",
+    "base_sha": "2a428387a72bce4688b7e47ef165ac561d9cf711",
+    "fix_sha": "36bb3a2418bcf41fd63d1fc79e8a5173e4b0bc51",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkConnectionToServer.cs"
+    ],
+    "test_class": "ClientDisconnectSingleCallbackTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.7f1"
+  },
+  {
+    "instance_id": "miragenet-129",
+    "repo": "miragenet",
+    "issue_number": 129,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/129",
+    "base_sha": "2a428387a72bce4688b7e47ef165ac561d9cf711",
+    "fix_sha": "9d9efa0e31cbea4d90d7408ae6b3742151b49a21",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkClient.cs"
+    ],
+    "test_class": "HostModeServerDisconnectedTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.7f1"
+  },
+  {
+    "instance_id": "miragenet-299",
+    "repo": "miragenet",
+    "issue_number": 299,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/299",
+    "base_sha": "c4ecdda6e46952d3262d73dd356497cd1c89a144",
+    "fix_sha": "ce8601c9b80c985bf6c365a0b5023f61e5e1b91d",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkManager.cs",
+      "Assets/Mirror/Runtime/NetworkServer.cs"
+    ],
+    "test_class": "NetworkServerSpawnObjectsTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "miragenet-382",
+    "repo": "miragenet",
+    "issue_number": 382,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/382",
+    "base_sha": "64fd6ed862a15074c980c4fb81b4c99fe9698cda",
+    "fix_sha": "97b1c04af8f0386ba74ef0cf523d4583ff12f108",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkBehaviour.cs"
+    ],
+    "test_class": "DisabledNetworkBehaviourIdentityTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "miragenet-389",
+    "repo": "miragenet",
+    "issue_number": 389,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/389",
+    "base_sha": "de0abcc4b07c4aa3622348ed67758a044ce410fa",
+    "fix_sha": "0ef5c33418bf1550d664ed942eede165752fca7e",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkIdentity.cs",
+      "Assets/Mirror/Runtime/ServerObjectManager.cs"
+    ],
+    "test_class": "LegacyServerOnlyBehaviorTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "miragenet-552",
+    "repo": "miragenet",
+    "issue_number": 552,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/552",
+    "base_sha": "c0aa5f6546994c4072fa3fd8fd68b8040bc80ee2",
+    "fix_sha": "12a1d73061766d3c8d1bfb406a20ba4f44d18d50",
+    "target_files": [
+      "Assets/Mirror/Weaver/MirrorILPostProcessor.cs"
+    ],
+    "test_class": "WillProcessTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "miragenet-586",
+    "repo": "miragenet",
+    "issue_number": 586,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/586",
+    "base_sha": "c9018b42ece05d60b69cc5b1c0417a0357c0d2aa",
+    "fix_sha": "ed180ff3f9230f4676a8b9a07351dd8302acb906",
+    "target_files": [
+      "Assets/Mirage/Runtime/PlayerSpawner.cs"
+    ],
+    "test_class": "PlayerSpawnerSceneManagerNullTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "miragenet-596",
+    "repo": "miragenet",
+    "issue_number": 596,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/596",
+    "base_sha": "c9018b42ece05d60b69cc5b1c0417a0357c0d2aa",
+    "fix_sha": "67e41bd66c15d5951b1b7bd8a0bd302e21182655",
+    "target_files": [
+      "Assets/Mirage/Runtime/NetworkSceneManager.cs"
+    ],
+    "test_class": "NetworkSceneManagerDontDestroyTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "miragenet-629",
+    "repo": "miragenet",
+    "issue_number": 629,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/629",
+    "base_sha": "1457e57dcd1ffc6060a2aae245dde7689f9cc651",
+    "fix_sha": "87becee8fdc028ca86abd6aa13a55396ea202567",
+    "target_files": [
+      "Assets/Mirage/Weaver/Readers.cs"
+    ],
+    "test_class": "DerivedNetworkBehaviourRpcReaderTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "miragenet-737",
+    "repo": "miragenet",
+    "issue_number": 737,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/737",
+    "base_sha": "6499d53e00aea940c1ddeff354557349cc2c19af",
+    "fix_sha": "297d7f56b9d60b6238512387d5b846d57e4be213",
+    "target_files": [
+      "Assets/Mirage/Runtime/NetworkManager.cs",
+      "Assets/Mirage/Editor/NetworkMenu.cs"
+    ],
+    "test_class": "NetworkManagerSceneManagerCollisionTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.7f1"
+  },
+  {
+    "instance_id": "miragenet-929",
+    "repo": "miragenet",
+    "issue_number": 929,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/929",
+    "base_sha": "70dce3ffff8f0bfa5d96c6bd85f18698a07ba511",
+    "fix_sha": "88badd61fc0f1f8c377b2299cb647f6e70a1ef7b",
+    "target_files": [
+      "Assets/Mirage/Runtime/Sockets/Udp/UdpSocketFactory.cs"
+    ],
+    "test_class": "UdpSocketFactoryMissingNanoSocketTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "miragenet-973",
+    "repo": "miragenet",
+    "issue_number": 973,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/973",
+    "base_sha": "4863071a72df0991e22fa581221d4151cf807f32",
+    "fix_sha": "4738d2938e3881481612465cff27680189c6442b",
+    "target_files": [
+      "Assets/Mirage/Runtime/NetworkIdentity.cs"
+    ],
+    "test_class": "NetworkIdentityNestedBehaviourTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1"
+  },
+  {
+    "instance_id": "moorestech-213",
+    "repo": "moorestech",
+    "issue_number": 213,
+    "issue_url": "https://github.com/moorestech/moorestech/issues/213",
+    "base_sha": "37be3d0e92ad3cf3b84e740d7d9d92484becdcc0",
+    "fix_sha": "25dcdf1b01c754404fcb1ae4054ea7da84906bff",
+    "target_files": [
+      "moorestech_server/Assets/ServerStarter.cs"
+    ],
+    "test_class": "ServerStarterDisposesGameUpdaterTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.3.1f1",
+    "project_subdir": "moorestech_server"
+  },
+  {
+    "instance_id": "ress3d-392",
+    "repo": "ress3d",
+    "issue_number": 392,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/382",
+    "base_sha": "f699cca0aa600f251e1557e490799471b29403e1",
+    "fix_sha": "5b3626e99f59b1a3db84f6af920100002cadc132",
+    "target_files": [
+      "Assets/Engine/Inventory/Container.cs"
+    ],
+    "test_class": "ContainerAddItemValidationTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.12f1"
+  },
+  {
+    "instance_id": "ress3d-569",
+    "repo": "ress3d",
+    "issue_number": 569,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/514",
+    "base_sha": "2fe35d51040c644f97a410683279504cecab4ee3",
+    "fix_sha": "a6ad5ae24711ad8b2efaa6a5edc7779e16899551",
+    "target_files": [
+      "Assets/Engine/Inventory/Inventory.cs"
+    ],
+    "test_class": "InventoryContainerDeduplicationTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.12f1"
+  },
+  {
+    "instance_id": "ress3d-570",
+    "repo": "ress3d",
+    "issue_number": 570,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/538",
+    "base_sha": "2fe35d51040c644f97a410683279504cecab4ee3",
+    "fix_sha": "37305b5b20d3782ccf5f3275c092456cdee63dd0",
+    "target_files": [
+      "Assets/Engine/Inventory/Container.cs"
+    ],
+    "test_class": "ContainerAddItemActivationTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.12f1"
+  },
+  {
+    "instance_id": "ress3d-647",
+    "repo": "ress3d",
+    "issue_number": 647,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/646",
+    "base_sha": "e4be8ec871ac81369b8a7c776ee3f2cf6ecd660c",
+    "fix_sha": "296bbc9a1e96ef24b3717b471cce780090b318fc",
+    "target_files": [
+      "Assets/Engine/Inventory/AttachedContainerGenerator.cs"
+    ],
+    "test_class": "AttachedContainerStartFilterTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.12f1"
+  },
+  {
+    "instance_id": "ress3d-673",
+    "repo": "ress3d",
+    "issue_number": 673,
+    "issue_url": "",
+    "base_sha": "36de3c705fa7aa5701dca8fe4258d67a0fbfbec1",
+    "fix_sha": "c423dff92e0da5eebc763390fd0d672464023754",
+    "target_files": [
+      "Assets/Content/Systems/Managers/LoadingScreenManager.cs",
+      "Assets/Engine/Server/Round/LoadingSceneUIHelper.cs"
+    ],
+    "test_class": "LoadingSceneEventCleanupTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.12f1"
+  },
+  {
+    "instance_id": "ress3d-801",
+    "repo": "ress3d",
+    "issue_number": 801,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/790",
+    "base_sha": "c2fac16a846314ea8e38765b1d214d6b22ff2093",
+    "fix_sha": "c3516b9434d6cf65228719ebafb165ed7c0baa91",
+    "target_files": [
+      "Assets/Engine/Inventory/Container.cs"
+    ],
+    "test_class": "ContainerDumpMutationTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.4.30f1"
+  },
+  {
+    "instance_id": "ress3d-838",
+    "repo": "ress3d",
+    "issue_number": 838,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/837",
+    "base_sha": "c1fa840bac8b1cc3c125044a034e4b2aa1a9b736",
+    "fix_sha": "68face1e2fcc8f128978056de64de4c577927229",
+    "target_files": [
+      "Assets/Engine/Tile/TileRework/TileMap.cs"
+    ],
+    "test_class": "TileMapFindChildToleranceTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.4.30f1"
+  },
+  {
+    "instance_id": "ress3d-844",
+    "repo": "ress3d",
+    "issue_number": 844,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/806",
+    "base_sha": "5d7ee17b274816a756be3b1a7970d6ad7587891d",
+    "fix_sha": "4dab147ed5587a36c8b7fa75d9152a418979a7cd",
+    "target_files": [
+      "Assets/Engine/Chat/ChatRegister.cs"
+    ],
+    "test_class": "ChatRegisterTagEscapingTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.4.30f1"
+  },
+  {
+    "instance_id": "ress3d-1004",
+    "repo": "ress3d",
+    "issue_number": 1004,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/1004",
+    "base_sha": "19304bca8dae5fc159378f2d2ed3ad4405fc7079",
+    "fix_sha": "684dbffb9ac97c8bbe8e66da852ac6ce0ecab0df",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Storage/Items/Item.cs"
+    ],
+    "test_class": "ItemPickupIconTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.0f1"
+  },
+  {
+    "instance_id": "ress3d-1082",
+    "repo": "ress3d",
+    "issue_number": 1082,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/1074",
+    "base_sha": "c0b5e1bbe018840981ee8506c9320f50d0f4b20c",
+    "fix_sha": "9fefe3ef11a34688415cb554bafa383ae401b21e",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Screens/CameraFollow.cs"
+    ],
+    "test_class": "CameraSnapDirectionTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.15f1"
+  },
+  {
+    "instance_id": "ress3d-1158",
+    "repo": "ress3d",
+    "issue_number": 1158,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/1105",
+    "base_sha": "d69b22a9bd277cb51d55f4756a57998536775ee2",
+    "fix_sha": "56f02cb7d841ebb92783a1f8b30f2f32ecd6eb3d",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/GhostManager.cs"
+    ],
+    "test_class": "GhostManagerRigidbodyTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.15f1"
+  },
+  {
+    "instance_id": "ress3d-1304",
+    "repo": "ress3d",
+    "issue_number": 1304,
+    "issue_url": "",
+    "base_sha": "ef8cc56576b17217f58f0fdc05a0f523af269e90",
+    "fix_sha": "c759e38adf8e2a7e080ca871af7e5ef1c0df18a0",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Tile/TileMap.cs"
+    ],
+    "test_class": "TileMapLoadTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.15f1"
+  },
+  {
+    "instance_id": "ress3d-1314",
+    "repo": "ress3d",
+    "issue_number": 1314,
+    "issue_url": "",
+    "base_sha": "c27ea7bc7ee036ac7f0a937ef561caba09675497",
+    "fix_sha": "c08bea9b395b15a007bc5d8465d42472690abaca",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Tile/TileMap.cs"
+    ],
+    "test_class": "TileMapClearTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.15f1"
+  },
+  {
+    "instance_id": "ress3d-1329",
+    "repo": "ress3d",
+    "issue_number": 1329,
+    "issue_url": "",
+    "base_sha": "2ca1ced94b18b819d4c605813db689aa87ef4025",
+    "fix_sha": "75df769269b038ef3e47f61a81bf42fac0b06299",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Interactions/InteractionController.cs",
+      "Assets/Scripts/SS3D/Systems/Inventory/Containers/HumanInventory.cs"
+    ],
+    "test_class": "InteractInHandTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.15f1"
+  },
+  {
+    "instance_id": "ress3d-1380",
+    "repo": "ress3d",
+    "issue_number": 1380,
+    "issue_url": "",
+    "base_sha": "e310f40e0c0354b37b7035387638d0ca3c52f3e4",
+    "fix_sha": "40508fa6c2d37765470b395424dd4f4ac49843af",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/ConstructionHologram.cs"
+    ],
+    "test_class": "ConstructionHologramSMRTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.15f1"
+  },
+  {
+    "instance_id": "ress3d-1383",
+    "repo": "ress3d",
+    "issue_number": 1383,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/1383",
+    "base_sha": "fe308492b449c0c05a95f1f325e6556abca6bfcd",
+    "fix_sha": "aa21ba6b5d40fe0168c468f1921df97e94bd3d52",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Tile/TileMapCreator/TileMapMenu.cs"
+    ],
+    "test_class": "TileMapMenuSearchResetTests",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2021.3.15f1"
+  },
+  {
+    "instance_id": "ress3d-1417",
+    "repo": "ress3d",
+    "issue_number": 1417,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/1416",
+    "base_sha": "adcab190a7c402bb6f555921151d6dbc525c72e2",
+    "fix_sha": "41ec5f23f8b23027a0ee52cde6e1fa3e34420725",
+    "target_files": [
+      "Assets/Scripts/SS3D/Systems/Inventory/Items/Item.cs"
+    ],
+    "test_class": "ItemNativeColliderToggleTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.15f1"
+  },
+  {
+    "instance_id": "rpr-261",
+    "repo": "rpr",
+    "issue_number": 261,
+    "issue_url": "https://github.com/hackerspace-ntnu/Red-Planet-Rampage/issues/261",
+    "base_sha": "9342d87bcf8f09a7a7dd54115ae7482170d24291",
+    "fix_sha": "0195f097b5633a2ee73831d1c6f615aca19c0bfe",
+    "target_files": [
+      "Assets/Scripts/Gamestate/Round.cs"
+    ],
+    "test_class": "RoundSoloSuicideTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.2.15f1"
+  },
+  {
+    "instance_id": "rpr-469",
+    "repo": "rpr",
+    "issue_number": 469,
+    "issue_url": "https://github.com/hackerspace-ntnu/Red-Planet-Rampage/issues/469",
+    "base_sha": "f8cc0694754ff3b60b3ef4b582fd14bdfba5207d",
+    "fix_sha": "210a45264cbf2fd1b7a346bfd071cd5cc2fa59f8",
+    "target_files": [
+      "Assets/Scripts/Auction/BiddingPlatform.cs"
+    ],
+    "test_class": "BiddingPlatformNoSubscriberTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.2.15f1"
+  },
+  {
+    "instance_id": "rpr-666",
+    "repo": "rpr",
+    "issue_number": 666,
+    "issue_url": "https://github.com/hackerspace-ntnu/Red-Planet-Rampage/issues/666",
+    "base_sha": "436d0bcd750ece2a3e274b2cd32ff4c781578930",
+    "fix_sha": "de5584b5588b15c3bbed3da70418d398ea38f0fe",
+    "target_files": [
+      "Assets/Scripts/Augment/AugmentImplementations/Hat/HatBarrelModel.cs"
+    ],
+    "test_class": "HatBarrelZeroAmmoTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.2.15f1"
+  },
+  {
+    "instance_id": "rpr-705",
+    "repo": "rpr",
+    "issue_number": 705,
+    "issue_url": "https://github.com/hackerspace-ntnu/Red-Planet-Rampage/issues/705",
+    "base_sha": "eac694ab11664e33e57696a25953e76ebeae6931",
+    "fix_sha": "0ca6abdfe81d5387500a335f7eacabac144bc4a3",
+    "target_files": [
+      "Assets/Scripts/Augment/AugmentImplementations/RubberSniper.cs"
+    ],
+    "test_class": "RubberSniperCrosshairResetTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.2.15f1"
+  },
+  {
+    "instance_id": "rpr-847",
+    "repo": "rpr",
+    "issue_number": 847,
+    "issue_url": "https://github.com/hackerspace-ntnu/Red-Planet-Rampage/issues/847",
+    "base_sha": "aa08fb816e2c9229a79a2a81408321e212f27ca3",
+    "fix_sha": "fda01a409289216afbf6eae0cbe8e28788e0ad37",
+    "target_files": [
+      "Assets/Scripts/Augment/AugmentImplementations/Revolver.cs"
+    ],
+    "test_class": "RevolverReloadSpamTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.2.15f1"
+  },
+  {
+    "instance_id": "rpr-898",
+    "repo": "rpr",
+    "issue_number": 898,
+    "issue_url": "https://github.com/hackerspace-ntnu/Red-Planet-Rampage/issues/898",
+    "base_sha": "33790ac967d2379f36e65c0411423c60494c2cef",
+    "fix_sha": "84ecb770c0c743e269b7373f4c095b2f0641344d",
+    "target_files": [
+      "Assets/Scripts/Augment/AugmentImplementations/Telescope.cs"
+    ],
+    "test_class": "TelescopeDynamiteBarrelZoomTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2022.2.15f1"
+  },
+  {
+    "instance_id": "fungus-963",
+    "repo": "fungus",
+    "issue_number": 963,
+    "issue_url": "https://github.com/snozbot/fungus/issues/963",
+    "base_sha": "23c26bcdee0e4c1e0c519c719d2fcf68841b3550",
+    "fix_sha": "632a612e1a4c11fdb08c652c8df8fd751fb4238b",
+    "target_files": [
+      "Assets/Fungus/Scripts/Utils/TextVariationHandler.cs"
+    ],
+    "test_class": "Fungus.Tests.TextVariationSelectionTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.4.12f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "ress3d-1180",
+    "repo": "ress3d",
+    "issue_number": 1180,
+    "issue_url": "https://github.com/RE-SS3D/SS3D/issues/1180",
+    "base_sha": "7cac7a92f844afcaa7e0b54af574935670795425",
+    "fix_sha": "f4141826cbfe5c32b2903d024a52b0df39e8fdc7",
+    "target_files": [
+      "Assets/Scripts/SS3D/Logging/Punpun.cs"
+    ],
+    "test_class": "EditorTests.Log.LogTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2021.3.15f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-68",
+    "repo": "miragenet",
+    "issue_number": 68,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/68",
+    "base_sha": "8502846b063c0988a6fd42f08237850ec4b28ce0",
+    "fix_sha": "fc99c67712564e2d983674b37858591903294f1a",
+    "target_files": [
+      "Assets/Mirror/Editor/Weaver/Processors/PropertySiteProcessor.cs",
+      "Assets/Mirror/Editor/Weaver/Weaver.cs"
+    ],
+    "test_class": "Mirror.Tests.FlagsTests",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2019.2.21f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-103",
+    "repo": "miragenet",
+    "issue_number": 103,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/103",
+    "base_sha": "27d9bf6fca32b297be4ca06cf96705f438b2b0ea",
+    "fix_sha": "e326064b51e8372726b30d19973df6293c74c376",
+    "target_files": [
+      "Assets/Mirror/Runtime/SyncList.cs"
+    ],
+    "test_class": "Mirror.Tests.SyncListStructTest;Mirror.Tests.SyncListTest",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.6f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-104",
+    "repo": "miragenet",
+    "issue_number": 104,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/104",
+    "base_sha": "c9a42ffaa4bce77d2241a0cfbe877241742e62aa",
+    "fix_sha": "261f5d6a1481634dc524fb57b5866e378a1d909d",
+    "target_files": [
+      "Assets/Mirror/Runtime/SyncSet.cs"
+    ],
+    "test_class": "Mirror.Tests.SyncSetTest",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.6f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-105",
+    "repo": "miragenet",
+    "issue_number": 105,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/105",
+    "base_sha": "c9a42ffaa4bce77d2241a0cfbe877241742e62aa",
+    "fix_sha": "b3c1b16100c440131d6d933627a9f6479aed11ad",
+    "target_files": [
+      "Assets/Mirror/Runtime/SyncDictionary.cs"
+    ],
+    "test_class": "Mirror.Tests.SyncDictionaryTest",
+    "test_platform": "EditMode",
+    "unity_bucket": "2019.3.6f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-222",
+    "repo": "miragenet",
+    "issue_number": 222,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/222",
+    "base_sha": "de26dacf8d4dc716fa8071c1f6052a91fb69756a",
+    "fix_sha": "86742740ef2707f420d5cb6aeeb257bf07511f0b",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkClient.cs"
+    ],
+    "test_class": "Mirror.Tests.ClientServerComponentTests.OnSpawnSpawnHandlerTest",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2019.3.10f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-225",
+    "repo": "miragenet",
+    "issue_number": 225,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/225",
+    "base_sha": "bd2af0ae02d4612293c8e9261cfc903c334f09f6",
+    "fix_sha": "485f78b0d011950bb98ebf5ed0bd12673773224b",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkConnection.cs"
+    ],
+    "test_class": "Mirror.Tests.NetworkIdentityTests",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.5f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-235",
+    "repo": "miragenet",
+    "issue_number": 235,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/235",
+    "base_sha": "debb0ce3fa31d25d2b654d012c74c8aee70a65e3",
+    "fix_sha": "8c6d57cc5b881e3579dcece469fbf5f32cd11035",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkSceneManager.cs"
+    ],
+    "test_class": "Mirror.Tests.NetworkAuthenticatorTest;Mirror.Tests.NetworkSceneManagerTests;Mirror.Tests.NetworkSceneManagerNonHostTests",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2019.4.3f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-368",
+    "repo": "miragenet",
+    "issue_number": 368,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/368",
+    "base_sha": "46b2115b703f29ba89e1a8ffba547f8be75e7032",
+    "fix_sha": "74298c50b330216edbd19cf087eece910a05f656",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkClient.cs"
+    ],
+    "test_class": "Mirror.Tests.ClientServerComponentTests;Mirror.Tests.NetworkClientTest",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.5f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-399",
+    "repo": "miragenet",
+    "issue_number": 399,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/399",
+    "base_sha": "76ca6ca017244a07333cc934184ccc668729327a",
+    "fix_sha": "870f49d9bd03f21e7b85e9b6f98cc55551f433c9",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkBehaviour.cs"
+    ],
+    "test_class": "",
+    "test_platform": "",
+    "unity_bucket": "2020.1.9f1",
+    "benchmark_set": "golden",
+    "test_suites": [
+      {
+        "test_platform": "EditMode",
+        "test_class": "Mirror.Tests.SyncVarTest"
+      },
+      {
+        "test_platform": "PlayMode",
+        "test_class": "Mirror.Tests.NetworkBehaviourTests;Mirror.Tests.NetworkBehaviourHookGuardTester;Mirror.Tests.NetworkBehaviourInitSyncObjectTester"
+      }
+    ]
+  },
+  {
+    "instance_id": "miragenet-467",
+    "repo": "miragenet",
+    "issue_number": 467,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/467",
+    "base_sha": "0ef5c33418bf1550d664ed942eede165752fca7e",
+    "fix_sha": "abf5f2f4fb4375c7fece06d3e11ce79408ac9666",
+    "target_files": [
+      "Assets/Mirror/Runtime/ServerObjectManager.cs"
+    ],
+    "test_class": "Mirror.Tests.ServerObjectManagerHostTest;Mirror.Tests.ServerObjectManagerTest",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.14f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-503",
+    "repo": "miragenet",
+    "issue_number": 503,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/503",
+    "base_sha": "8fbc1ab2f54bfd1a109082c858b002d6ef1ddbd1",
+    "fix_sha": "fa2fb305165dcaa0664d7113f2b9193c35932498",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkSceneManager.cs",
+      "Assets/Mirror/Runtime/ServerObjectManager.cs"
+    ],
+    "test_class": "Mirror.Tests.NetworkSceneManagerTests;Mirror.Tests.NetworkSceneManagerNonHostTests",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.14f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-517",
+    "repo": "miragenet",
+    "issue_number": 517,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/517",
+    "base_sha": "59027c52fe0e7a8c72a8d0adb1406dc8ce22671f",
+    "fix_sha": "c9d03870210a130fa47237d14144a033585de481",
+    "target_files": [
+      "Assets/Mirror/Runtime/NetworkConnection.cs",
+      "Assets/Mirror/Runtime/ServerObjectManager.cs"
+    ],
+    "test_class": "Mirror.Tests.Host.ServerObjectManagerHostTest",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-609",
+    "repo": "miragenet",
+    "issue_number": 609,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/609",
+    "base_sha": "7191a40d61667529692254585a88a6114dceccd4",
+    "fix_sha": "f8366d29b9dfac6d165cd7121dc47931b2410dd2",
+    "target_files": [
+      "Assets/Mirage/Editor/NetworkScenePostProcess.cs",
+      "Assets/Mirage/Runtime/ServerObjectManager.cs"
+    ],
+    "test_class": "Mirage.Tests.Runtime.ClientServer.ServerObjectManagerTest",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-625",
+    "repo": "miragenet",
+    "issue_number": 625,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/625",
+    "base_sha": "96384715595bd87a0607161e372a64ee0be36b89",
+    "fix_sha": "e0dd626d5bd23e6c555730c6a4c3517694ea3bba",
+    "target_files": [
+      "Assets/Mirage/Runtime/PlayerSpawner.cs"
+    ],
+    "test_class": "",
+    "test_platform": "",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden",
+    "test_suites": [
+      {
+        "test_platform": "PlayMode",
+        "test_class": "Mirage.Tests.Host.PlayerSpawnerTest.DontAutoSpawnTest"
+      },
+      {
+        "test_platform": "PlayMode",
+        "test_class": "Mirage.Tests.Host.PlayerSpawnerTest.ManualSpawnTest"
+      }
+    ]
+  },
+  {
+    "instance_id": "miragenet-740",
+    "repo": "miragenet",
+    "issue_number": 740,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/740",
+    "base_sha": "6499d53e00aea940c1ddeff354557349cc2c19af",
+    "fix_sha": "f1f8f57b64e49a81225916db981f5ae1d6809e51",
+    "target_files": [
+      "Assets/Mirage/Runtime/NetworkManager.cs"
+    ],
+    "test_class": "",
+    "test_platform": "",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden",
+    "extra_prepare_steps": [
+      {
+        "name": "remove_paths",
+        "paths": [
+          "Assets/Tests/Editor/AddLateEventTests.cs",
+          "Assets/Tests/Editor/NetworkIdentityCallbackTests.cs",
+          "Assets/Tests/Editor/NetworkWorldTests.cs",
+          "Assets/Tests/Runtime/ClientServer/ClientServerComponentTests.cs",
+          "Assets/Tests/Runtime/ClientServer/GameObjectSyncvarTest.cs",
+          "Assets/Tests/Runtime/ClientServer/GenericNetworkBehaviorSyncvarTest.cs",
+          "Assets/Tests/Runtime/ClientServer/GenericNetworkBehaviourSyncvarDeeperTest.cs",
+          "Assets/Tests/Runtime/ClientServer/GenericNetworkBehaviourSyncvarNoMiddleTest.cs",
+          "Assets/Tests/Runtime/ClientServer/NetworkBehaviorSyncvarTest.cs",
+          "Assets/Tests/Runtime/ClientServer/NetworkIdentitySyncvarTest.cs",
+          "Assets/Tests/Runtime/ClientServer/ServerObjectManagerTests.cs",
+          "Assets/Tests/Runtime/Host/ClientObjectManagerTest.cs",
+          "Assets/Tests/Runtime/Host/ServerObjectManagerTest.cs"
+        ]
+      }
+    ],
+    "test_suites": [
+      {
+        "test_platform": "PlayMode",
+        "test_class": "Mirage.Tests.Runtime.Host.NetworkManagerTest.NetworkManagerModeHostTest"
+      },
+      {
+        "test_platform": "PlayMode",
+        "test_class": "Mirage.Tests.Runtime.Host.NetworkManagerTest.NetworkManagerModeOfflineHostTest"
+      }
+    ]
+  },
+  {
+    "instance_id": "miragenet-837",
+    "repo": "miragenet",
+    "issue_number": 837,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/837",
+    "base_sha": "99189f12c36349b67ca72a5f0cc48802316648bc",
+    "fix_sha": "eebe63ada737ff5e4d15f0c5231ed192f9d76079",
+    "target_files": [
+      "Assets/Mirage/Runtime/NetworkClient.cs",
+      "Assets/Mirage/Runtime/PipePeerConnection.cs"
+    ],
+    "test_class": "",
+    "test_platform": "",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden",
+    "test_suites": [
+      {
+        "test_platform": "EditMode",
+        "test_class": "Mirage.PipePeerConnectionTest"
+      },
+      {
+        "test_platform": "PlayMode",
+        "test_class": "Mirage.Tests.Runtime.Host.HostComponentTests"
+      }
+    ]
+  },
+  {
+    "instance_id": "miragenet-913",
+    "repo": "miragenet",
+    "issue_number": 913,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/913",
+    "base_sha": "01530054abf85cbf9c0ccef566a07ea28642d639",
+    "fix_sha": "7d4cd20fa3f95005e9debf79c212264b608bc944",
+    "target_files": [
+      "Assets/Mirage/Weaver/Processors/SyncVarProcessor.cs"
+    ],
+    "test_class": "Mirage.Tests.Runtime.Serialization.SyncVarHookOrderTest;Mirage.Tests.Runtime.Serialization.SyncVarTest",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-916",
+    "repo": "miragenet",
+    "issue_number": 916,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/916",
+    "base_sha": "01530054abf85cbf9c0ccef566a07ea28642d639",
+    "fix_sha": "aa8fe87d94a8b20ec9de882c731eb54f314e4b84",
+    "target_files": [
+      "Assets/Mirage/Weaver/Processors/ReaderWriterProcessor.cs"
+    ],
+    "test_class": "Mirage.Tests.Weaver.GeneratedReaderWriterTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-945",
+    "repo": "miragenet",
+    "issue_number": 945,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/945",
+    "base_sha": "52dec42a9f52e54922d46e62081744953a86fa0f",
+    "fix_sha": "708248838eac8cd6824e764a0ba3c4df967184a9",
+    "target_files": [
+      "Assets/Mirage/Runtime/CharacterSpawner.cs"
+    ],
+    "test_class": "Mirage.Tests.CharacterSpawnerTest",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-984",
+    "repo": "miragenet",
+    "issue_number": 984,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/984",
+    "base_sha": "27d00438ed500c578c98139d310c535c89037f76",
+    "fix_sha": "94f8ac7baf3f1a47090d1460ee5f6debb9da9152",
+    "target_files": [
+      "Assets/Mirage/Weaver/Processors/AttributeProcessor.cs"
+    ],
+    "test_class": "Mirage.Tests.Weaver.ClientServerAttributeTests",
+    "test_platform": "EditMode",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-997",
+    "repo": "miragenet",
+    "issue_number": 997,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/997",
+    "base_sha": "4dbcbb8823aeafc25e32e74ea5bfcabbcec613b0",
+    "fix_sha": "11b2fb3473b74b7b46447c0e449fa9b5dbf3bc1d",
+    "target_files": [
+      "Assets/Mirage/Runtime/ClientObjectManager.cs"
+    ],
+    "test_class": "Mirage.Tests.Runtime.ClientServer.ClientServerComponentTests;Mirage.Tests.Runtime.ClientServer.ReturnRpcTest_int;Mirage.Tests.Runtime.ClientServer.ReturnRpcTest_float;Mirage.Tests.Runtime.ClientServer.ReturnRpcTest_struct;Mirage.Tests.Runtime.ClientServer.ReturnRpcTest_Identity",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden"
+  },
+  {
+    "instance_id": "miragenet-998",
+    "repo": "miragenet",
+    "issue_number": 998,
+    "issue_url": "https://github.com/MirageNet/Mirage/issues/998",
+    "base_sha": "13e8780c5c81aef844e9af5ea8f0b50d18ea9d55",
+    "fix_sha": "ef5c426e1adf1d6ab8b4524d341a256fbae024ad",
+    "target_files": [
+      "Assets/Mirage/Runtime/SocketLayer/Pool.cs"
+    ],
+    "test_class": "Mirage.SocketLayer.Tests.PoolTest",
+    "test_platform": "PlayMode",
+    "unity_bucket": "2020.1.17f1",
+    "benchmark_set": "golden"
+  }
+]

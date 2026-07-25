@@ -1,0 +1,23 @@
+[BUG] Speedometer
+
+Damage or speed text scaling is off by one for some values because of the rounding logic used in the HUD.
+
+Expected behavior:
+- The scale calculation should use floor semantics instead of rounding up.
+- The displayed scaling should be stable for mid-range values.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] Speedometer
+
+Body:
+**Describe the bug**
+The speedometer currently rounds up to the nearest .1 (so for example if you're going fast enough to hit 2690, the speedometer will display your speed as 2.7K). This is not the same as AoTTG, in which it floors the numbers so it won't show 2.7K until you're at least going fast enough to hit 2,700 damage.
+Rounding up sounds more logical on paper, but in practice it's a little misleading because it baits you into thinking you're about to hit higher than you actually will.
+
+**Additional context**
+Hi @sxlksxskul <3
+
+**Contributor instructions**
+1. Try to recreate the bug via the reported reproduction steps. If the bug can be reproduced, remove the investigation label. If the bug cannot be reproduced, please add a comment, attach "On Hold" label and inform the submitter that the bug cannot be reproduced. If there is no reply after 2 weeks, the issue can be closed.
+2. Follow the default development team procedures (Create a new branch, apply your fix, create a pull request, submit new builds for testing team in dev squad)
+3. Once testing team has confirmed the issue is resolved and the pull request is accepted, the issue can be closed.

@@ -1,0 +1,18 @@
+diff --git a/Assets/Scripts/UI/InGame/HUD/HUD.cs b/Assets/Scripts/UI/InGame/HUD/HUD.cs
+index a0f0f9cc3..83054bdd0 100644
+--- a/Assets/Scripts/UI/InGame/HUD/HUD.cs
++++ b/Assets/Scripts/UI/InGame/HUD/HUD.cs
+@@ -69,11 +69,11 @@ namespace Assets.Scripts.UI.InGame.HUD
+ 
+             if (damage < highestDamageScaling)
+             {
+-                return (int) Math.Round(scale);
++                return (int) Math.Floor(scale);
+             }
+             else
+             {
+-                return (int) Math.Round(maxScaling);
++                return (int) Math.Floor(maxScaling);
+             }
+         }
+     }

@@ -1,0 +1,31 @@
+Issue 225: Hidden exception is being thrown if local player object has owned objects when closing server
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+If your local player object (that's spawned by the PlayerSpawner script) is spawning objects that have the local player as the owner and the server stops, a hidden NullReferenceException is being thrown in the `DestroyOwnedObjects` method in the `NetworkConnection` class. It seems to be because it's destroying itself first and calling the Reset method on itself before destroying the child objects. This causes the Identity.Server property to be null, thus causing the NullReferenceException.
+
+The NullReferenceException is also being thrown silently. It is never shown (probably due to Async methods), so a way to bring them forward to the main thread probably wouldn't hurt, in case something goes wrong.
+
+Due to this, the rest of the code isn't being called in the `NetworkServer.OnDisconnected` method. That means the LocalConnection isn't being reset and this stops you from properly hosting another server.
+
+**Repro project**
+[Mirror Hosting Bug.zip](https://github.com/MirrorNG/MirrorNG/files/4781316/Mirror.Hosting.Bug.zip)
+
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Open the attached project that you can get above.
+2. Go into Scenes/SampleScene.scene
+3. Enter play mode and start hosting. Notice how the prefab 'Network Player' is being spawned.
+4. Right after stop hosting and then try again. Notice how this time it isn't being spawned. That's because the server hasn't been started properly, as mentioned above. 
+
+**Expected behavior**
+Every object is destroyed properly and that you can start hosting again.
+
+**Desktop (please complete the following information):**
+* OS: Windows 64-bit
+* Build target: Windows 64-bit
+* Unity version: 2020.1b12
+* Mirror branch: master

@@ -1,0 +1,38 @@
+[BUG] Non-MC can change the level locally for themselves
+
+When a non-master-client attempts to change the level from Game Settings > Server Settings,
+the next restart changes that level locally for them. This is undesired because only the
+master client should determine which level is loaded.
+
+Steps to reproduce:
+1. Host a lobby as master client and join with a non-master client.
+2. As non-master client, go to Game Settings > Server Settings, choose a new level, and select Change.
+3. As master client, type /restart.
+4. The master client's level is not changed, but the non-master client loads their locally selected level.
+
+Expected behavior:
+- If a player is not the master client, they must respect the currently loaded level.
+- Non-master clients must be prevented from changing the next round level/gamemode locally.
+- When loading a level, the client should sync its level value back from Photon room state.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] Non-MC can change the level locally for themselves
+
+Body:
+**Describe the bug**
+When a non-MC attempts to change the level, upon the next restart, this level is changed locally for them. This is undesired behavior and only the MC can determine which levels are loaded.
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Host a lobby a MC and join with a non-MC client
+2. As non-MC, go to Game Settings > Server Settings, choose a new level and select "Change"
+3. As MC, type /restart
+4. The level of the MC is not changed, but the level of the non-MC is not changed.
+
+**Expected behavior**
+If a player is not the master client, then they must respect the current level that is loaded and be prevented from loading other levels.
+
+**Contributor instructions** (Do not modify)
+1. Try to recreate the bug via the reported reproduction steps. If the bug can be reproduced, remove the investigation label. If the bug cannot be reproduced, please add a comment, attach "On Hold" label and inform the submitter that the bug cannot be reproduced. If there is no reply after 2 weeks, the issue can be closed.
+2. Follow the default development team procedures (Create a new branch, apply your fix, create a pull request, submit new builds for testing team in dev squad)
+3. Once testing team has confirmed the issue is resolved and the pull request is accepted, the issue can be closed.

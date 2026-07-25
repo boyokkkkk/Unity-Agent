@@ -1,0 +1,14 @@
+Revolver reload can be started repeatedly while a reload animation is already in progress.
+
+When the revolver reaches empty ammo, repeated fire/end events can trigger Reload multiple times before the animation calls ResetReload.
+That causes duplicate reload events and can break the reload animation/weapon state.
+
+Expected behavior:
+- Once reload has started, repeated reload attempts should be ignored until ResetReload completes.
+- ResetReload should clear the in-progress state.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Fix broken revolver reload when spamming barrel with chargetime
+
+Body:
+You can still initate the reload animation while firing the last time (looks kinda funny, so I think it's ok to leave in for now), but it will no longer mess up the reload animation/weapon!

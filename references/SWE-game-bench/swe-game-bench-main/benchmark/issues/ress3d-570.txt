@@ -1,0 +1,11 @@
+Can't Put Items in Disposal Bin
+
+Seems you cant put items in the disposal bin anymore...
+
+### Steps to Reproduce
+
+- pick up item,
+- right click disposal bin,
+- try to store the item
+
+for me nothing happens...

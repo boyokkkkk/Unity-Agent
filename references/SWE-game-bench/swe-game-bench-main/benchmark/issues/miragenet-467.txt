@@ -1,0 +1,28 @@
+Issue 467: Networked objects not being destroyed after StopHost in host mode
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+After stopping the host mode via `StopHost`, the objects spawned by the server in host scene are not properly destroyed. Their "Is Server" and "Is Client" properties are both set to false though.
+
+**Repro project**
+Attached a simple repro project.
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Open the attached project '...'
+2. Start the game
+3. Spawn some networked objects by the player by clicking left mouse button
+4. Click Stop Host in top left corner
+5. Observe the objects not being destroyed in the scene.
+
+**Expected behavior**
+There should be no networked objects left after the server is stopped.
+
+**Desktop:**
+* OS: Windows 10 64bit
+* Build target: Windows standalone
+* Unity version: 2020.1.11
+* Mirror branch: latest master
+[MirrorNGReproNoDestroy.zip](https://github.com/MirrorNG/MirrorNG/files/5482263/MirrorNGReproNoDestroy.zip)

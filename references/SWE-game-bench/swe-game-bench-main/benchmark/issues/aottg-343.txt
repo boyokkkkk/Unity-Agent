@@ -1,0 +1,36 @@
+[BUG] /pause Message Staying Stuck on Screen
+
+When the game is paused and a level loads, the pause state can remain stuck instead of clearing cleanly.
+
+Expected behavior:
+- If a level loads while the game is paused, the pause service should immediately unpause and reset the pause state.
+- The game should not remain in a stale paused state after the level transition.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] /pause Message Staying Stuck on Screen
+
+Body:
+**Describe the bug**
+When you use /pause and then restart the game or switch servers without unpausing, the "Game Paused" message will remain on screen even though you're capable of moving around. This can be fixed by typing /pause again (which will clear the message but not pause the game), but if you cause this bug by switching to someone else's server, the message is stuck as you can't use /pause when not masterclient.
+
+**To Reproduce**
+1. Start a new lobby
+2. Type /pause
+3. Type /restart or leave the lobby and join a new one
+
+**Expected behavior**
+The "Game Paused" message should clear automatically when the game is restarted and not carry over to other servers.
+
+**Video**
+https://youtu.be/_XOsr_ym_TA
+
+**Log file**
+https://pastebin.com/M9zwj4Nr
+
+**Additional context**
+In AoTTG1, unpausing the game has a separate command /unpause, rather than just typing /pause again. This is a minor change so there's really no point in making AoTTG2 match it in my opinion, just figured I'd point out the difference.
+
+**Contributor instructions**
+1. Try to recreate the bug via the reported reproduction steps. If the bug can be reproduced, remove the investigation label. If the bug cannot be reproduced, please add a comment, attach "On Hold" label and inform the submitter that the bug cannot be reproduced. If there is no reply after 2 weeks, the issue can be closed.
+2. Follow the default development team procedures (Create a new branch, apply your fix, create a pull request, submit new builds for testing team in dev squad)
+3. Once testing team has confirmed the issue is resolved and the pull request is accepted, the issue can be closed.

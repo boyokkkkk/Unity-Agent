@@ -1,0 +1,33 @@
+Fix in hand interaction
+
+Expected behavior:
+- in-hand inventory interactions should be callable from the inventory flow
+- the interaction controller method used for in-hand clicks should be accessible for that cross-call
+- keep the change focused on the interaction-controller side of the bug
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Fix in hand interaction
+
+Body:
+<!-- The notes within these arrows are for you but can be deleted. -->
+
+## Summary
+The outdated branch used to have in hand interaction working. Fix it.
+
+## Current Behavior
+
+Does not work.
+
+## Expected Behavior
+
+- Pick up a bikehorn
+- Click on its sprite in UI when held in hand.
+- honk honk.
+
+## Possible Solution
+
+Look at the outdated code and compare with now. the Inventory script is lacking the ClientInteractWithSingleSlot method, which call "InteractInHand". 
+
+## Dependencies
+
+wait for #1257 to be complete

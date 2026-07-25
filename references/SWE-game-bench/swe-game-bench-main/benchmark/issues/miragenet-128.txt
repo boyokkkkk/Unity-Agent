@@ -1,0 +1,23 @@
+manager.client.Disconnected is raised twice
+
+Confirmed on hostmode, not in server only mode.
+
+Stacktraces:
+
+```cs
+UnityEngine.Events.UnityEvent:Invoke()
+Mirror.NetworkClient:HandleClientDisconnect() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkClient.cs:489)
+Mirror.ULocalConnectionToServer:DisconnectInternal() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/LocalConnections.cs:114)
+Mirror.ULocalConnectionToClient:Disconnect() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/LocalConnections.cs:43)
+Mirror.NetworkServer:RemoveLocalConnection() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkServer.cs:234)
+Mirror.NetworkClient:Disconnect() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkClient.cs:283)
+Mirror.NetworkManager:StopClient() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkManager.cs:407)
+Mirror.NetworkManager:StopHost() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkManager.cs:376)```
+
+
+UnityEngine.Events.UnityEvent:Invoke()
+Mirror.NetworkClient:HandleClientDisconnect() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkClient.cs:489)
+Mirror.NetworkClient:Disconnect() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkClient.cs:293)
+Mirror.NetworkManager:StopClient() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkManager.cs:407)
+Mirror.NetworkManager:StopHost() (at Library/PackageCache/com.mirrorng.mirrorng@29.1.0/Runtime/NetworkManager.cs:376)
+```

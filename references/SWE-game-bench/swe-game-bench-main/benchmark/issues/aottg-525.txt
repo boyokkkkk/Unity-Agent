@@ -1,0 +1,34 @@
+[BUG] Breaking chat with Rich Text
+
+Rich text in room chat breaks when opening and closing tag types do not match.
+
+Expected behavior:
+- Correctly matched rich text tags should still be accepted.
+- Mismatched tag types should be rejected instead of being treated as valid.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] Breaking chat with Rich Text
+
+Body:
+**Describe the bug**
+Since chat was made to support Rich Text again, it's now possible to break it by typing incomplete tags in it. Additionally, bold and italics don't seem to be working.
+
+**To Reproduce**
+1. Go into any game and open the chat
+2. Try the bold tag (<b> text </b>)
+3. Try the italics tag (<i> text </i>)
+4. Try an incomplete tag (can just send <b> by itself)
+
+**Expected behavior**
+Incomplete Rich Text tags shouldn't break the chat. Bold and italics tags should work.
+
+**Video**
+https://youtu.be/dfDNkgiD5j0
+
+**Additional notes**
+Please don't just remove the Rich Text option outright.
+
+**Contributor instructions**
+1. Try to recreate the bug via the reported reproduction steps. If the bug can be reproduced, remove the investigation label. If the bug cannot be reproduced, please add a comment, attach "On Hold" label and inform the submitter that the bug cannot be reproduced. If there is no reply after 2 weeks, the issue can be closed.
+2. Follow the default development team procedures (Create a new branch, apply your fix, create a pull request, submit new builds for testing team in dev squad)
+3. Once testing team has confirmed the issue is resolved and the pull request is accepted, the issue can be closed.

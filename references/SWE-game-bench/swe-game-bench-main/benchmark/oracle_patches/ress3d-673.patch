@@ -1,0 +1,67 @@
+diff --git a/Assets/Content/Systems/Managers/LoadingScreenManager.cs b/Assets/Content/Systems/Managers/LoadingScreenManager.cs
+index 4060b1f3..ba97acf3 100644
+--- a/Assets/Content/Systems/Managers/LoadingScreenManager.cs
++++ b/Assets/Content/Systems/Managers/LoadingScreenManager.cs
+@@ -20,10 +20,26 @@ public class LoadingScreenManager : MonoBehaviour
+ 
+     private void Start()
+     {
+-        SceneLoaderManager.mapLoaded += delegate { Toggle(true); };
+-        TileManager.tileManagerLoaded += delegate { Toggle(false); };
++        SceneLoaderManager.mapLoaded += SetAnimatorTrue;
++        TileManager.tileManagerLoaded += SetAnimatorFalse;
+     }
+ 
++	public void SetAnimatorTrue()
++	{
++		Toggle(true);
++	}
++	
++	public void SetAnimatorFalse()
++	{
++		Toggle(false);
++	}	
++
++	public void OnDestroy()
++	{
++        SceneLoaderManager.mapLoaded -= SetAnimatorTrue;
++        TileManager.tileManagerLoaded -= SetAnimatorFalse;		
++	}
++	
+     public void Toggle(bool state)
+     {
+         if (!animator.enabled) animator.enabled = true;
+diff --git a/Assets/Engine/Server/Round/LoadingSceneUIHelper.cs b/Assets/Engine/Server/Round/LoadingSceneUIHelper.cs
+index 667f671c..ff16be7d 100644
+--- a/Assets/Engine/Server/Round/LoadingSceneUIHelper.cs
++++ b/Assets/Engine/Server/Round/LoadingSceneUIHelper.cs
+@@ -11,10 +11,26 @@ public class LoadingSceneUIHelper : MonoBehaviour
+ 
+     private void Awake()
+     {
+-        SceneLoaderManager.mapLoaded += delegate { Toggle(true); };
+-        TileManager.tileManagerLoaded += delegate { Toggle(false); };
++        SceneLoaderManager.mapLoaded += SetAnimatorTrue;
++        TileManager.tileManagerLoaded += SetAnimatorFalse;
+     }
+-    
++
++	public void SetAnimatorTrue()
++	{
++		Toggle(true);
++	}
++	
++	public void SetAnimatorFalse()
++	{
++		Toggle(false);
++	}	
++	
++	public void OnDestroy()
++	{
++        SceneLoaderManager.mapLoaded -= SetAnimatorTrue;
++        TileManager.tileManagerLoaded -= SetAnimatorFalse;		
++	}
++
+     public void Toggle(bool state)
+     {
+         if (!animator.enabled) animator.enabled = true;

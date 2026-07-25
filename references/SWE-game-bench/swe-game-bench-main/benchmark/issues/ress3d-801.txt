@@ -1,0 +1,21 @@
+Container dumping fails when more than one item is held.
+
+When a container is dumped, it can modify the same item collection it is iterating over. This can throw an error or leave only one item dropped.
+
+Expected behavior:
+- Dumping a container should clear all contained items.
+- Dumping should not throw collection-modification errors.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: Container system: Resolve error in Container.Dump()
+
+Body:
+## Summary
+
+Container.Dump() method was changed to prevent modification of the collection it was iterating over. This resolved the error that flagged whenever Container.Dump() was called. Consequently, it fixed the issue where only one item was dropped when the player was knocked down.
+
+Note: I couldn't actually find a banana peel in the scene, so you'll have to add one locally to test.
+
+## Fixes
+
+Closes #790

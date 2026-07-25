@@ -1,0 +1,27 @@
+Normal Titans should use the forward death animation.
+
+Currently Normal Titans use the same backward death animation as Aberrants, Jumpers, and Punks. They should instead use the AoTTG1-style forward death animation.
+
+Expected behavior:
+- Normal Titan configuration should select the forward death animation.
+- Other titan type animation choices should remain unchanged.
+
+--- Original GitHub issue (auto-fetched) ---
+Title: [BUG] Normal Titans are currently using the Aberrant death animation
+
+Body:
+**Describe the bug**
+Currently Normal Titans are using the death animation shared by Aberrants, Jumpers, and Punks in which they fall backwards upon death. Instead, they should be using their animation from AoTTG1 in which they fall forwards and at a slower speed than Aberrants do.
+
+**To Reproduce**
+1. Kill a Normal Titan in AoTTG1
+2. Kill a Normal Titan in AoTTG2
+3. Pay attention to the difference in their death animations
+
+**Expected behavior**
+Normal Titans should use the same death animation as AoTTG1 unless purposefully changed.
+
+**Contributor instructions**
+1. Try to recreate the bug via the reported reproduction steps. If the bug can be reproduced, remove the investigation label. If the bug cannot be reproduced, please add a comment, attach "On Hold" label and inform the submitter that the bug cannot be reproduced. If there is no reply after 2 weeks, the issue can be closed.
+2. Follow the default development team procedures (Create a new branch, apply your fix, create a pull request, submit new builds for testing team in dev squad)
+3. Once testing team has confirmed the issue is resolved and the pull request is accepted, the issue can be closed.

@@ -1,0 +1,52 @@
+diff --git a/Assets/Scripts/Gamemode/WaveGamemode.cs b/Assets/Scripts/Gamemode/WaveGamemode.cs
+index 009638ad7..819bc9311 100644
+--- a/Assets/Scripts/Gamemode/WaveGamemode.cs
++++ b/Assets/Scripts/Gamemode/WaveGamemode.cs
+@@ -80,14 +80,11 @@ namespace Assets.Scripts.Gamemode
+             {
+                 if (Wave % Settings.BossWave.Value == 0)
+                 {
+-                    for (var i = 0; i < Wave / Settings.BossWave.Value; i++)
+-                    {
+-                        SpawnService.Spawn<MindlessTitan>(GetWaveTitanConfiguration(Settings.BossType.Value));
+-                    }
++                    StartCoroutine(SpawnBossTitan(Wave / Settings.BossWave.Value));
+                 }
+                 else
+                 {
+-                    StartCoroutine(SpawnTitan(GameSettings.Titan.Start.Value + Wave * Settings.WaveIncrement.Value));
++                    StartCoroutine(SpawnTitan(GameSettings.Titan.Start.Value + (Wave - 1) * Settings.WaveIncrement.Value));
+                 }
+             }
+         }
+@@ -139,5 +136,17 @@ namespace Assets.Scripts.Gamemode
+                 yield return new WaitForEndOfFrame();
+             }
+         }
++
++        private IEnumerator SpawnBossTitan(int titans)
++        {
++            for (var i = 0; i < titans; i++)
++            {
++                if (EntityService.Count<MindlessTitan>() >= GameSettings.Titan.Limit.Value) break;
++                var randomSpawn = GetSpawnLocation();
++                SpawnService.Spawn<MindlessTitan>(randomSpawn.position, randomSpawn.rotation,
++                    GetWaveTitanConfiguration(Settings.BossType.Value));
++                yield return new WaitForEndOfFrame();
++            }
++        }
+     }
+ }
+diff --git a/Assets/Scripts/Settings/Gamemodes/WaveGamemodeSettings.cs b/Assets/Scripts/Settings/Gamemodes/WaveGamemodeSettings.cs
+index fd94c1115..9fff83741 100644
+--- a/Assets/Scripts/Settings/Gamemodes/WaveGamemodeSettings.cs
++++ b/Assets/Scripts/Settings/Gamemodes/WaveGamemodeSettings.cs
+@@ -20,7 +20,7 @@ namespace Assets.Scripts.Settings.Gamemodes
+             Respawn.Mode = RespawnMode.NewRound;
+             StartWave = 1;
+             MaxWave = 20;
+-            WaveIncrement = 2;
++            WaveIncrement = 1;
+             BossWave = 5;
+             BossType = MindlessTitanType.Punk;
+ 

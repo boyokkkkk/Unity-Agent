@@ -1,0 +1,19 @@
+Issue 609: Enable and disable networked objects
+
+Repository: miragenet/mirage
+
+Issue body:
+As a game dev,  I want to enable and disable networked objects so that I can control when user can see them.
+
+# Explanation
+Currently Mirage takes over enable/disable.  All scene objects get disabled when the game starts and are enabled when the user connects.   
+The user therefore cannot control when objects are enabled/disabled as it interferes with the scene object mechanism.
+This also makes for a very complicated way to control objects.
+
+discussions about NetworkScenePostProcssing: #608
+- this feature is left over from UNET, hard to know the reason for the initial feature
+
+# Acceptance criteria
+When a spawned object is disabled in the server,  Mirage disables it in the client
+When a spawned object is enabled in the server, Mirage enables it in the client
+When the user starts the game,  the scene objects should not be visible until he connects to the server

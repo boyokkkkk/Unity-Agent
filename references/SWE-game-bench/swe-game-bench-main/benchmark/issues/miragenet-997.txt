@@ -1,0 +1,53 @@
+Issue 997: Calling async ServerRpc that returns value crashes the server on 2021.2
+
+Repository: miragenet/mirage
+
+Issue body:
+**Describe the bug**
+Simply calling an async UniTask ServerRpc from a client instantly crashes the server, whether it be in the editor or on a build, with Unity 2021.2. Also tested on 2021.1.13, but there was no issue there.
+
+**Repro project**
+Tiny project with a simple Player script that calls an async rpc to get randomized X position when spacebar is pressed.
+[Mirage Async RPC Test.zip](https://github.com/MirageNet/Mirage/files/7628640/Mirage.Async.RPC.Test.zip)
+
+**To Reproduce**
+Steps to reproduce the behavior:
+1. Open the attached project.
+2. Open the 'Scene' scene.
+3. Build a player or duplicate the project so multiplayer can be tested.
+4. Play game, host. Join with other client.
+5. Press Spacebar key on the joined client to call the async rpc, instantly crashing the server process.
+
+**Desktop (please complete the following information):**
+* OS: Windows 10
+* Build target: Editor/Windows
+* Unity version: 2021.2.4
+* Mirage version: v113.0.0
+
+**Additional context**
+The calling code looks like this:
+```cs
+public class Player : NetworkBehaviour
+{
+    private void Update()
+    {
+        if (IsLocalPlayer && Input.GetKeyUp(KeyCode.Space))
+            StrafeByRandomValueFromServer().Forget();
+    }
+
+    private async UniTaskVoid StrafeByRandomValueFromServer()
+    {
+        float value = await RequestRandomValue();
+        transform.position = new Vector3(value, 0f, 0f);
+    }
+
+    [ServerRpc]
+    public UniTask<float> RequestRandomValue()
+    {
+        return UniTask.FromResult(Random.Range(-2, 2f));
+    }
+}
+```
+
+Crash log:
+[Player.log](https://github.com/MirageNet/Mirage/files/7628746/Player.log)

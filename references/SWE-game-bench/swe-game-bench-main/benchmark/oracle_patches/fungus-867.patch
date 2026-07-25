@@ -1,0 +1,31 @@
+diff --git a/Assets/Fungus/Scripts/Commands/LoadVariable.cs b/Assets/Fungus/Scripts/Commands/LoadVariable.cs
+index 06380227..29b2e19f 100644
+--- a/Assets/Fungus/Scripts/Commands/LoadVariable.cs
++++ b/Assets/Fungus/Scripts/Commands/LoadVariable.cs
+@@ -28,18 +28,19 @@ namespace Fungus
+ 
+         public override void OnEnter()
+         {
+-            if (key == "" ||
+-                variable == null)
++            var flowchart = GetFlowchart();
++
++            // Prepend the current save profile (if any) and make sure all inputs are valid
++            string prefsKey = SetSaveProfile.SaveProfile + "_" + flowchart.SubstituteVariables(key);
++            bool validKey = key != "" && PlayerPrefs.HasKey(prefsKey);
++            bool validVariable = variable != null;
++
++            if (!validKey || !validVariable)
+             {
+                 Continue();
+                 return;
+             }
+ 
+-            var flowchart = GetFlowchart();
+-
+-            // Prepend the current save profile (if any)
+-            string prefsKey = SetSaveProfile.SaveProfile + "_" + flowchart.SubstituteVariables(key);
+-
+             System.Type variableType = variable.GetType();
+ 
+             if (variableType == typeof(BooleanVariable))

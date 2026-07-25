@@ -1,0 +1,5 @@
+Flowchart icon hiding dropdown triangle in hierarchy
+
+[Image (Screenshot 2020-02-20 at 18 24 26): The screenshot shows a UI hierarchy/tree with a root node labeled **“Map”**. Under it is a child **“TypePanel”** (with a red error/status icon), and beneath that two children: **“SearchIcon”** and **“InputArea”**. Both **SearchIcon** and **InputArea** appear greyed out/disabled compared to the other entries.]
+
+Here you can see that the flowchart icons are incorrectly covering the little dropdown triangle things in the hierarchy view, rather than being to the left as they used to be. This is in v3.11.5 in Unity 2019.2.14f1, on Mac.
