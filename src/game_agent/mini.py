@@ -1,26 +1,18 @@
 """mini-SWE-agent compatible runner for the Kitchen Chaos Unity project.
 
-The actual reasoning loop, model adapters, format-error recovery, limits and
-trajectory serialization are provided by mini-SWE-agent. This module only
-binds its Environment protocol to the selected Unity project and adds stable
-experiment telemetry.
+The project-owned framework provides the reasoning loop, model adapter, format-error recovery, limits, and trajectory serialization. This module binds that framework to the selected Unity project and adds stable experiment telemetry.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from pathlib import Path
 from typing import Any
 
-# mini-SWE-agent creates this directory during import. Keep the runner
-# self-contained and usable in restricted/CI environments.
-os.environ.setdefault("MSWEA_GLOBAL_CONFIG_DIR", str(Path.cwd() / ".runtime" / "minisweagent"))
-
-from minisweagent.agents import get_agent
-from minisweagent.environments.local import LocalEnvironment
-from minisweagent.models import get_model
+from game_agent.framework.agents import get_agent
+from game_agent.framework.environments import LocalEnvironment
+from game_agent.framework.models import get_model
 
 from .logging import ExperimentLogger
 

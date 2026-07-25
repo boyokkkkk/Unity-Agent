@@ -1,7 +1,7 @@
 {
   "experiment": {
     "config_id": "W1-mini-swe-kitchen-chaos-v1",
-    "backend": "mini-swe-agent-2.4.6",
+    "backend": "skill-game-agent-framework-2.4.6-local",
     "target_project": "E:/Unity_project/Kitchen_Chaos/Kitchen_Chaos",
     "tool": "bash",
     "max_input_tokens": 12000,
