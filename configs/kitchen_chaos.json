@@ -1,0 +1,42 @@
+{
+  "experiment": {
+    "config_id": "W1-mini-swe-kitchen-chaos-v1",
+    "backend": "mini-swe-agent-2.4.6",
+    "target_project": "E:/Unity_project/Kitchen_Chaos/Kitchen_Chaos",
+    "tool": "bash",
+    "max_input_tokens": 12000,
+    "max_output_tokens": 2048,
+    "max_total_tokens": 81920,
+    "max_rounds": 40,
+    "cost_limit": 3.0,
+    "seed": 42
+  },
+  "model": {
+    "model_name": "openai/gpt-4o-mini",
+    "model_class": "litellm",
+    "model_kwargs": {
+      "drop_params": true,
+      "temperature": 0.0,
+      "max_tokens": 2048,
+      "seed": 42
+    },
+    "cost_tracking": "ignore_errors"
+  },
+  "environment": {
+    "cwd": "E:/Unity_project/Kitchen_Chaos/Kitchen_Chaos",
+    "timeout": 120,
+    "env": {"PAGER": "cat", "MANPAGER": "cat", "PIP_PROGRESS_BAR": "off", "TQDM_DISABLE": "1"}
+  },
+  "agent": {
+    "system_template": "You are a software engineering agent working inside a Unity project. Inspect before editing, make the smallest safe change, compile and run the relevant Unity tests. Finish only after verification.",
+    "instance_template": "Solve this task in the Unity project:\n\n{{task}}\n\nUse shell commands to inspect and edit files. Do not modify Library, Temp, Logs, obj, or generated project files. End successfully by running exactly: echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT",
+    "step_limit": 40,
+    "cost_limit": 3.0,
+    "wall_time_limit_seconds": 1800,
+    "max_consecutive_format_errors": 3
+  },
+  "logging": {
+    "events_path": "E:/sysu-course/GameAgent/artifacts/kitchen-chaos/events.jsonl",
+    "trajectory_path": "E:/sysu-course/GameAgent/artifacts/kitchen-chaos/trajectory.json"
+  }
+}

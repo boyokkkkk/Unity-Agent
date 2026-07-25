@@ -1,0 +1,35 @@
+{
+  "experiment": {
+    "config_id": "W1-baseline-local-v1",
+    "backend": "project_adapter",
+    "model": "deterministic_fixture",
+    "max_rounds": 4,
+    "token_budget": 0
+  },
+  "commands": {
+    "compile": ["dotnet", "build", "baseline/Unity2D/Unity2D.csproj", "--nologo", "-v", "minimal"],
+    "test": ["dotnet", "run", "--project", "baseline/Unity2D/Unity2D.csproj", "--no-restore", "--", "--test"],
+    "unity": ["Unity", "-batchmode", "-quit", "-projectPath", "baseline/Unity2D"]
+  },
+  "logging": {
+    "path": "artifacts/logs/events.jsonl",
+    "summary": "artifacts/week1-summary.json"
+  },
+  "tasks": [
+    {
+      "id": "A1-player-dash",
+      "intent": "add player dash movement",
+      "operations": [{"path": "baseline/Unity2D/Assets/Scripts/PlayerMovement.cs", "old": "public const int DashDistance = 0;", "new": "public const int DashDistance = 4;"}]
+    },
+    {
+      "id": "B1-damage-invincibility",
+      "intent": "add temporary invincibility after damage",
+      "operations": [{"path": "baseline/Unity2D/Assets/Scripts/HealthState.cs", "old": "public const int InvincibilityFrames = 0;", "new": "public const int InvincibilityFrames = 30;"}]
+    },
+    {
+      "id": "C1-pickup-counter",
+      "intent": "bind pickup interaction to a counter",
+      "operations": [{"path": "baseline/Unity2D/Assets/Scripts/PickupCounter.cs", "old": "public const int PickupValue = 0;", "new": "public const int PickupValue = 1;"}]
+    }
+  ]
+}

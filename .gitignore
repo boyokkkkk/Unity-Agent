@@ -1,0 +1,15 @@
+.venv/
+.runtime/
+references/
+baseline/Unity2D/Library/
+baseline/Unity2D/Temp/
+baseline/Unity2D/Logs/
+references/SWE-game-bench/swe-game-bench-main/.env
+references/SWE-game-bench/swe-game-bench-main/runs/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+artifacts/
+baseline/Unity2D/bin/
+baseline/Unity2D/obj/
