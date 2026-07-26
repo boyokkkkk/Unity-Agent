@@ -19,7 +19,7 @@ def _capture_diff(project_path: Path, destination: Path) -> None:
     if not (project_path / ".git").exists():
         destination.write_text("", encoding="utf-8")
         return
-    result = subprocess.run(
+    tracked = subprocess.run(
         ["git", "diff", "--binary", "--no-ext-diff"],
         cwd=project_path,
         capture_output=True,
@@ -29,7 +29,30 @@ def _capture_diff(project_path: Path, destination: Path) -> None:
         timeout=60,
         check=False,
     )
-    destination.write_text(result.stdout, encoding="utf-8")
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=project_path,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+        check=False,
+    )
+    patches = [tracked.stdout]
+    for name in filter(None, untracked.stdout.split("\0")):
+        result = subprocess.run(
+            ["git", "diff", "--no-index", "--binary", "--no-ext-diff", "--", "/dev/null", name],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            check=False,
+        )
+        patches.append(result.stdout)
+    destination.write_text("".join(patches), encoding="utf-8")
 
 
 def prepare_run_config(source_path: Path, artifact_dir: Path, project_path: Path | None = None) -> Path:

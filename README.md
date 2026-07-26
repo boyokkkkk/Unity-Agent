@@ -629,6 +629,12 @@ $env:PYTHONPATH="src"
   --port 8000
 ```
 
+已经配置仓库根目录 `.env` 时，也可以直接使用固定入口脚本：
+
+```powershell
+.\scripts\start-backend.ps1
+```
+
 终端二：
 
 ```powershell

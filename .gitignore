@@ -1,4 +1,5 @@
 .venv/
+.env
 .runtime/
 references/GameDevBench/.git/
 references/**/.git/

@@ -9,7 +9,7 @@ export function StatusBadge({ status, pulse = false }: { status: RunStatus; puls
   </span>;
 }
 
-export function LoadingState({ label = "????" }: { label?: string }) {
+export function LoadingState({ label = "加载中" }: { label?: string }) {
   return <div className="state-card state-loading" role="status">
     <span className="loader" /><p>{label}</p>
   </div>;
@@ -25,8 +25,8 @@ export function EmptyState({ title, detail, action }: { title: string; detail: s
 export function ErrorState({ message, retry }: { message: string; retry?: () => void }) {
   return <div className="state-card state-error" role="alert">
     <div className="error-glyph">!</div>
-    <h3>????</h3><p>{message}</p>
-    {retry && <button className="button button-secondary" onClick={retry}>????</button>}
+    <h3>请求失败</h3><p>{message}</p>
+    {retry && <button className="button button-secondary" onClick={retry}>重新加载</button>}
   </div>;
 }
 

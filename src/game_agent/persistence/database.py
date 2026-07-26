@@ -125,3 +125,5 @@ class Database:
             connection.execute("""UPDATE runs SET status='failed',
                 error='API service restarted while worker was active', finished_at=?
                 WHERE status IN ('pending', 'running')""", (utc_now(),))
+            connection.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_runs_active_project
+                ON runs(project_path) WHERE status IN ('pending', 'running')""")

@@ -12,7 +12,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
   if (!response.ok) {
-    let detail = `?????${response.status}?`;
+    let detail = `请求失败（${response.status}）`;
     try {
       const body = await response.json() as { detail?: unknown };
       if (typeof body.detail === "string") detail = body.detail;
@@ -47,7 +47,7 @@ export const api = {
   async diff(runId: string): Promise<string | null> {
     const response = await fetch(`/api/runs/${runId}/diff`);
     if (response.status === 404) return null;
-    if (!response.ok) throw new ApiError(`???? diff?${response.status}?`, response.status);
+    if (!response.ok) throw new ApiError(`读取 Diff 失败（${response.status}）`, response.status);
     return response.text();
   },
 };

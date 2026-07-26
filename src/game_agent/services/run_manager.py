@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import multiprocessing
 import os
+import sqlite3
 import subprocess
 import threading
 import time
@@ -45,10 +46,16 @@ class RunManager:
         run_id = uuid.uuid4().hex[:12]
         artifact_dir = self.artifact_root / run_id
         artifact_dir.mkdir(parents=True, exist_ok=False)
-        self.database.create_run({
-            "run_id": run_id, "task": task, "status": "pending", "config_path": str(config_path),
-            "project_path": str(resolved_project), "artifact_dir": str(artifact_dir), "created_at": utc_now(),
-        })
+        try:
+            self.database.create_run({
+                "run_id": run_id, "task": task, "status": "pending", "config_path": str(config_path),
+                "project_path": str(resolved_project), "artifact_dir": str(artifact_dir), "created_at": utc_now(),
+            })
+        except sqlite3.IntegrityError as exc:
+            artifact_dir.rmdir()
+            if "runs.project_path" in str(exc):
+                raise RuntimeError(f"Unity workspace is already in use: {resolved_project}") from exc
+            raise
         self.database.add_event(run_id, "run_created", {"run_id": run_id, "status": "pending"})
         process = multiprocessing.Process(
             target=self.worker_target,
@@ -105,11 +112,18 @@ class RunManager:
             return offset
         with path.open("r", encoding="utf-8") as handle:
             handle.seek(offset)
-            while line := handle.readline():
+            while True:
+                line_start = handle.tell()
+                line = handle.readline()
+                if not line:
+                    break
                 try:
                     payload = json.loads(line)
                 except json.JSONDecodeError:
-                    break
+                    if not line.endswith("\n"):
+                        handle.seek(line_start)
+                        break
+                    continue
                 self.database.add_event(run_id, payload.get("event", "agent_event"), payload,
                                         source="worker", source_seq=payload.get("seq"))
             return handle.tell()
