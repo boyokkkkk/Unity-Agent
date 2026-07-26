@@ -14,6 +14,13 @@ dependencies = [
     "tenacity",
 ]
 
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "uvicorn[standard]>=0.30",
+]
+
 [project.scripts]
 game-agent = "game_agent.cli:main"
 

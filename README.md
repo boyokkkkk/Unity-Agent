@@ -17,8 +17,8 @@ SkillGameAgent 是面向 Unity 项目级代码修改实验的 Agent 框架，研
 | Unity 项目图 | 待实现 | Scene、Prefab、GameObject、Component、C# 符号和序列化引用 |
 | Verified Skill | 待实现 | Skill 抽取、匹配、迁移和负迁移控制 |
 | Compile/Test/PlayMode 验证器 | 待实现 | 当前由 Agent 自行执行命令，尚未形成统一验证接口 |
-| FastAPI 后端 | 待实现 | 计划提供任务管理、事件流、取消和结果查询 |
-| React 前端 | 待实现 | 计划提供实验控制台和运行时间线 |
+| FastAPI 后端 | 已完成 MVP | RunManager、Worker 子进程、SQLite、REST/SSE、取消与 artifact API |
+| React 前端 | 已完成 MVP | 新建任务、实验列表、SSE 时间线、工具输出、diff、验证与错误/空状态 |
 
 当前执行链路：
 
@@ -326,7 +326,9 @@ RunManager
 - 同一个 Unity 工作区同一时间只允许一个写任务；
 - 并发实验使用项目副本或 Git worktree。
 
-## 10. 后端落地计划
+## 10. FastAPI MVP
+
+阶段 2 已实现，运行方式和完整 API 见 [docs/fastapi-mvp.md](docs/fastapi-mvp.md)。以下目录与接口继续作为后续增强目标。
 
 ### 10.1 目标目录
 
@@ -438,7 +440,9 @@ validations
 
 以上命令属于目标运行方式；当前仓库尚未包含 `game_agent.api.app` 和 `web` optional dependency。
 
-## 11. 前端落地计划
+## 11. React 实验控制台
+
+阶段 3 已实现，开发与前后端契约见 [docs/frontend-console.md](docs/frontend-console.md)。以下内容保留为后续增强计划。
 
 ### 11.1 技术栈
 

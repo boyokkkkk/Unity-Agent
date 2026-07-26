@@ -91,10 +91,10 @@ def load_config(path: Path) -> dict:
     return config
 
 
-def run(task: str, config_path: Path) -> dict:
+def run(task: str, config_path: Path, *, run_id: str | None = None) -> dict:
     config = load_config(config_path)
     experiment = config["experiment"]
-    run_id = uuid.uuid4().hex[:12]
+    run_id = run_id or uuid.uuid4().hex[:12]
     telemetry = Path(config["logging"]["events_path"])
     logger = ExperimentLogger(telemetry, run_id=run_id, config_id=experiment["config_id"])
     logger.emit(
