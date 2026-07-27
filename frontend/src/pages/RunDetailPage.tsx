@@ -1,18 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "../router";
 import { api } from "../api";
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from "../components/ui";
+import { connectRunEventStream, mergeRunEvents } from "../runEventStream";
 import type { ArtifactInfo, RunEvent, RunRecord, Trajectory } from "../types";
 import { terminalStatuses } from "../types";
 import { eventTitle, eventTone, formatBytes, formatDate, formatDuration, stringValue } from "../utils";
 
 type DetailTab = "timeline" | "diff" | "validation" | "artifacts";
-
-const streamEvents = [
-  "run_created", "worker_started", "run_start", "model_start", "model_end", "tool_start", "tool_end",
-  "validation_start", "validation_end", "artifact_created", "run_end", "run_status_changed", "run_cancelled",
-  "worker_start_failed",
-];
 
 function numberAt(source: Record<string, unknown> | undefined, ...path: string[]): number | null {
   let value: unknown = source;
@@ -36,7 +31,6 @@ export function RunDetailPage() {
   const [error, setError] = useState("");
   const [streamState, setStreamState] = useState<"idle" | "connected" | "retrying">("idle");
   const [cancelling, setCancelling] = useState(false);
-  const lastEventId = useRef(0);
 
   const loadRun = useCallback(async () => {
     const next = await api.getRun(runId);
@@ -60,7 +54,6 @@ export function RunDetailPage() {
     try {
       const [, history] = await Promise.all([loadRun(), api.eventHistory(runId)]);
       setEvents(history);
-      lastEventId.current = history.at(-1)?.id || 0;
       await loadArtifacts();
       setError("");
     } catch (reason) {
@@ -74,28 +67,27 @@ export function RunDetailPage() {
 
   useEffect(() => {
     if (!run || terminalStatuses.has(run.status)) return;
-    const timer = window.setInterval(() => loadRun().catch(() => undefined), 2000);
+    const timer = window.setInterval(() => loadRun().catch(() => undefined), 15000);
     return () => window.clearInterval(timer);
   }, [loadRun, run?.status]);
 
   useEffect(() => {
     if (!run || terminalStatuses.has(run.status) || loading) return;
-    const source = new EventSource(`/api/runs/${runId}/events?after=${lastEventId.current}`);
-    source.onopen = () => setStreamState("connected");
-    const receive = (message: MessageEvent<string>) => {
-      const id = Number(message.lastEventId);
-      const item: RunEvent = {
-        id, event: message.type, created_at: new Date().toISOString(), data: JSON.parse(message.data) as Record<string, unknown>,
-      };
-      lastEventId.current = Math.max(lastEventId.current, id);
-      setEvents((current) => current.some((event) => event.id === id) ? current : [...current, item]);
-      if (["run_status_changed", "run_cancelled", "run_end"].includes(message.type)) {
-        loadRun().then((next) => { if (terminalStatuses.has(next.status)) loadArtifacts(); }).catch(() => undefined);
-      }
-    };
-    streamEvents.forEach((name) => source.addEventListener(name, receive as EventListener));
-    source.onerror = () => setStreamState("retrying");
-    return () => { source.close(); setStreamState("idle"); };
+    const after = events.reduce((largest, event) => Math.max(largest, event.id), 0);
+    return connectRunEventStream({
+      runId,
+      after,
+      onEvent: (item) => {
+        setEvents((current) => mergeRunEvents(current, item));
+        if (["run_status_changed", "run_cancelled", "run_end"].includes(item.event)) {
+          loadRun().then((next) => { if (terminalStatuses.has(next.status)) loadArtifacts(); }).catch(() => undefined);
+        }
+      },
+      onState: (state) => {
+        setStreamState(state === "connected" ? "connected" : state === "reconnecting" ? "retrying" : "idle");
+      },
+      onError: (reason) => setError(`实时事件格式错误：${reason.message}`),
+    });
   }, [loadArtifacts, loadRun, loading, run?.status, runId]);
 
   useEffect(() => {

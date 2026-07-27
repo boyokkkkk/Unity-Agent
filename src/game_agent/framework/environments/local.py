@@ -39,7 +39,11 @@ class LocalEnvironment:
                 "exception_info": f"An error occurred while executing the command: {e}",
                 "extra": {"exception_type": type(e).__name__, "exception": str(e)},
             }
-        self._check_finished(output)
+        try:
+            self._check_finished(output)
+        except Submitted as submitted:
+            submitted.tool_output = output
+            raise
         return output
 
     def _check_finished(self, output: dict):

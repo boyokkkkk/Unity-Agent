@@ -12,10 +12,11 @@
     "seed": 42
   },
   "model": {
-    "model_name": "openai/gpt-4o-mini",
+    "model_name": "openai/qwen-plus",
     "model_class": "litellm",
     "model_kwargs": {
       "drop_params": true,
+      "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "temperature": 0.0,
       "max_tokens": 2048,
       "seed": 42

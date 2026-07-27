@@ -6,12 +6,14 @@ The project-owned framework provides the reasoning loop, model adapter, format-e
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from pathlib import Path
 from typing import Any
 
 from game_agent.framework.agents import get_agent
 from game_agent.framework.environments import LocalEnvironment
+from game_agent.framework.exceptions import Submitted
 from game_agent.framework.models import get_model
 
 from .logging import ExperimentLogger
@@ -48,17 +50,22 @@ class KitchenEnvironment(LocalEnvironment):
         command = action.get("command", "")
         self.logger.emit("tool_start", tool="bash", command=command, cwd=cwd or self.config.cwd)
         output: dict[str, Any] = {"returncode": -1, "output": "", "exception_info": ""}
+        started = time.perf_counter()
         try:
             output = super().execute(action, cwd=cwd, timeout=timeout)
             return output
+        except Submitted as submitted:
+            output = getattr(submitted, "tool_output", output)
+            raise
         finally:
             self.logger.emit(
                 "tool_end",
                 tool="bash",
                 command=command,
                 returncode=output.get("returncode"),
-                output=output.get("output", "")[-8000:],
+                output=output.get("output", ""),
                 exception_info=output.get("exception_info", ""),
+                duration_ms=int((time.perf_counter() - started) * 1000),
             )
 
     def serialize(self) -> dict:
@@ -125,6 +132,8 @@ def run(task: str, config_path: Path, *, run_id: str | None = None) -> dict:
 
     agent_config = dict(config["agent"])
     agent_config["output_path"] = Path(config["logging"]["trajectory_path"])
+    agent_config["event_sink"] = logger.emit
+    agent_config["event_context_sink"] = logger.set_context
     agent = get_agent(model, environment, agent_config, default_type="default")
     try:
         result = agent.run(task)

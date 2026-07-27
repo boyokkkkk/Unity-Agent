@@ -58,7 +58,10 @@ class FrameworkTest(unittest.TestCase):
             self.assertEqual(agent.run("finish")["exit_status"], "Submitted")
             saved = json.loads(trajectory.read_text(encoding="utf-8"))
             self.assertEqual(saved["info"]["framework_version"], "2.4.6-local")
-            self.assertEqual(saved["info"]["model_stats"], {"instance_cost": 0.25, "api_calls": 1})
+            self.assertEqual(
+                saved["info"]["model_stats"],
+                {"instance_cost": 0.25, "api_calls": 1, "tool_calls": 1},
+            )
             self.assertEqual(saved["trajectory_format"], "mini-swe-agent-1.1")
 
 

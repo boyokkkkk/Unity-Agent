@@ -53,6 +53,17 @@ Last-Event-ID: 42
 or `GET /api/runs/{run_id}/events?after=42`. Worker JSONL events are ingested into
 SQLite while the process is running, so browser refreshes do not lose event history.
 
+All SSE records use one stable event type and the same envelope as the history API:
+
+```text
+id: 43
+event: run_event
+data: {"id":43,"event":"tool_end","created_at":"...","data":{...}}
+```
+
+Clients listen for `run_event`, merge by the numeric `id`, and treat the nested
+`event` field as the domain event name.
+
 ## Lifecycle and artifacts
 
 Run states are `pending`, `running`, `submitted`, `failed`, `cancelled`, and

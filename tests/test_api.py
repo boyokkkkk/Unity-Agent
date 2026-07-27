@@ -207,8 +207,27 @@ class ApiTest(unittest.TestCase):
             history = client.get(f"/api/runs/{run_id}/events/history").json()
             self.assertIn("run_start", [event["event"] for event in history])
             event_stream = client.get(f"/api/runs/{run_id}/events")
-            self.assertIn("event: run_start", event_stream.text)
+            self.assertIn("event: run_event", event_stream.text)
             self.assertIn("id:", event_stream.text)
+            data_lines = [
+                json.loads(line.removeprefix("data: "))
+                for line in event_stream.text.splitlines()
+                if line.startswith("data: ")
+            ]
+            self.assertIn("run_start", [item["event"] for item in data_lines])
+            self.assertTrue(all({"id", "event", "created_at", "data"} <= set(item) for item in data_lines))
+            cursor = history[1]["id"]
+            resumed = client.get(
+                f"/api/runs/{run_id}/events?after=0",
+                headers={"Last-Event-ID": str(cursor)},
+            )
+            resumed_items = [
+                json.loads(line.removeprefix("data: "))
+                for line in resumed.text.splitlines()
+                if line.startswith("data: ")
+            ]
+            self.assertTrue(resumed_items)
+            self.assertTrue(all(item["id"] > cursor for item in resumed_items))
 
 
 if __name__ == "__main__":

@@ -102,8 +102,8 @@ def create_app(*, data_dir: Path | None = None, manager: RunManager | None = Non
                     idle_ticks = 0
                     for item in events:
                         cursor = item["id"]
-                        data = json.dumps(item["data"], ensure_ascii=False)
-                        yield f"id: {cursor}\nevent: {item['event']}\ndata: {data}\n\n"
+                        data = json.dumps(item, ensure_ascii=False)
+                        yield f"id: {cursor}\nevent: run_event\ndata: {data}\n\n"
                 else:
                     idle_ticks += 1
                     current = run_manager.get(run_id)

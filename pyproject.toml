@@ -23,6 +23,7 @@ web = [
 
 [project.scripts]
 game-agent = "game_agent.cli:main"
+game-agent-console = "game_agent.console:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

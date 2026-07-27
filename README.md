@@ -10,7 +10,7 @@ SkillGameAgent 是面向 Unity 项目级代码修改实验的 Agent 框架，研
 |---|---|---|
 | Agent 控制循环 | 已完成 | 本地 `DefaultAgent`，支持轮数、成本、时间和格式错误限制 |
 | 本地命令环境 | 已完成 | 本地 `LocalEnvironment`，支持 bash 工具调用和提交检测 |
-| 模型适配 | 已完成 | 本地 `LitellmModel`，当前默认模型为 `openai/gpt-4o-mini` |
+| 模型适配 | 已完成 | 本地 `LitellmModel`，当前默认通过 OpenAI 兼容模式调用百炼 `qwen-plus` |
 | Unity 适配 | 已完成基础版 | 校验 Unity 项目、限制工具格式、记录实验事件 |
 | CLI | 已完成 | 支持自然语言任务和固定实验配置 |
 | 实验日志 | 已完成基础版 | 输出 `events.jsonl` 和 `trajectory.json` |
@@ -106,14 +106,15 @@ $env:PYTHONPATH="src"
 - 日志路径必须是当前机器可写路径；
 - API Key 只能通过环境变量提供，不能写入 JSON 或提交到 Git。
 
-OpenAI 兼容模型示例：
+阿里云百炼 OpenAI 兼容模式：
 
 ```powershell
-$env:OPENAI_API_KEY="你的 API Key"
+$env:OPENAI_API_KEY="你的百炼 API Key"
+$env:OPENAI_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
 $env:PYTHONPATH="src"
 ```
 
-更换模型时，同时修改配置中的 `model.model_name` 和对应提供商环境变量。
+默认配置使用 `openai/qwen-plus`，并在 `model.model_kwargs.api_base` 中显式指定中国内地百炼兼容端点。API Key 与 Base URL 必须属于同一区域。
 
 ## 5. 最新 CLI 运行方式
 
@@ -153,6 +154,38 @@ echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT
 只有检测到该提交标记时，CLI 才以成功状态退出。达到轮数、成本、时间限制或发生异常时会以失败状态退出。
 
 `fixture` 是旧版本地回归入口。当前工作区已经不包含 `baseline/Unity2D`，因此它不是最新可运行方式；只有恢复对应基线项目后才能使用 `configs/week1.json`。
+
+### 5.1 独立终端 Agent 对话
+
+开发过程中不启动 FastAPI 和 React，也可以直接进入连续 Agent 会话：
+
+```powershell
+$env:PYTHONPATH="src"
+
+.\scripts\start-console.ps1
+```
+
+也可以直接运行 Python 模块，或在重新执行 `pip install -e .` 后使用安装入口：
+
+```powershell
+.\.venv\Scripts\python.exe -m game_agent.console --config configs\kitchen_chaos.json
+game-agent-console --config configs\kitchen_chaos.json
+```
+
+终端会实时显示 Run、Agent、Model、Environment、bash、验证和真实 Skill
+事件。普通输入在当前任务中继承完整上下文，最小命令集为：
+
+```text
+/new [可选任务]   保存当前任务并创建新上下文
+/status           查看调用、耗时与代码变更统计
+/diff             查看当前工程 Git patch
+/help             查看帮助
+/exit             保存产物并退出
+```
+
+每个终端任务保存在 `artifacts/console/{task_id}/`，包含解析后的配置、
+结构化事件、完整多轮 trajectory、最终结果和 `diff.patch`。使用
+`--task "..." --once` 可以执行单次非交互调试。
 
 ## 6. Agent 运行过程
 
@@ -210,7 +243,7 @@ Web 服务落地前必须增加服务端路径白名单，不能只依赖提示�
 | 配置项 | 当前值 |
 |---|---|
 | Agent 后端 | `skill-game-agent-framework-2.4.6-local` |
-| 模型 | `openai/gpt-4o-mini` |
+| 模型 | `openai/qwen-plus`（阿里云百炼 OpenAI 兼容模式） |
 | 工具 | `bash` |
 | 温度 | `0.0` |
 | 最大输入上下文 | `12000` tokens |

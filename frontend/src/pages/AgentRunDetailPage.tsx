@@ -3,6 +3,7 @@ import { api } from "../api";
 import { Icon } from "../components/Icon";
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from "../components/ui";
 import { Link, useParams } from "../router";
+import { connectRunEventStream, mergeRunEvents, type StreamState } from "../runEventStream";
 import type { ArtifactInfo, RunEvent, RunRecord, Trajectory } from "../types";
 import { terminalStatuses } from "../types";
 import { eventTitle, formatBytes, formatDate, formatDuration, stringValue } from "../utils";
@@ -20,8 +21,7 @@ function numberAt(source: Record<string, unknown> | undefined, ...path: string[]
 }
 
 function stepKind(event: RunEvent): StepKind {
-  const searchable = `${event.event} ${stringValue(event.data.skill || event.data.command || event.data.name)}`.toLowerCase();
-  if (searchable.includes("skill")) return "skill";
+  if (event.event.startsWith("skill_")) return "skill";
   if (event.event.startsWith("tool_")) return "tool";
   if (event.event.startsWith("validation_")) return "validation";
   if (event.event.startsWith("model_")) return "thinking";
@@ -83,6 +83,7 @@ export function AgentRunDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [streamState, setStreamState] = useState<StreamState>("closed");
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -96,12 +97,52 @@ export function AgentRunDetailPage() {
     finally { if (!quiet) setLoading(false); }
   }, [runId]);
 
+  const refreshOutcome = useCallback(async () => {
+    try {
+      const nextRun = await api.getRun(runId);
+      setRun(nextRun);
+      if (terminalStatuses.has(nextRun.status)) {
+        const [history, items, nextDiff, nextTrajectory] = await Promise.all([
+          api.eventHistory(runId), api.artifacts(runId).catch(() => []),
+          api.diff(runId).catch(() => null), api.trajectory(runId).catch(() => null),
+        ]);
+        setEvents((current) => mergeRunEvents(current, history));
+        setArtifacts(items);
+        setDiff(nextDiff);
+        setTrajectory(nextTrajectory);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法刷新任务状态");
+    }
+  }, [runId]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     if (!run || terminalStatuses.has(run.status)) return;
-    const timer = window.setInterval(() => load(true), 2500);
-    return () => window.clearInterval(timer);
-  }, [load, run?.status]);
+    const after = events.reduce((largest, event) => Math.max(largest, event.id), 0);
+    const close = connectRunEventStream({
+      runId,
+      after,
+      onEvent: (event) => {
+        setEvents((current) => mergeRunEvents(current, event));
+        if (
+          event.event === "run_end"
+          || event.event === "run_status_changed"
+          || event.event === "run_cancelled"
+          || event.event === "worker_start_failed"
+        ) {
+          void refreshOutcome();
+        }
+      },
+      onState: setStreamState,
+      onError: (reason) => setError(`实时事件格式错误：${reason.message}`),
+    });
+    const timer = window.setInterval(() => { void refreshOutcome(); }, 15000);
+    return () => {
+      window.clearInterval(timer);
+      close();
+    };
+  }, [refreshOutcome, run?.status, runId]);
 
   const validationEvents = events.filter((item) => item.event.startsWith("validation_"));
   const modelCalls = numberAt(trajectory?.info as Record<string, unknown> | undefined, "model_stats", "api_calls");
@@ -123,7 +164,9 @@ export function AgentRunDetailPage() {
     <div className="breadcrumb"><Link to="/workspace">项目工作台</Link><span>/</span><Link to="/runs">任务与对话</Link><span>/</span><strong>{run.run_id}</strong></div>
     <header className="detail-header agent-detail-header">
       <div className="detail-title"><div className="run-kicker"><StatusBadge status={run.status} pulse={run.status === "running"} />
-        {run.status === "running" && <span className="stream-indicator connected"><i />实时同步</span>}</div>
+        {run.status === "running" && <span className={`stream-indicator ${streamState === "connected" ? "connected" : ""}`}><i />{
+          streamState === "connected" ? "实时同步" : streamState === "reconnecting" ? "正在重连" : "正在连接"
+        }</span>}</div>
         <h1>{run.task}</h1><p><code>{run.run_id}</code><span>·</span>{run.project_path}</p></div>
       <div className="detail-actions"><button className="button button-secondary" onClick={() => load()}><Icon name="refresh" size={16} />刷新</button>
         {!terminalStatuses.has(run.status) && <button className="button button-danger" disabled={cancelling} onClick={cancel}>{cancelling ? "正在取消" : "取消任务"}</button>}</div>
