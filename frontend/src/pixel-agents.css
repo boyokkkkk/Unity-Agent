@@ -1,0 +1,39 @@
+/* Character sprites adapted from pixel-agents (MIT). Each sheet: 7 × 3 frames, 16 × 32 px. */
+.pixel-agent.sprite-agent {
+  top: 50px;
+  left: calc(50% - 16px);
+  width: 32px;
+  height: 64px;
+  background-repeat: no-repeat;
+  background-size: 224px 192px;
+  background-position: -32px 0;
+  image-rendering: pixelated;
+  filter: drop-shadow(4px 6px 1px rgba(55, 39, 64, .16));
+  animation: none;
+}
+.sprite-agent.sprite-char-0 { background-image: url("/assets/pixel-agents/characters/char_0.png"); }
+.sprite-agent.sprite-char-1 { background-image: url("/assets/pixel-agents/characters/char_1.png"); }
+.sprite-agent.sprite-char-2 { background-image: url("/assets/pixel-agents/characters/char_2.png"); }
+.sprite-agent.sprite-char-3 { background-image: url("/assets/pixel-agents/characters/char_3.png"); }
+.sprite-agent.sprite-char-4 { background-image: url("/assets/pixel-agents/characters/char_4.png"); }
+.sprite-agent.sprite-char-5 { background-image: url("/assets/pixel-agents/characters/char_5.png"); }
+.sprite-agent.is-idle { opacity: .74; }
+.sprite-agent.is-working { opacity: 1; }
+.sprite-agent.phase-0.is-working,
+.sprite-agent.phase-1.is-working { animation: agent-read .72s steps(1, end) infinite; }
+.sprite-agent.phase-2.is-working,
+.sprite-agent.phase-3.is-working { animation: agent-type .58s steps(1, end) infinite; }
+@keyframes agent-read {
+  0%, 49% { background-position: -160px 0; }
+  50%, 100% { background-position: -192px 0; }
+}
+@keyframes agent-type {
+  0%, 49% { background-position: -96px 0; }
+  50%, 100% { background-position: -128px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sprite-agent.phase-0.is-working,
+  .sprite-agent.phase-1.is-working { animation: none; background-position: -160px 0; }
+  .sprite-agent.phase-2.is-working,
+  .sprite-agent.phase-3.is-working { animation: none; background-position: -96px 0; }
+}

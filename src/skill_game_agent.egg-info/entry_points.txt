@@ -1,0 +1,2 @@
+[console_scripts]
+game-agent = game_agent.cli:main

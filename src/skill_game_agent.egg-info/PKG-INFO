@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: skill-game-agent
+Version: 0.2.0
+Requires-Python: >=3.10
+Requires-Dist: jinja2
+Requires-Dist: litellm!=1.82.7,!=1.82.8,>=1.75.5
+Requires-Dist: pydantic>=2
+Requires-Dist: pyyaml
+Requires-Dist: tenacity
+Provides-Extra: web
+Requires-Dist: fastapi>=0.115; extra == "web"
+Requires-Dist: httpx>=0.27; extra == "web"
+Requires-Dist: uvicorn[standard]>=0.30; extra == "web"

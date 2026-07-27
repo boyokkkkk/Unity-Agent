@@ -1,0 +1,10 @@
+jinja2
+litellm!=1.82.7,!=1.82.8,>=1.75.5
+pydantic>=2
+pyyaml
+tenacity
+
+[web]
+fastapi>=0.115
+httpx>=0.27
+uvicorn[standard]>=0.30
