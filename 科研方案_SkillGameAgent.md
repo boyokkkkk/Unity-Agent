@@ -220,7 +220,94 @@ SWE-game-bench 只选取 4–8 个可复现的 Golden Unity Issue，作为外部
 
 不要同时改变图、Skill、模型、工具和 Token 预算，否则无法解释结果。
 
-## 8. 六周执行计划
+## 8. 当前 Baseline 实现进度（截至 2026-07-29）
+
+### 8.1 当前定位
+
+当前 baseline 已经完成从“mini-SWE-agent 核心控制循环复现”到“可承载 Unity 受控实验”的两阶段建设。其定位不再只是能够调用模型和执行命令的最小 Agent，而是具备任务隔离、Unity 验证、稳定轨迹、批量消融和结果聚合能力的科研实验底座。
+
+需要区分两种完成度：
+
+- **Unity 科研 baseline 完成度较高**：P0 可信执行层和 P1 科研实验层已经实现；
+- **mini-SWE-agent 完整产品 parity 仍然有限**：当前只对研究所需核心行为建立精选 parity，并未复现全部上游组件和约 447 项上游测试。
+
+因此，当前状态应表述为“Unity Agent 可信执行与可重复实验基础设施基本完成”，而不是“完整复现 mini-SWE-agent”或“研究假设已经得到验证”。
+
+### 8.2 P0：可信执行底座
+
+| 能力 | 当前状态 | 科研作用 |
+| ---- | -------- | -------- |
+| 精选核心 parity 测试 | 已完成 | 使用确定性 fixture 对比本地与 vendored mini-SWE-agent 的消息顺序、FormatError、成本/步数边界和 trajectory 公共字段 |
+| Unity Compile 验证 | 已完成 | 解析 Editor 退出码、日志与编译错误，避免只依据进程返回码判断成功 |
+| Unity EditMode / PlayMode 验证 | 已完成 | 解析测试 XML，并区分 passed、failed、missing 和 `skipped_unavailable` |
+| 任务级 workspace 隔离 | 已完成 | 优先使用 Git worktree；不可用时使用过滤复制，不直接修改源 Unity 项目 |
+| 完整进程树回收 | 已完成 | Windows 下回收任务派生进程，降低 Unity Editor 或工具进程泄漏对后续实验的污染 |
+| 稳定 trajectory schema | 已完成 | 固定 schema version、messages、turn results、退出状态、提交内容、模型统计和配置等基础字段 |
+| Unity 资源安全检查 | 已完成 | 覆盖资源与 `.meta` 配对、GUID 重复/外部引用，以及 Scene/Prefab YAML 基础兼容性 |
+
+P0 的直接结果是：任务成功不再仅等价于 Agent 输出提交标记，而可以分别记录 `agent_success` 和 `verified_success`。当验证器已启用但 Unity Editor 不可用时，结果会被显式标记为 `skipped_unavailable`，不会被误计为验证成功。
+
+### 8.3 P1：科研实验支持
+
+| 能力 | 当前状态 | 实现语义 |
+| ---- | -------- | -------- |
+| Unity/GameDevBench 风格 adapter | 已完成 | 将任务、项目、模型、Skill、seed 和验证产物统一映射为稳定 benchmark result |
+| 批量与并行执行 | 已完成 | 使用线程池调度，每个真实 Unity case 在独立 spawn 进程和独立 workspace 中运行 |
+| 断点续跑 | 已完成 | 每个 case 完成后原子更新 `progress.json`；恢复时跳过已成功 case |
+| 失败重试 | 已完成 | 支持单次运行重试和 resume 后重试失败项；attempt 目录只追加、不覆盖 |
+| 消融矩阵 | 已完成 | 确定性展开 `task × model × skill × seed`；完整配置变化会生成新的 case ID |
+| 指标聚合 | 已完成 | 汇总总体及按 model、skill、seed、组合分组的成功率、验证结果、成本、token、轮数、调用数和耗时 |
+| 结果导出 | 已完成 | 生成 `progress.json`、`results.json`、`summary.json` 和 `results.csv` |
+| 受控组件 registry | 已完成 | Agent、Environment、Model 和 Benchmark Adapter 只接受显式注册别名，不允许 manifest 任意动态导入模块路径 |
+| LiteLLM Responses variant | 已完成 | 支持 Responses 风格 function call 和基于 `call_id` 的 `function_call_output` observation |
+| OpenRouter | 已完成协议实现 | 支持 Chat Completions 和无状态 Responses 两种变体，使用 `OPENROUTER_API_KEY` |
+
+当前受控模型别名包括：`litellm`、`litellm_response`、`responses`、`openrouter` 和 `openrouter_response`。Responses 变体会回放完整 response output item 历史，不依赖服务端保存会话状态。
+
+### 8.4 当前验证证据与使用入口
+
+截至本次更新，仓库全量 Python 回归测试为 **46 项，全部通过**，其中包括 4 项 vendored mini-SWE-agent 核心 parity 测试、P0 Unity/隔离/schema 测试和 7 项 P1 registry/model/benchmark 测试；`compileall` 同样通过。示例 manifest 能确定性展开 12 个 `model × skill × seed` case。
+
+实验入口为：
+
+```powershell
+game-agent-benchmark --manifest configs/benchmark.example.json --dry-run
+game-agent-benchmark --manifest configs/benchmark.example.json
+game-agent-benchmark --list-components
+```
+
+单次 benchmark 的产物结构为：
+
+```text
+artifacts/benchmarks/{benchmark_id}/
+├── progress.json
+├── results.json
+├── summary.json
+├── results.csv
+└── cases/{case_id}/attempt-{number}/
+```
+
+当前自动测试使用确定性模型和 mock provider 验证协议与调度逻辑，尚未完成以下外部实证：
+
+- 使用真实 API Key 对 OpenRouter Chat/Responses 进行在线调用；
+- 在目标 Unity Editor 和真实项目上批量运行 Compile/EditMode/PlayMode；
+- 运行完整 GameDevBench 或 SWE-game-bench 任务集；
+- 用真实实验结果计算置信区间、显著性检验和失败类型分布。
+
+### 8.5 与论文研究主线的剩余差距
+
+当前完成的是可信、可重复的实验底座，尚未完成论文的主要创新与实证部分：
+
+1. Unity 类型化代码—资产项目图及六类核心关系；
+2. A0/A1/A2 影响范围定位对照与人工 gold 标注；
+3. Graph-Conditioned Verified Skill 的抽取、检索和前置条件匹配；
+4. 三个 Skill 家族、迁移任务和负迁移控制任务；
+5. A2-T/A2-S/A2-G 与 A2-G-CT/A2-G-CTP 的真实消融结果；
+6. SWE-game-bench 外部有效性验证。
+
+仍未纳入 baseline 的上游产品组件包括 InteractiveAgent、Docker/Singularity/Bubblewrap/SWE-ReX 环境、Portkey、Requesty、SWE-bench runner、ProgramBench runner 和 Inspector。动态组件导入没有照搬上游，而是出于实验可控性主动替换为受控 registry。上述缺口不会阻塞当前 Unity 受控实验，但意味着本项目仍不应宣称具备 mini-SWE-agent 的完整产品覆盖率。
+
+## 9. 六周执行计划
 
 ### 第 1 周：统一 Agent 基线
 
@@ -264,11 +351,11 @@ SWE-game-bench 只选取 4–8 个可复现的 Golden Unity Issue，作为外部
 
 第 3 周结束时，如果项目图无法稳定导出或定位评测无法完成，则暂停大规模 Skill 迁移和截图评测，先完成“项目图 → 影响范围定位”的最小闭环。Play Mode 和 SWE-game-bench 都属于可延期扩展项。
 
-## 9. 最终贡献表述
+## 10. 最终贡献表述
 
 本文研究 Unity 仓库级功能修改中的结构化项目理解与经验迁移问题。首先，构建连接 C# 程序符号、Scene、GameObject、Component、Prefab 和序列化引用的 Unity 类型化代码—资产依赖图，并将其用于需求影响范围定位。其次，将成功开发轨迹抽象为包含图前置条件、变换步骤、后置条件、验证器和失败模式的 Graph-Conditioned Verified Skill，评估其在命名不同但结构相似任务上的迁移能力。最后，通过 Compile、Test 和 Play Mode 状态断言建立受控验证闭环，分析项目图、结构化 Skill 和运行反馈对定位准确率、任务成功率、负迁移率和上下文成本的独立影响。
 
-## 10. 优先级总结
+## 11. 优先级总结
 
 ### 必须完成
 
