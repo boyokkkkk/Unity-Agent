@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from game_agent.framework.exceptions import FormatError
 from game_agent.framework.models import GLOBAL_MODEL_STATS
 from game_agent.framework.models.utils.actions_toolcall import (
-    BASH_TOOL,
+    AGENT_TOOLS,
     format_toolcall_observation_messages,
     parse_toolcall_actions,
 )
@@ -66,7 +66,7 @@ class LitellmModel:
             return litellm.completion(
                 model=self.config.model_name,
                 messages=messages,
-                tools=[BASH_TOOL],
+                tools=AGENT_TOOLS,
                 **(self.config.model_kwargs | kwargs),
             )
         except litellm.exceptions.AuthenticationError as e:
@@ -78,16 +78,34 @@ class LitellmModel:
         prepared = _reorder_anthropic_thinking_blocks(prepared)
         return set_cache_control(prepared, mode=self.config.set_cache_control)
 
+    @staticmethod
+    def _conservative_token_estimate(value: Any) -> int:
+        '''Return a deliberately conservative fallback when a tokenizer is unavailable.'''
+        serialized = json.dumps(value, ensure_ascii=False, default=str, separators=(',', ':'))
+        return max(1, len(serialized.encode('utf-8')))
+
+    def estimate_input_tokens(self, messages: list[dict[str, str]]) -> int:
+        '''Estimate request tokens, including the tool schema sent with every request.'''
+        prepared = self._prepare_messages_for_api(messages)
+        try:
+            message_tokens = int(litellm.token_counter(model=self.config.model_name, messages=prepared))
+        except Exception:
+            message_tokens = self._conservative_token_estimate(prepared)
+        tool_tokens = self._conservative_token_estimate(AGENT_TOOLS)
+        return max(1, message_tokens + tool_tokens)
+
     def query(self, messages: list[dict[str, str]], **kwargs) -> dict:
         for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):
             with attempt:
                 response = self._query(self._prepare_messages_for_api(messages), **kwargs)
         cost_output = self._calculate_cost(response)
+        usage_output = self._calculate_usage(response, messages)
         GLOBAL_MODEL_STATS.add(cost_output["cost"])
         # Note: all model.query() implementations must persist the response and cost on FormatError.
         try:
             actions = self._parse_actions(response)
         except FormatError as e:
+            e.messages[0].setdefault('extra', {}).update(usage_output)
             e.messages[0]["extra"].update(cost_output)
             try:
                 e.messages[0]["extra"]["response"] = response.model_dump(mode="json")
@@ -101,9 +119,37 @@ class LitellmModel:
             "actions": actions,
             "response": response.model_dump(),
             **cost_output,
+            **usage_output,
             "timestamp": time.time(),
         }
         return message
+
+    def _calculate_usage(self, response: Any, messages: list[dict]) -> dict[str, int]:
+        '''Extract provider usage; conservatively estimate it when usage is omitted.'''
+        usage = getattr(response, 'usage', None)
+
+        def value(name: str) -> int:
+            if usage is None:
+                return 0
+            raw = usage.get(name, 0) if isinstance(usage, dict) else getattr(usage, name, 0)
+            return int(raw or 0)
+
+        prompt_tokens = value('prompt_tokens')
+        completion_tokens = value('completion_tokens')
+        total_tokens = value('total_tokens')
+        if prompt_tokens <= 0:
+            prompt_tokens = self.estimate_input_tokens(messages)
+        if completion_tokens <= 0:
+            choices = getattr(response, 'choices', []) or []
+            completion = choices[0].message.model_dump() if choices else {}
+            completion_tokens = self._conservative_token_estimate(completion)
+        if total_tokens <= 0:
+            total_tokens = prompt_tokens + completion_tokens
+        return {
+            'prompt_tokens': prompt_tokens,
+            'completion_tokens': completion_tokens,
+            'total_tokens': total_tokens,
+        }
 
     def _calculate_cost(self, response) -> dict[str, float]:
         try:

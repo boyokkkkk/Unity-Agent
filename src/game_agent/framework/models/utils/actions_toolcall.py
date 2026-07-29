@@ -8,23 +8,43 @@ from jinja2 import StrictUndefined, Template
 from game_agent.framework.exceptions import FormatError
 from game_agent.framework.models.utils.openai_multimodal import expand_multimodal_content
 
-BASH_TOOL = {
+POWERSHELL_TOOL = {
     "type": "function",
     "function": {
-        "name": "bash",
-        "description": "Execute a bash command",
+        "name": "powershell",
+        "description": "Execute a Windows PowerShell command in the Unity project",
         "parameters": {
             "type": "object",
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "The bash command to execute",
+                    "description": "A Windows PowerShell command; Unix shell commands are not available",
                 }
             },
             "required": ["command"],
         },
     },
 }
+
+SUBMIT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "submit",
+        "description": "Finish the task and return the final answer to the user",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string",
+                    "description": "The complete final answer, including relevant paths, changes, and verification",
+                }
+            },
+            "required": ["answer"],
+        },
+    },
+}
+
+AGENT_TOOLS = [POWERSHELL_TOOL, SUBMIT_TOOL]
 
 
 def parse_toolcall_actions(
@@ -42,7 +62,7 @@ def parse_toolcall_actions(
             {
                 "role": "user",
                 "content": Template(format_error_template, undefined=StrictUndefined).render(
-                    error="No tool calls found in the response. Every response MUST include at least one tool call.",
+                    error="No tool calls found. Call powershell to continue or submit to finish the task.",
                     actions=[],
                     has_tool_calls=False,
                     **template_kwargs,
@@ -58,10 +78,15 @@ def parse_toolcall_actions(
             args = json.loads(tool_call.function.arguments)
         except Exception as e:
             error_msg = f"Error parsing tool call arguments: {e}."
-        if tool_call.function.name != "bash":
-            error_msg += f"Unknown tool '{tool_call.function.name}'."
-        if not isinstance(args, dict) or "command" not in args:
-            error_msg += "Missing 'command' argument in bash tool call."
+        tool_name = tool_call.function.name
+        if tool_name == "powershell":
+            if not isinstance(args, dict) or not isinstance(args.get("command"), str) or not args["command"].strip():
+                error_msg += "Missing non-empty 'command' argument in powershell tool call."
+        elif tool_name == "submit":
+            if not isinstance(args, dict) or not isinstance(args.get("answer"), str) or not args["answer"].strip():
+                error_msg += "Missing non-empty 'answer' argument in submit tool call."
+        else:
+            error_msg += f"Unknown tool '{tool_name}'. Expected powershell or submit."
         if error_msg:
             raise FormatError(
                 {
@@ -72,7 +97,25 @@ def parse_toolcall_actions(
                     "extra": {"interrupt_type": "FormatError"},
                 }
             )
-        actions.append({"command": args["command"], "tool_call_id": tool_call.id})
+        if tool_name == "powershell":
+            actions.append(
+                {"tool": "powershell", "command": args["command"], "tool_call_id": tool_call.id}
+            )
+        else:
+            actions.append({"tool": "submit", "answer": args["answer"], "tool_call_id": tool_call.id})
+    if any(action["tool"] == "submit" for action in actions) and len(actions) != 1:
+        raise FormatError(
+            {
+                "role": "user",
+                "content": Template(format_error_template, undefined=StrictUndefined).render(
+                    actions=[],
+                    error="submit must be the only tool call in a response.",
+                    has_tool_calls=True,
+                    **template_kwargs,
+                ),
+                "extra": {"interrupt_type": "FormatError"},
+            }
+        )
     return actions
 
 
@@ -95,7 +138,6 @@ def format_toolcall_observation_messages(
         msg = {
             "content": content,
             "extra": {
-                "raw_output": output.get("output", ""),
                 "returncode": output.get("returncode"),
                 "timestamp": time.time(),
                 "exception_info": output.get("exception_info"),

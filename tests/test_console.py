@@ -16,19 +16,25 @@ class ConversationalFixtureModel:
         self.histories: list[list[dict]] = []
         self.calls = 0
 
+    def estimate_input_tokens(self, messages):
+        return 10
+
     def query(self, messages, **kwargs):
         self.histories.append(deepcopy(messages))
         self.calls += 1
         if self.calls % 2:
-            command = "echo inspected"
+            actions = [{"tool": "powershell", "command": "Write-Output inspected", "tool_call_id": f"call-{self.calls}"}]
         else:
-            command = f"echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT && echo answer-{self.calls // 2}"
+            actions = [{"tool": "submit", "answer": f"answer-{self.calls // 2}", "tool_call_id": f"call-{self.calls}"}]
         return {
             "role": "assistant",
             "content": "",
             "extra": {
-                "actions": [{"command": command, "tool_call_id": f"call-{self.calls}"}],
+                "actions": actions,
                 "cost": 0.1,
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
             },
         }
 
@@ -78,7 +84,7 @@ class ConsoleTaskTest(unittest.TestCase):
                         "config_id": "console-test",
                         "backend": "fixture",
                         "target_project": str(self.project),
-                        "tool": "bash",
+                        "tool": "powershell",
                         "max_input_tokens": 1000,
                         "max_output_tokens": 1000,
                         "max_total_tokens": 2000,
@@ -138,7 +144,7 @@ class ConsoleTaskTest(unittest.TestCase):
         self.assertIn("[Skill]", stream.getvalue())
 
     def test_events_and_artifacts_capture_component_rotation(self):
-        task, _, _ = self.create_task()
+        task, _, stream = self.create_task()
         (self.project / "source.txt").write_text("after\n", encoding="utf-8")
 
         task.run_turn("verify events")
@@ -157,15 +163,50 @@ class ConsoleTaskTest(unittest.TestCase):
         self.assertIn("agent_observation_added", names)
         self.assertTrue(all(event["returncode"] == 0 for event in events if event["event"] == "tool_end"))
         self.assertEqual({event["task_id"] for event in events}, {"console-task"})
-        for name in ("config.json", "events.jsonl", "trajectory.json", "result.json", "diff.patch"):
+        self.assertTrue(
+            all(
+                {"schema_version", "component", "phase", "turn", "round"} <= set(event)
+                and event["schema_version"] == "game-agent-jsonl-v3"
+                for event in events
+            )
+        )
+        for name in (
+            "config.json",
+            "events.jsonl",
+            "trajectory.json",
+            "result.json",
+            "diff.patch",
+            "workspace-baseline.json",
+        ):
             self.assertTrue((task.artifact_dir / name).is_file(), name)
         result = json.loads((task.artifact_dir / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(result["turn_count"], 1)
         self.assertEqual(result["model_calls"], 2)
+        self.assertEqual(result["token_usage"]["total_tokens"], 30)
+        self.assertIn("context", stream.getvalue())
         trajectory = json.loads((task.artifact_dir / "trajectory.json").read_text(encoding="utf-8"))
         self.assertEqual(trajectory["info"]["exit_status"], "Submitted")
         self.assertEqual(trajectory["info"]["submission"].strip(), "answer-1")
         self.assertIn("+after", (task.artifact_dir / "diff.patch").read_text(encoding="utf-8"))
+
+    def test_matching_skill_is_applied_to_agent_context_and_trajectory(self):
+        task, model, _ = self.create_task()
+
+        task.run_turn("find Unity source scripts")
+        task.close()
+
+        first_user_message = next(message for message in model.histories[0] if message["role"] == "user")
+        self.assertIn('<verified-skill name="unity-source-navigation">', first_user_message["content"])
+        events = [
+            json.loads(line)
+            for line in (task.artifact_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        names = [event["event"] for event in events]
+        self.assertLess(names.index("skill_search_start"), names.index("skill_matched"))
+        self.assertLess(names.index("skill_matched"), names.index("skill_apply_start"))
+        self.assertLess(names.index("skill_apply_start"), names.index("skill_apply_end"))
+        trajectory = json.loads((task.artifact_dir / "trajectory.json").read_text(encoding="utf-8"))
+        self.assertEqual(trajectory["applied_skills"][0]["name"], "unity-source-navigation")
 
     def test_session_new_command_starts_an_independent_task(self):
         stream = io.StringIO()

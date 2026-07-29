@@ -11,6 +11,7 @@ dependencies = [
     "litellm>=1.75.5,!=1.82.7,!=1.82.8",
     "pydantic>=2",
     "pyyaml",
+    "requests>=2.31",
     "tenacity",
 ]
 
@@ -24,6 +25,10 @@ web = [
 [project.scripts]
 game-agent = "game_agent.cli:main"
 game-agent-console = "game_agent.console:main"
+game-agent-benchmark = "game_agent.benchmark.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+game_agent = ["builtin_skills/**/SKILL.md"]

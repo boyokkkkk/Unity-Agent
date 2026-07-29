@@ -16,7 +16,13 @@ from game_agent.framework.agents.default import DefaultAgent
 from game_agent.framework.models import get_model
 from game_agent.logging import ExperimentLogger
 from game_agent.mini import KitchenEnvironment, load_config
-from game_agent.services.worker import _capture_diff, _write_json, prepare_run_config
+from game_agent.services.worker import (
+    _capture_diff,
+    _write_json,
+    capture_task_baseline,
+    prepare_run_config,
+)
+from game_agent.skills import build_skill_runtime
 
 
 HELP = """Commands:
@@ -87,6 +93,41 @@ class ConsoleRenderer:
         return text
 
     def handle(self, record: dict[str, Any]) -> None:
+        if record.get('event') == 'agent_limit_reached' and record.get('limit') in {
+            'max_input_tokens',
+            'max_total_tokens',
+        }:
+            input_tokens = record.get('input_tokens', 0)
+            max_input = record.get('max_input_tokens', 0)
+            total_tokens = record.get('total_tokens', 0)
+            max_total = record.get('max_total_tokens', 0)
+            self.write(
+                f'[Agent]  TOKEN LIMIT {record.get("limit")} | input {input_tokens:,}/{max_input:,} | '
+                f'total {total_tokens:,}/{max_total:,}'
+            )
+            return
+        if record.get('event') == 'model_preflight':
+            input_tokens = record.get('input_tokens', 0)
+            max_input = record.get('max_input_tokens', 0)
+            total_tokens = record.get('total_tokens', 0)
+            max_total = record.get('max_total_tokens', 0)
+            context_percent = record.get('context_usage_percent', 0.0)
+            input_text = f'{input_tokens:,}/{max_input:,}' if max_input else f'{input_tokens:,}/unlimited'
+            total_text = f'{total_tokens:,}/{max_total:,}' if max_total else f'{total_tokens:,}/unlimited'
+            self.write(
+                f'[Model]  request | input {input_text} | total {total_text} | context {context_percent:.1f}%'
+            )
+            return
+        if record.get('event') == 'model_usage':
+            prompt_tokens = record.get('prompt_tokens', 0)
+            completion_tokens = record.get('completion_tokens', 0)
+            total_tokens = record.get('total_tokens', 0)
+            max_total = record.get('max_total_tokens', 0)
+            self.write(
+                f'[Model]  usage | input {prompt_tokens:,} + output {completion_tokens:,} | '
+                f'total {total_tokens:,}/{max_total:,}'
+            )
+            return
         event = record["event"]
         if event == "turn_start":
             self.write(f"\n[Run]    Turn #{record['turn']} started")
@@ -97,7 +138,7 @@ class ConsoleRenderer:
         elif event == "model_end":
             seconds = record.get("duration_ms", 0) / 1000
             actions = record.get("action_count", 0)
-            outcome = f"{actions} bash action{'s' if actions != 1 else ''}" if actions else "message"
+            outcome = f"{actions} tool action{'s' if actions != 1 else ''}" if actions else "message"
             self.write(f"[Model]  {record.get('model', 'model')} | {seconds:.1f}s | {outcome}")
             content = self._bounded_output(record.get("content"))
             if content:
@@ -105,9 +146,7 @@ class ConsoleRenderer:
         elif event == "model_error":
             self.write(f"[Model]  ERROR {record.get('error_type', '')}: {record.get('error', '')}")
         elif event == "skill_not_found":
-            reason = record.get("reason")
-            detail = "Verified Skill runtime is not enabled" if reason == "runtime_disabled" else "no Skill matched"
-            self.write(f"[Skill]  {detail}")
+            self.write("[Skill]  no Skill matched")
         elif event == "skill_search_start":
             self.write(f"[Skill]  searching {record.get('query', 'available Skills')}")
         elif event == "skill_matched":
@@ -123,7 +162,7 @@ class ConsoleRenderer:
                 f"{record.get('error', '')}"
             )
         elif event == "tool_start":
-            self.write(f"[Env]    {record.get('tool', 'bash')}: {record.get('command', '')}")
+            self.write(f"[Env]    {record.get('tool', 'powershell')}: {record.get('command', '')}")
         elif event == "tool_end":
             seconds = record.get("duration_ms", 0) / 1000
             output = self._bounded_output(record.get("output"))
@@ -135,6 +174,12 @@ class ConsoleRenderer:
                 self.write("\n".join(f"         ERROR {line}" for line in exception.splitlines()))
         elif event == "agent_observation_added":
             self.write(f"[Agent]  observation appended | {record.get('message_count', 0)} messages")
+        elif event == "agent_progress_warning":
+            self.write(
+                f"[Agent]  progress warning | repeated {record.get('repeated_actions', 0)} | "
+                f"no progress {record.get('no_progress_rounds', 0)} | "
+                f"failures {record.get('consecutive_tool_failures', 0)}"
+            )
         elif event == "agent_limit_reached":
             self.write(
                 f"[Agent]  limit reached: {record.get('limit')} after {record.get('turn_model_calls', 0)} calls"
@@ -150,9 +195,13 @@ class ConsoleRenderer:
         summary = task.current_diff_summary()
         answer = result.get("submission") or result.get("error") or result.get("exit_status", "No final answer")
         elapsed = time.time() - task.started_at
+        self.write(
+            f'Tokens {task.agent.prompt_tokens:,} input + {task.agent.completion_tokens:,} output '
+            f'= {task.agent.total_tokens:,}/{task.agent.config.max_total_tokens:,}'
+        )
         self.write(f"\n✓ {answer}" if result.get("exit_status") == "Submitted" else f"\n! {answer}")
         self.write(
-            f"Calls  {task.agent.n_calls} model · {task.agent.n_tool_calls} shell\n"
+            f"Calls  {task.agent.n_calls} model · {task.agent.n_tool_calls} tools\n"
             f"Time   {elapsed:.1f}s\n"
             f"Files  {summary['files']} changed · +{summary['additions']} -{summary['deletions']}\n"
             f"Diff   {task.artifact_dir / 'diff.patch'}"
@@ -182,6 +231,11 @@ class ConsoleTask:
         self.task_id = task_id or uuid.uuid4().hex[:12]
         self.artifact_dir = artifact_root.resolve() / self.task_id
         self.artifact_dir.mkdir(parents=True, exist_ok=False)
+        self.workspace_baseline = capture_task_baseline(
+            self.project_path,
+            self.artifact_dir / "workspace-baseline.json",
+            exclude_paths=(self.artifact_dir,),
+        )
         resolved_config_path = prepare_run_config(config_path.resolve(), self.artifact_dir, self.project_path)
         self.config = load_config(resolved_config_path)
         self.renderer = renderer or ConsoleRenderer()
@@ -190,7 +244,7 @@ class ConsoleTask:
             self.artifact_dir / "events.jsonl",
             run_id=self.task_id,
             config_id=experiment["config_id"],
-            schema_version="game-agent-jsonl-v2",
+            schema_version="game-agent-jsonl-v3",
             context={"task_id": self.task_id},
             listeners=[self.renderer.handle],
         )
@@ -211,12 +265,19 @@ class ConsoleTask:
             output_path=self.artifact_dir / "trajectory.json",
             event_sink=self.logger.emit,
             event_context_sink=self.logger.set_context,
+            max_input_tokens=experiment["max_input_tokens"],
+            max_output_tokens=experiment["max_output_tokens"],
+            max_total_tokens=experiment["max_total_tokens"],
+            skill_runtime=build_skill_runtime(
+                self.config,
+                self.logger,
+                config_path=resolved_config_path,
+            ),
         )
         self.agent = DefaultAgent(self.model, self.environment, **agent_config)
         self.started_at = time.time()
         self.last_result: dict[str, Any] = {}
         self.closed = False
-        self.skill_reported = False
         self.logger.emit(
             "task_start",
             component="run",
@@ -230,13 +291,6 @@ class ConsoleTask:
         turn = self.agent.turn + 1
         self.logger.set_context(turn=turn, round=0)
         self.logger.emit("turn_start", component="run", request=request)
-        if not self.skill_reported:
-            self.logger.emit(
-                "skill_not_found",
-                component="skill",
-                reason="runtime_disabled",
-            )
-            self.skill_reported = True
         try:
             result = self.agent.run_turn(request)
             status = "completed" if result.get("exit_status") == "Submitted" else "stopped"
@@ -274,7 +328,7 @@ class ConsoleTask:
                 }
             },
         )
-        _capture_diff(self.project_path, self.artifact_dir / "diff.patch")
+        _capture_diff(self.project_path, self.artifact_dir / "diff.patch", self.workspace_baseline)
         _write_json(
             self.artifact_dir / "result.json",
             {
@@ -284,12 +338,13 @@ class ConsoleTask:
                 "model_calls": self.agent.n_calls,
                 "tool_calls": self.agent.n_tool_calls,
                 "model_cost": self.agent.cost,
+                'token_usage': self.agent.token_usage(),
                 **self.last_result,
             },
         )
 
     def current_diff(self) -> str:
-        _capture_diff(self.project_path, self.artifact_dir / "diff.patch")
+        _capture_diff(self.project_path, self.artifact_dir / "diff.patch", self.workspace_baseline)
         return (self.artifact_dir / "diff.patch").read_text(encoding="utf-8")
 
     def current_diff_summary(self) -> dict[str, int]:
@@ -297,10 +352,16 @@ class ConsoleTask:
 
     def status_text(self) -> str:
         summary = self.current_diff_summary()
+        token_status = (
+            f'Tokens {self.agent.prompt_tokens:,} input + {self.agent.completion_tokens:,} output '
+            f'= {self.agent.total_tokens:,}/{self.agent.config.max_total_tokens:,}\n'
+        )
         return (
+            token_status
+            +
             f"Task   {self.task_id}\n"
             f"Turn   {self.agent.turn}\n"
-            f"Calls  {self.agent.n_calls} model · {self.agent.n_tool_calls} shell\n"
+            f"Calls  {self.agent.n_calls} model · {self.agent.n_tool_calls} tools\n"
             f"Cost   ${self.agent.cost:.4f}\n"
             f"Time   {time.time() - self.started_at:.1f}s\n"
             f"Files  {summary['files']} changed · +{summary['additions']} -{summary['deletions']}"

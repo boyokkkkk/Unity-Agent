@@ -1,0 +1,60 @@
+{
+  "schema_version": "game-agent-benchmark-v1",
+  "benchmark_id": "kitchen-chaos-ablation-v1",
+  "adapter": "unity",
+  "output_dir": "../artifacts/benchmarks",
+  "tasks": [
+    {
+      "id": "pickup-regression",
+      "task": "检查玩家拾取物品逻辑，修复问题并运行相关 Unity 测试",
+      "project_path": "E:/Unity_project/Kitchen_Chaos/Kitchen_Chaos",
+      "config_path": "kitchen_chaos.json",
+      "tags": ["gameplay", "interaction"]
+    }
+  ],
+  "matrix": {
+    "models": [
+      {
+        "name": "qwen-chat",
+        "model_name": "openai/qwen-plus",
+        "model_class": "litellm",
+        "model_kwargs": {
+          "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          "temperature": 0.0,
+          "max_tokens": 2048,
+          "drop_params": true
+        },
+        "cost_tracking": "ignore_errors"
+      },
+      {
+        "name": "openrouter-responses",
+        "model_name": "openai/o4-mini",
+        "model_class": "openrouter_response",
+        "model_kwargs": {
+          "max_output_tokens": 4096
+        },
+        "cost_tracking": "default"
+      }
+    ],
+    "skills": [
+      {
+        "name": "no-skill",
+        "enabled": false,
+        "paths": []
+      },
+      {
+        "name": "unity-navigation",
+        "enabled": true,
+        "paths": ["../src/game_agent/builtin_skills/unity-source-navigation"]
+      }
+    ],
+    "seeds": [41, 42, 43]
+  },
+  "execution": {
+    "max_workers": 2,
+    "retries": 1,
+    "resume": true,
+    "retry_failed_on_resume": true
+  }
+}
+

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from game_agent.api.app import create_app
 from game_agent.persistence import Database
 from game_agent.services import RunManager
-from game_agent.services.worker import _capture_diff
+from game_agent.services.worker import _capture_diff, capture_task_baseline
 
 
 def fixture_worker(run_id: str, task: str, config_path: str, project_path: str, artifact_dir: str) -> None:
@@ -58,7 +58,7 @@ class ApiTest(unittest.TestCase):
         self.config.write_text(json.dumps({
             "experiment": {
                 "config_id": "test", "backend": "fixture", "target_project": str(self.project),
-                "tool": "bash", "max_input_tokens": 100, "max_output_tokens": 100,
+                "tool": "powershell", "max_input_tokens": 100, "max_output_tokens": 100,
                 "max_total_tokens": 100, "max_rounds": 2, "cost_limit": 1,
             },
             "model": {"model_name": "fixture"},
@@ -187,6 +187,37 @@ class ApiTest(unittest.TestCase):
         self.assertIn("+after", patch)
         self.assertIn("untracked.txt", patch)
         self.assertIn("+new", patch)
+
+    def test_task_diff_excludes_changes_that_existed_before_baseline(self):
+        repository = self.root / "baseline-repository"
+        repository.mkdir()
+        subprocess.run(["git", "init"], cwd=repository, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repository, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=repository, check=True)
+        tracked = repository / "tracked.txt"
+        tracked.write_text("committed\n", encoding="utf-8")
+        subprocess.run(["git", "add", "tracked.txt"], cwd=repository, check=True)
+        subprocess.run(["git", "commit", "-m", "initial"], cwd=repository, check=True, capture_output=True)
+
+        tracked.write_text("preexisting\n", encoding="utf-8")
+        (repository / "preexisting-untracked.txt").write_text("keep\n", encoding="utf-8")
+        baseline_path = self.root / "workspace-baseline.json"
+        baseline = capture_task_baseline(repository, baseline_path)
+        tracked.write_text("agent-change\n", encoding="utf-8")
+        (repository / "agent-created.txt").write_text("created\n", encoding="utf-8")
+
+        destination = self.root / "task-diff.patch"
+        _capture_diff(repository, destination, baseline)
+        patch = destination.read_text(encoding="utf-8")
+        metadata = json.loads(baseline_path.read_text(encoding="utf-8"))
+
+        self.assertIn("-preexisting", patch)
+        self.assertIn("+agent-change", patch)
+        self.assertIn("agent-created.txt", patch)
+        self.assertNotIn("preexisting-untracked.txt", patch)
+        self.assertTrue(metadata["tree"])
+        self.assertIn(" M tracked.txt", metadata["status"])
+        self.assertIn("?? preexisting-untracked.txt", metadata["status"])
 
     def test_run_artifact_and_sse_api(self):
         manager = self.manager()

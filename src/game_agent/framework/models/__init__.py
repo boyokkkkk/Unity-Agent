@@ -4,6 +4,8 @@ import copy
 import os
 import threading
 
+from game_agent.registry import COMPONENTS
+
 
 class GlobalModelStats:
     def __init__(self) -> None:
@@ -32,15 +34,32 @@ class GlobalModelStats:
 GLOBAL_MODEL_STATS = GlobalModelStats()
 
 
-def get_model(input_model_name: str, config: dict | None = None):
+def register_builtin_models() -> None:
     from game_agent.framework.models.litellm_model import LitellmModel
+    from game_agent.framework.models.litellm_response_model import LitellmResponseModel
+    from game_agent.framework.models.openrouter_model import OpenRouterModel
+    from game_agent.framework.models.openrouter_response_model import OpenRouterResponseModel
 
+    for name, factory in {
+        "litellm": LitellmModel,
+        "litellm_response": LitellmResponseModel,
+        "responses": LitellmResponseModel,
+        "openrouter": OpenRouterModel,
+        "openrouter_response": OpenRouterResponseModel,
+    }.items():
+        COMPONENTS.register("model", name, factory)
+
+
+def get_model(input_model_name: str, config: dict | None = None):
     model_config = copy.deepcopy(config or {})
     model_class = model_config.pop("model_class", "litellm")
-    if model_class not in {"", "litellm", "game_agent.framework.models.litellm_model.LitellmModel"}:
-        raise ValueError(f"Unknown model class: {model_class}")
+    model_class = {
+        "": "litellm",
+        "game_agent.framework.models.litellm_model.LitellmModel": "litellm",
+    }.get(model_class, model_class)
+    register_builtin_models()
     model_config["model_name"] = input_model_name
-    return LitellmModel(**model_config)
+    return COMPONENTS.create("model", model_class, **model_config)
 
 
-__all__ = ["GLOBAL_MODEL_STATS", "GlobalModelStats", "get_model"]
+__all__ = ["GLOBAL_MODEL_STATS", "GlobalModelStats", "get_model", "register_builtin_models"]

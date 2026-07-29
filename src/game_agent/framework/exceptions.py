@@ -14,6 +14,26 @@ class LimitsExceeded(InterruptAgentFlow):
     pass
 
 
+class InputTokenLimitExceeded(LimitsExceeded):
+    pass
+
+
+class TotalTokenLimitExceeded(LimitsExceeded):
+    pass
+
+
+class RepeatedActionExceeded(LimitsExceeded):
+    pass
+
+
+class NoProgressExceeded(LimitsExceeded):
+    pass
+
+
+class ConsecutiveToolFailuresExceeded(LimitsExceeded):
+    pass
+
+
 class TimeExceeded(LimitsExceeded):
     pass
 

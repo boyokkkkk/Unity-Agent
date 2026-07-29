@@ -6,6 +6,7 @@ Requires-Dist: jinja2
 Requires-Dist: litellm!=1.82.7,!=1.82.8,>=1.75.5
 Requires-Dist: pydantic>=2
 Requires-Dist: pyyaml
+Requires-Dist: requests>=2.31
 Requires-Dist: tenacity
 Provides-Extra: web
 Requires-Dist: fastapi>=0.115; extra == "web"

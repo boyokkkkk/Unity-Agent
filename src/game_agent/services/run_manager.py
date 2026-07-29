@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 import multiprocessing
-import os
 import sqlite3
-import subprocess
 import threading
 import time
 import uuid
@@ -13,6 +11,7 @@ from typing import Any, Callable
 
 from game_agent.mini import load_config
 from game_agent.persistence.database import Database, utc_now
+from game_agent.processes import terminate_process_tree
 
 from .worker import run_worker
 
@@ -171,10 +170,8 @@ class RunManager:
 
     @staticmethod
     def _terminate_process_tree(process: multiprocessing.Process) -> None:
-        if process.pid and os.name == "nt":
-            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True, check=False)
-        else:
-            process.terminate()
+        if process.pid:
+            terminate_process_tree(process.pid)
 
     def _index_artifacts(self, run_id: str) -> None:
         root = Path(self.get(run_id)["artifact_dir"])
