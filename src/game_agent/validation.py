@@ -16,6 +16,9 @@ from game_agent.unity_assets import audit_unity_assets
 
 
 VALIDATION_SCHEMA_VERSION = "game-agent-unity-validation-v1"
+TEST_PROCESS_EXIT_GRACE_SECONDS = 10.0
+TEST_RESULT_POLL_SECONDS = 0.1
+PROCESS_TERMINATION_GRACE_SECONDS = 2.0
 
 
 def find_unity_editor(project_path: Path, configured_path: str = "") -> Path | None:
@@ -36,19 +39,79 @@ def find_unity_editor(project_path: Path, configured_path: str = "") -> Path | N
     return None
 
 
+def _terminate_and_collect(process: subprocess.Popen[str]) -> str:
+    """Terminate the exact spawned tree, with a direct-process fallback and bounded waits."""
+    terminate_process_tree(process.pid)
+    try:
+        output, _ = process.communicate(timeout=PROCESS_TERMINATION_GRACE_SECONDS)
+        return output
+    except subprocess.TimeoutExpired:
+        process.kill()
+        output, _ = process.communicate(timeout=PROCESS_TERMINATION_GRACE_SECONDS)
+        return output
+
+
 def _run_process(arguments: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
     process = subprocess.Popen(
         arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         encoding="utf-8", errors="replace", start_new_session=os.name == "posix",
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
+    result_path: Path | None = None
+    if "-testResults" in arguments:
+        result_path = Path(arguments[arguments.index("-testResults") + 1])
+
+    if result_path is not None:
+        deadline = time.monotonic() + timeout
+        result_ready = False
+        while time.monotonic() < deadline:
+            if result_path.is_file():
+                try:
+                    ET.parse(result_path)
+                    result_ready = True
+                    break
+                except (ET.ParseError, OSError):
+                    pass
+            if process.poll() is not None:
+                break
+            time.sleep(TEST_RESULT_POLL_SECONDS)
+
+        if result_ready:
+            grace_deadline = min(deadline, time.monotonic() + TEST_PROCESS_EXIT_GRACE_SECONDS)
+            while process.poll() is None and time.monotonic() < grace_deadline:
+                time.sleep(TEST_RESULT_POLL_SECONDS)
+            forced_termination = process.poll() is None
+            if forced_termination:
+                output = _terminate_and_collect(process)
+            else:
+                output, _ = process.communicate()
+            completed = subprocess.CompletedProcess(arguments, process.returncode, stdout=output)
+            completed.result_ready = True
+            completed.forced_termination = forced_termination
+            completed.pid = process.pid
+            return completed
+
+        if process.poll() is not None:
+            output, _ = process.communicate()
+            completed = subprocess.CompletedProcess(arguments, process.returncode, stdout=output)
+            completed.result_ready = False
+            completed.forced_termination = False
+            completed.pid = process.pid
+            return completed
+
+        output = _terminate_and_collect(process)
+        raise subprocess.TimeoutExpired(arguments, timeout, output=output)
+
     try:
         output, _ = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        terminate_process_tree(process.pid)
-        output, _ = process.communicate()
+        output = _terminate_and_collect(process)
         raise subprocess.TimeoutExpired(arguments, timeout, output=output)
-    return subprocess.CompletedProcess(arguments, process.returncode, stdout=output)
+    completed = subprocess.CompletedProcess(arguments, process.returncode, stdout=output)
+    completed.result_ready = False
+    completed.forced_termination = False
+    completed.pid = process.pid
+    return completed
 
 
 class UnityValidator:
@@ -106,9 +169,11 @@ class UnityValidator:
             return result
         timeout = int(self.config.get("timeout_seconds", 1200))
         log_path = self.artifact_dir / f"{mode}.log"
-        arguments = [str(editor), "-batchmode", "-quit", "-projectPath", str(self.project_path), "-logFile", str(log_path)]
+        arguments = [str(editor), "-batchmode", "-projectPath", str(self.project_path), "-logFile", str(log_path)]
         result_path: Path | None = None
-        if mode != "compile":
+        if mode == "compile":
+            arguments.insert(2, "-quit")
+        else:
             platform = "EditMode" if mode == "editmode" else "PlayMode"
             result_path = self.artifact_dir / f"{mode}-results.xml"
             arguments += ["-runTests", "-testPlatform", platform, "-testResults", str(result_path)]
@@ -116,7 +181,8 @@ class UnityValidator:
         started = time.perf_counter()
         try:
             completed = self.runner(arguments, timeout)
-            status = "passed" if completed.returncode == 0 else "failed"
+            forced_termination = bool(getattr(completed, "forced_termination", False))
+            status = "passed" if completed.returncode == 0 or forced_termination else "failed"
             if completed.stdout and not log_path.exists():
                 log_path.write_text(completed.stdout, encoding="utf-8")
             result = {
@@ -124,29 +190,76 @@ class UnityValidator:
                 "duration_ms": int((time.perf_counter() - started) * 1000),
                 "log": log_path.name,
             }
+            if hasattr(completed, "pid"):
+                result["pid"] = int(completed.pid)
+            if forced_termination:
+                result["forced_termination"] = True
             if result_path is not None:
                 result["results"] = result_path.name
-                if status == "passed" and not result_path.is_file():
-                    result.update(status="failed", error="Unity did not produce a test result XML")
-                elif status == "passed":
+                if not result_path.is_file():
+                    result.update(
+                        status="failed",
+                        error_code="missing_test_results",
+                        error="Unity did not produce a test result XML",
+                    )
+                else:
                     try:
                         test_run = ET.parse(result_path).getroot()
+                        total = int(test_run.attrib.get("total", "0"))
+                        passed = int(test_run.attrib.get("passed", "0"))
                         failed = int(test_run.attrib.get("failed", "0"))
-                        if test_run.attrib.get("result", "").casefold() == "failed" or failed > 0:
-                            result.update(status="failed", failed_tests=failed, error="Unity tests failed")
+                        skipped = int(test_run.attrib.get("skipped", "0"))
+                        result.update(
+                            total_tests=total,
+                            passed_tests=passed,
+                            failed_tests=failed,
+                            skipped_tests=skipped,
+                        )
+                        if total < 1:
+                            result.update(
+                                status="failed",
+                                error_code="zero_tests",
+                                error="Unity test run contained zero tests",
+                            )
+                        elif test_run.attrib.get("result", "").casefold() != "passed" or failed > 0:
+                            result.update(
+                                status="failed",
+                                error_code="test_failures",
+                                error="Unity tests failed",
+                            )
                     except (ET.ParseError, ValueError) as exc:
-                        result.update(status="failed", error=f"Invalid Unity test result XML: {exc}")
+                        result.update(
+                            status="failed",
+                            error_code="invalid_test_results",
+                            error=f"Invalid Unity test result XML: {exc}",
+                        )
             log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
-            if status == "passed" and re.search(
+            if re.search(
+                r"(?:another Unity instance|project is already open|project.*(?:locked|lock file))",
+                log_text,
+                re.IGNORECASE,
+            ):
+                result.update(
+                    status="failed",
+                    error_code="project_locked",
+                    error="Unity project is locked by another Editor process",
+                )
+            elif status == "passed" and re.search(
                 r"(?:error CS\d{4}|scripts have compiler errors|compilation failed)", log_text, re.IGNORECASE
             ):
-                result.update(status="failed", error="Unity log contains compiler errors")
+                result.update(
+                    status="failed",
+                    error_code="compiler_errors",
+                    error="Unity log contains compiler errors",
+                )
+            if result["status"] == "failed" and "error_code" not in result and completed.returncode != 0:
+                result["error_code"] = "process_exit"
         except subprocess.TimeoutExpired as exc:
             if exc.output and not log_path.exists():
                 log_path.write_text(str(exc.output), encoding="utf-8")
             result = {
                 "name": mode, "status": "timed_out", "duration_ms": int((time.perf_counter() - started) * 1000),
-                "timeout_seconds": timeout, "log": log_path.name,
+                "error_code": "timeout", "timeout_seconds": timeout, "log": log_path.name,
             }
         self._emit("validation_end", validation=mode, **result)
         return result

@@ -6,19 +6,20 @@ SkillGameAgent 是面向 Unity 项目级代码修改实验的 Agent 框架，研
 
 ## 1. 当前状态
 
-| 模块 | 状态 | 说明 |
-|---|---|---|
-| Agent 控制循环 | 已完成 | 本地 `DefaultAgent`，支持轮数、成本、时间和格式错误限制 |
-| 本地命令环境 | 已完成 | 本地 `LocalEnvironment`，支持 bash 工具调用和提交检测 |
-| 模型适配 | 已完成 | 本地 `LitellmModel`，当前默认通过 OpenAI 兼容模式调用百炼 `qwen-plus` |
-| Unity 适配 | 已完成基础版 | 校验 Unity 项目、限制工具格式、记录实验事件 |
-| CLI | 已完成 | 支持自然语言任务和固定实验配置 |
-| 实验日志 | 已完成基础版 | 输出 `events.jsonl` 和 `trajectory.json` |
-| Unity 项目图 | 待实现 | Scene、Prefab、GameObject、Component、C# 符号和序列化引用 |
-| Verified Skill | 待实现 | Skill 抽取、匹配、迁移和负迁移控制 |
-| Compile/Test/PlayMode 验证器 | 待实现 | 当前由 Agent 自行执行命令，尚未形成统一验证接口 |
-| FastAPI 后端 | 已完成 MVP | RunManager、Worker 子进程、SQLite、REST/SSE、取消与 artifact API |
-| React 前端 | 已完成 MVP | 新建任务、实验列表、SSE 时间线、工具输出、diff、验证与错误/空状态 |
+
+| 模块                         | 状态         | 说明                                                                 |
+| ---------------------------- | ------------ | -------------------------------------------------------------------- |
+| Agent 控制循环               | 已完成       | 本地`DefaultAgent`，支持轮数、成本、时间和格式错误限制               |
+| 本地命令环境                 | 已完成       | 本地`LocalEnvironment`，支持 bash 工具调用和提交检测                 |
+| 模型适配                     | 已完成       | 本地`LitellmModel`，当前默认通过 OpenAI 兼容模式调用百炼 `qwen-plus` |
+| Unity 适配                   | 已完成基础版 | 校验 Unity 项目、限制工具格式、记录实验事件                          |
+| CLI                          | 已完成       | 支持自然语言任务和固定实验配置                                       |
+| 实验日志                     | 已完成基础版 | 输出`events.jsonl` 和 `trajectory.json`                              |
+| Unity 项目图                 | 待实现       | Scene、Prefab、GameObject、Component、C# 符号和序列化引用            |
+| Verified Skill               | 待实现       | Skill 抽取、匹配、迁移和负迁移控制                                   |
+| Compile/Test/PlayMode 验证器 | 待实现       | 当前由 Agent 自行执行命令，尚未形成统一验证接口                      |
+| FastAPI 后端                 | 已完成 MVP   | RunManager、Worker 子进程、SQLite、REST/SSE、取消与 artifact API     |
+| React 前端                   | 已完成 MVP   | 新建任务、实验列表、SSE 时间线、工具输出、diff、验证与错误/空状态    |
 
 当前执行链路：
 
@@ -32,6 +33,21 @@ CLI
  → Unity 项目
  → events.jsonl / trajectory.json
 ```
+
+更新进度
+
+
+
+| 模块           | 判断                     | 依据                                                                                                                                |
+| -------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Agent 核心循环 | 可用                     | 上下文、Token、重复动作、无进展、工具失败保护齐全                                                                                   |
+| FastAPI 后端   | MVP 可用                 | Run、取消、SSE、trajectory、diff、artifact 均有真实接口，[app.py (line 43)](E:/sysu-course/GameAgent/src/game\_agent/api/app.py:43) |
+| React 前端     | MVP 可用                 | 任务创建、列表、详情、SSE 恢复、产物展示已接真实 API                                                                                |
+| 任务隔离       | 基本完成                 | Git worktree/过滤复制、源工程保护，[workspace.py (line 87)](E:/sysu-course/GameAgent/src/game\_agent/workspace.py:87)               |
+| Unity 验证     | 代码完成、真实环境未验收 | 资产审计及三类 Editor 验证已实现，[validation.py (line 54)](E:/sysu-course/GameAgent/src/game\_agent/validation.py:54)              |
+| 实验基础设施   | 已具备                   | 支持任务×模型×Skill×种子的矩阵、重试、恢复、指标聚合                                                                             |
+| Unity 项目图   | 未开始                   | 无节点/边模型、导出器、图 API、图页面或 NetworkX 依赖                                                                               |
+| Verified Skill | 原型级                   | 有 Skill 加载与轨迹记录，但图条件匹配、抽取和负迁移控制尚未实现                                                                     |
 
 ## 2. 环境要求
 
@@ -240,18 +256,19 @@ Web 服务落地前必须增加服务端路径白名单，不能只依赖提示�
 
 默认实验变量：
 
-| 配置项 | 当前值 |
-|---|---|
-| Agent 后端 | `skill-game-agent-framework-2.4.6-local` |
-| 模型 | `openai/qwen-plus`（阿里云百炼 OpenAI 兼容模式） |
-| 工具 | `bash` |
-| 温度 | `0.0` |
-| 最大输入上下文 | `12000` tokens |
-| 单次最大输出 | `2048` tokens |
-| 最大总 Token | `81920` |
-| 最大 Agent 轮数 | `40` |
-| 成本上限 | `3.0` |
-| 随机种子 | `42` |
+
+| 配置项          | 当前值                                           |
+| --------------- | ------------------------------------------------ |
+| Agent 后端      | `skill-game-agent-framework-2.4.6-local`         |
+| 模型            | `openai/qwen-plus`（阿里云百炼 OpenAI 兼容模式） |
+| 工具            | `bash`                                           |
+| 温度            | `0.0`                                            |
+| 最大输入上下文  | `12000` tokens                                   |
+| 单次最大输出    | `2048` tokens                                    |
+| 最大总 Token    | `81920`                                          |
+| 最大 Agent 轮数 | `40`                                             |
+| 成本上限        | `3.0`                                            |
+| 随机种子        | `42`                                             |
 
 主要产物：
 

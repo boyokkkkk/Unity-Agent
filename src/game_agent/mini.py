@@ -17,6 +17,7 @@ from game_agent.framework.environments import LocalEnvironment
 from game_agent.framework.models import get_model
 
 from .logging import ExperimentLogger
+from .baseline import enrich_tool_event
 from .skills import build_skill_runtime
 from .validation import UnityValidator
 
@@ -105,8 +106,14 @@ class KitchenEnvironment(LocalEnvironment):
                 "exception_info": "Only the powershell execution tool is accepted by the environment.",
             }
         command = action.get("command", "")
+        event_details = enrich_tool_event(command)
         self.logger.emit(
-            "tool_start", component="environment", tool="powershell", command=command, cwd=cwd or self.config.cwd
+            "tool_start",
+            component="environment",
+            tool="powershell",
+            command=command,
+            cwd=cwd or self.config.cwd,
+            **event_details,
         )
         output: dict[str, Any] = {"returncode": -1, "output": "", "exception_info": ""}
         started = time.perf_counter()
@@ -123,6 +130,7 @@ class KitchenEnvironment(LocalEnvironment):
                 output=output.get("output", ""),
                 exception_info=output.get("exception_info", ""),
                 duration_ms=int((time.perf_counter() - started) * 1000),
+                **enrich_tool_event(command, output),
                 **output.get("extra", {}),
             )
 
@@ -174,6 +182,8 @@ def run(task: str, config_path: Path, *, run_id: str | None = None) -> dict:
         max_rounds=experiment["max_rounds"],
         task=task,
     )
+    logger.emit("task_start", component="run", task=task)
+    logger.emit("turn_start", component="run", request=task, turn=1)
 
     model_config = dict(config["model"])
     model_name = model_config.pop("model_name")
@@ -224,6 +234,14 @@ def run(task: str, config_path: Path, *, run_id: str | None = None) -> dict:
             trajectory_extensions,
         )
         logger.emit(
+            "turn_end",
+            component="run",
+            status="completed" if result.get("exit_status") == "Submitted" else "stopped",
+            exit_status=result.get("exit_status", ""),
+            submission=result.get("submission", ""),
+            turn=1,
+        )
+        logger.emit(
             "run_end",
             exit_status=result.get("exit_status", ""),
             submission=result.get("submission", ""),
@@ -231,7 +249,18 @@ def run(task: str, config_path: Path, *, run_id: str | None = None) -> dict:
             model_cost=getattr(agent, "cost", None),
             trajectory_path=config["logging"]["trajectory_path"],
         )
+        logger.emit("task_end", component="run", status="closed", turn=1)
         return result
     except Exception as exc:
+        logger.emit(
+            "turn_end",
+            component="run",
+            status="failed",
+            exit_status=type(exc).__name__,
+            submission="",
+            exception=str(exc),
+            turn=1,
+        )
         logger.emit("run_end", exit_status="exception", exception_type=type(exc).__name__, exception=str(exc))
+        logger.emit("task_end", component="run", status="failed", turn=1)
         raise

@@ -57,12 +57,14 @@ class ExperimentLogger:
         self.context = dict(context or {})
         self.listeners = list(listeners or [])
         self.sequence = 0
+        self._started_ns = time.perf_counter_ns()
 
     def set_context(self, **context: Any) -> None:
         self.context.update(context)
 
     def emit(self, event: str, **data: Any) -> dict[str, Any]:
         self.sequence += 1
+        monotonic_ns = time.perf_counter_ns()
         default_component, default_phase = self.EVENT_PHASES.get(event, ("run", "event"))
         component = data.pop("component", default_component)
         phase = data.pop("phase", default_phase)
@@ -71,6 +73,8 @@ class ExperimentLogger:
         record = {
             "schema_version": self.schema_version,
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "monotonic_ns": monotonic_ns,
+            "elapsed_ms": (monotonic_ns - self._started_ns) // 1_000_000,
             "run_id": self.run_id,
             "config_id": self.config_id,
             "seq": self.sequence,

@@ -9,6 +9,7 @@ requires-python = ">=3.10"
 dependencies = [
     "jinja2",
     "litellm>=1.75.5,!=1.82.7,!=1.82.8",
+    "networkx>=3.2",
     "pydantic>=2",
     "pyyaml",
     "requests>=2.31",
@@ -26,9 +27,14 @@ web = [
 game-agent = "game_agent.cli:main"
 game-agent-console = "game_agent.console:main"
 game-agent-benchmark = "game_agent.benchmark.cli:main"
+game-agent-baseline = "game_agent.baseline_cli:main"
+game-agent-graph = "game_agent.project_graph.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-game_agent = ["builtin_skills/**/SKILL.md"]
+game_agent = [
+    "builtin_skills/**/SKILL.md",
+    "project_graph/editor/*.cs",
+]

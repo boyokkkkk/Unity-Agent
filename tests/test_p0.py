@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,7 +10,7 @@ from unittest.mock import patch
 
 from game_agent.trajectory import TRAJECTORY_SCHEMA_VERSION, TrajectorySchemaError, validate_trajectory
 from game_agent.unity_assets import audit_unity_assets
-from game_agent.validation import UnityValidator
+from game_agent.validation import UnityValidator, _run_process
 from game_agent.workspace import create_task_workspace
 from game_agent.processes import terminate_process_tree
 from game_agent.services.worker import run_worker
@@ -99,10 +100,16 @@ class UnityValidatorTest(unittest.TestCase):
             editor = root / "Unity.exe"
             editor.write_text("fixture", encoding="utf-8")
 
+            commands: list[list[str]] = []
+
             def runner(arguments: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+                commands.append(arguments)
                 if "-testResults" in arguments:
                     result_path = Path(arguments[arguments.index("-testResults") + 1])
-                    result_path.write_text('<test-run result="Passed" />', encoding="utf-8")
+                    result_path.write_text(
+                        '<test-run result="Passed" total="1" passed="1" failed="0" skipped="0" />',
+                        encoding="utf-8",
+                    )
                 return subprocess.CompletedProcess(arguments, 0, stdout="validation passed")
 
             result = UnityValidator(
@@ -116,6 +123,10 @@ class UnityValidatorTest(unittest.TestCase):
             self.assertEqual([check["status"] for check in result["checks"]], ["passed"] * 4)
             self.assertTrue((root / "validation" / "editmode-results.xml").is_file())
             self.assertTrue((root / "validation" / "playmode-results.xml").is_file())
+            self.assertIn("-quit", commands[0])
+            self.assertNotIn("-quit", commands[1])
+            self.assertNotIn("-quit", commands[2])
+            self.assertEqual(result["checks"][2]["total_tests"], 1)
 
     def test_editor_failure_fails_validation(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -142,7 +153,10 @@ class UnityValidatorTest(unittest.TestCase):
             def runner(arguments: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
                 if "-testResults" in arguments:
                     result_path = Path(arguments[arguments.index("-testResults") + 1])
-                    result_path.write_text('<test-run result="Failed" failed="2" />', encoding="utf-8")
+                    result_path.write_text(
+                        '<test-run result="Failed" total="2" passed="0" failed="2" skipped="0" />',
+                        encoding="utf-8",
+                    )
                     return subprocess.CompletedProcess(arguments, 0, stdout="tests completed")
                 return subprocess.CompletedProcess(arguments, 0, stdout="error CS1002: ; expected")
 
@@ -156,6 +170,137 @@ class UnityValidatorTest(unittest.TestCase):
             self.assertEqual(result["status"], "failed")
             self.assertEqual(result["checks"][1]["error"], "Unity log contains compiler errors")
             self.assertEqual(result["checks"][2]["failed_tests"], 2)
+
+    def test_zero_tests_and_missing_xml_are_distinct_failures(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = create_unity_project(root)
+            editor = root / "Unity.exe"
+            editor.write_text("fixture", encoding="utf-8")
+            calls = 0
+
+            def runner(arguments: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    result_path = Path(arguments[arguments.index("-testResults") + 1])
+                    result_path.write_text(
+                        '<test-run result="Passed" total="0" passed="0" failed="0" skipped="0" />',
+                        encoding="utf-8",
+                    )
+                return subprocess.CompletedProcess(arguments, 0, stdout="")
+
+            result = UnityValidator(
+                project,
+                root / "validation",
+                {"editor_path": str(editor), "modes": ["editmode", "playmode"]},
+                runner=runner,
+            ).run()
+
+            self.assertEqual(result["checks"][1]["error_code"], "zero_tests")
+            self.assertEqual(result["checks"][2]["error_code"], "missing_test_results")
+
+    def test_result_xml_can_pass_after_bounded_process_cleanup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = create_unity_project(root)
+            editor = root / "Unity.exe"
+            editor.write_text("fixture", encoding="utf-8")
+
+            def runner(arguments: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+                result_path = Path(arguments[arguments.index("-testResults") + 1])
+                result_path.write_text(
+                    '<test-run result="Passed" total="1" passed="1" failed="0" skipped="0" />',
+                    encoding="utf-8",
+                )
+                completed = subprocess.CompletedProcess(arguments, 1, stdout="")
+                completed.forced_termination = True
+                completed.pid = 4321
+                return completed
+
+            result = UnityValidator(
+                project,
+                root / "validation",
+                {"editor_path": str(editor), "modes": ["playmode"]},
+                runner=runner,
+            ).run()
+
+            check = result["checks"][1]
+            self.assertEqual(check["status"], "passed")
+            self.assertTrue(check["forced_termination"])
+            self.assertEqual(check["pid"], 4321)
+
+    def test_timeout_has_machine_readable_failure_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = create_unity_project(root)
+            editor = root / "Unity.exe"
+            editor.write_text("fixture", encoding="utf-8")
+
+            def runner(arguments: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+                raise subprocess.TimeoutExpired(arguments, timeout, output="still running")
+
+            result = UnityValidator(
+                project,
+                root / "validation",
+                {"editor_path": str(editor), "modes": ["editmode"], "timeout_seconds": 1},
+                runner=runner,
+            ).run()
+
+            check = result["checks"][1]
+            self.assertEqual(check["status"], "timed_out")
+            self.assertEqual(check["error_code"], "timeout")
+            self.assertEqual((root / "validation" / "editmode.log").read_text(encoding="utf-8"), "still running")
+
+    def test_real_runner_polls_xml_then_terminates_only_its_delayed_process(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = root / "delayed_unity.py"
+            results = root / "results.xml"
+            script.write_text(
+                "import pathlib, sys, time\n"
+                "target = pathlib.Path(sys.argv[sys.argv.index('-testResults') + 1])\n"
+                "target.write_text('<test-run result=\"Passed\" total=\"1\" passed=\"1\" failed=\"0\" skipped=\"0\" />', encoding='utf-8')\n"
+                "time.sleep(30)\n",
+                encoding="utf-8",
+            )
+
+            with (
+                patch("game_agent.validation.TEST_PROCESS_EXIT_GRACE_SECONDS", 0.1),
+                patch("game_agent.validation.PROCESS_TERMINATION_GRACE_SECONDS", 0.1),
+            ):
+                completed = _run_process(
+                    [sys.executable, str(script), "-testResults", str(results)],
+                    timeout=5,
+                )
+
+            self.assertTrue(completed.result_ready)
+            self.assertTrue(completed.forced_termination)
+            self.assertGreater(completed.pid, 0)
+            self.assertTrue(results.is_file())
+
+    def test_project_lock_is_not_reported_as_generic_process_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = create_unity_project(root)
+            editor = root / "Unity.exe"
+            editor.write_text("fixture", encoding="utf-8")
+
+            def runner(arguments: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+                return subprocess.CompletedProcess(
+                    arguments,
+                    1,
+                    stdout="Aborting batchmode due to another Unity instance using this project.",
+                )
+
+            result = UnityValidator(
+                project,
+                root / "validation",
+                {"editor_path": str(editor), "modes": ["compile"]},
+                runner=runner,
+            ).run()
+
+            self.assertEqual(result["checks"][1]["error_code"], "project_locked")
 
 
 class WorkspaceIsolationTest(unittest.TestCase):

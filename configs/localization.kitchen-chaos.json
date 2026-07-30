@@ -1,0 +1,278 @@
+{
+  "schema_version": "game-agent-localization-tasks-v1",
+  "project_path": "E:/Unity_project/Kitchen_Chaos/Kitchen_Chaos",
+  "ks": [1, 3, 5, 10],
+  "tasks": [
+    {
+      "id": "state-event-start-countdown",
+      "query": "player interaction starts game state countdown tutorial UI GameInput KitchenGameManager GameStartCountdownUI",
+      "gold_files": [
+        "Assets/Scripts/GameInput.cs",
+        "Assets/Scripts/KitchenGameManager.cs",
+        "Assets/Scripts/UI/TutorialUI.cs",
+        "Assets/Scripts/UI/GameStartCountdownUI.cs"
+      ],
+      "gold_game_objects": [
+        "Canvas/TutorialUI",
+        "Canvas/GameStartCountdownUI",
+        "KitchenGameManager"
+      ],
+      "gold_assets": [
+        "Assets/Scenes/GameScene.unity"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "GameStartCountdownUI",
+          "target_contains": "TutorialUI",
+          "edge_kinds": ["CODE_COMPONENT", "ATTACHED_TO", "CONTAINS"]
+        }
+      ],
+      "tags": ["baseline", "state-machine", "ui", "cross-file"]
+    },
+    {
+      "id": "stove-progress-burn-warning",
+      "query": "stove cooking frying progress bar burn warning state StoveCounter ProgressBarUI",
+      "gold_files": [
+        "Assets/Scripts/Counters/StoveCounter.cs",
+        "Assets/Scripts/Counters/StoveCounterVisual.cs",
+        "Assets/Scripts/UI/StoveBurnWarrningUI.cs",
+        "Assets/Scripts/UI/ProgressBarUI.cs",
+        "Assets/Scripts/IHasProgress.cs"
+      ],
+      "gold_game_objects": [
+        "StoveCounter",
+        "StoveCounter/StoveCounter_Visual",
+        "StoveCounter/StoveBurnWarningUI",
+        "StoveCounter/ProgressBarUI"
+      ],
+      "gold_assets": [
+        "Assets/Prefabs/Counters/StoveCounter.prefab",
+        "Assets/Scenes/GameScene.unity"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "hasProgressGameObject",
+          "target_contains": "StoveCounter",
+          "edge_kinds": ["SERIALIZED_REF"]
+        }
+      ],
+      "tags": ["state-machine", "prefab", "serialized-reference", "ui"]
+    },
+    {
+      "id": "delivery-result-ui",
+      "query": "deliver recipe success failure result popup delivery manager counter UI DeliveryResultUI",
+      "gold_files": [
+        "Assets/Scripts/DeliveryManager.cs",
+        "Assets/Scripts/Counters/DeliveryCounter.cs",
+        "Assets/Scripts/UI/DeliveryManagerUI.cs",
+        "Assets/Scripts/UI/DeliveryResultUI.cs",
+        "Assets/Scripts/UI/DeliverySingleUI.cs"
+      ],
+      "gold_game_objects": [
+        "DeliveryManger",
+        "Canvas/DeliveryManagerUI",
+        "DeliveryCounter/DeliveryResultUI_LookAtCamera/DeliveryResultUI"
+      ],
+      "gold_assets": [
+        "Assets/Prefabs/Counters/DeliveryCounter.prefab",
+        "Assets/Scenes/GameScene.unity"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "DeliveryResultUI",
+          "target_contains": "DeliveryResultUI",
+          "edge_kinds": ["CODE_COMPONENT", "ATTACHED_TO"]
+        }
+      ],
+      "tags": ["event", "prefab", "ui", "cross-file"]
+    },
+    {
+      "id": "player-movement-animation-sound",
+      "query": "player movement input walking animation footsteps picked object sound Player GameInput PlayerAnimator PlayerSounds",
+      "gold_files": [
+        "Assets/Scripts/Player.cs",
+        "Assets/Scripts/GameInput.cs",
+        "Assets/Scripts/PlayerAnimator.cs",
+        "Assets/Scripts/PlayerSounds.cs",
+        "Assets/Scripts/SelectedCounterVisual.cs"
+      ],
+      "gold_game_objects": [
+        "Player",
+        "Player/PlayerVisual"
+      ],
+      "gold_assets": [
+        "Assets/Scenes/GameScene.unity"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "gameInput",
+          "target_contains": "GameInput",
+          "edge_kinds": ["SERIALIZED_REF"]
+        }
+      ],
+      "tags": ["player", "input", "animation", "audio"]
+    },
+    {
+      "id": "cutting-counter-progress",
+      "query": "cutting counter interact alternate chop recipe progress bar animation CuttingCounter CuttingCounterVisual ProgressBarUI",
+      "gold_files": [
+        "Assets/Scripts/Counters/CuttingCounter.cs",
+        "Assets/Scripts/Counters/CuttingCounterVisual.cs",
+        "Assets/Scripts/UI/ProgressBarUI.cs",
+        "Assets/Scripts/IHasProgress.cs"
+      ],
+      "gold_game_objects": [
+        "CuttingCounter",
+        "CuttingCounter/CuttingCounter_Visual",
+        "CuttingCounter/ProgressBarUI"
+      ],
+      "gold_assets": [
+        "Assets/Prefabs/Counters/CuttingCounter.prefab",
+        "Assets/Scenes/GameScene.unity"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "hasProgressGameObject",
+          "target_contains": "CuttingCounter",
+          "edge_kinds": ["SERIALIZED_REF"]
+        }
+      ],
+      "tags": ["counter", "progress", "prefab", "serialized-reference"]
+    },
+    {
+      "id": "plates-counter-stack",
+      "query": "plates counter spawn remove stacked plate visual timer PlatesCounter PlatesCounterVisual PlateKitchenObject",
+      "gold_files": [
+        "Assets/Scripts/Counters/PlatesCounter.cs",
+        "Assets/Scripts/Counters/PlatesCounterVisual.cs",
+        "Assets/Scripts/PlateKitchenObject.cs"
+      ],
+      "gold_game_objects": [
+        "PlatesCounter",
+        "PlatesCounter/PlatesCounter_Visual"
+      ],
+      "gold_assets": [
+        "Assets/Prefabs/Counters/PlatesCounter.prefab",
+        "Assets/Prefabs/KitchenObjects/Plate.prefab",
+        "Assets/Scenes/GameScene.unity"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "plateKitchenObjectSO",
+          "target_contains": "Plate",
+          "edge_kinds": ["SERIALIZED_REF"]
+        }
+      ],
+      "tags": ["counter", "spawn", "prefab", "event"]
+    },
+    {
+      "id": "plate-ingredient-visuals",
+      "query": "plate ingredient added complete visual icons activate toppings PlateKitchenObject PlateCompleteVisual PlateIconsUI",
+      "gold_files": [
+        "Assets/Scripts/PlateKitchenObject.cs",
+        "Assets/Scripts/PlateCompleteVisual.cs",
+        "Assets/Scripts/UI/PlateIconsUI.cs",
+        "Assets/Scripts/UI/PlateIconSingleUI.cs"
+      ],
+      "gold_game_objects": [
+        "Plate",
+        "Plate/PlateCompleteVisual",
+        "Plate/PlateIconsUI"
+      ],
+      "gold_assets": [
+        "Assets/Prefabs/KitchenObjects/Plate.prefab",
+        "Assets/Prefabs/PlateCompleteVisual.prefab"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "plateKitchenObject",
+          "target_contains": "Plate",
+          "edge_kinds": ["SERIALIZED_REF"]
+        }
+      ],
+      "tags": ["kitchen-object", "visual", "prefab", "serialized-reference"]
+    },
+    {
+      "id": "container-counter-spawn-visual",
+      "query": "container counter player grabs ingredient spawn kitchen object open close animator ContainerCounter ContainerCounterVisual",
+      "gold_files": [
+        "Assets/Scripts/Counters/ContainerCounter.cs",
+        "Assets/Scripts/Counters/ContainerCounterVisual.cs",
+        "Assets/Scripts/KitchenObject.cs",
+        "Assets/Scripts/ScriptableObjects/KitchenObjectSO.cs"
+      ],
+      "gold_game_objects": [
+        "ContainerCounter_Bread",
+        "ContainerCounter_Bread/ContainerCounter_Visual"
+      ],
+      "gold_assets": [
+        "Assets/Prefabs/Counters/ContainerCounter.prefab",
+        "Assets/Prefabs/Counters/ContainerCounter_Bread.prefab",
+        "Assets/Scenes/GameScene.unity"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "kitchenObjectSO",
+          "target_contains": "Bread",
+          "edge_kinds": ["SERIALIZED_REF"]
+        }
+      ],
+      "tags": ["counter", "spawn", "animation", "prefab"]
+    },
+    {
+      "id": "pause-options-rebind",
+      "query": "pause resume options menu input key rebind buttons GamePauseUI OptionUI GameInput KitchenGameManager",
+      "gold_files": [
+        "Assets/Scripts/UI/GamePauseUI.cs",
+        "Assets/Scripts/UI/OptionUI.cs",
+        "Assets/Scripts/GameInput.cs",
+        "Assets/Scripts/KitchenGameManager.cs",
+        "Assets/Scripts/Loader.cs"
+      ],
+      "gold_game_objects": [
+        "Canvas/GamePauseUI",
+        "Canvas/OptionUI",
+        "GameInput",
+        "KitchenGameManager"
+      ],
+      "gold_assets": [
+        "Assets/Scenes/GameScene.unity"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "optionsButton",
+          "target_contains": "Show",
+          "edge_kinds": ["UNITY_EVENT_CALL"]
+        }
+      ],
+      "tags": ["ui", "input", "unity-event", "cross-file"]
+    },
+    {
+      "id": "audio-volume-options",
+      "query": "music sound effects volume option buttons audio clips MusicManager SoundManager OptionUI AudioClipRefsSO",
+      "gold_files": [
+        "Assets/Scripts/MusicManager.cs",
+        "Assets/Scripts/SoundManager.cs",
+        "Assets/Scripts/UI/OptionUI.cs",
+        "Assets/Scripts/ScriptableObjects/AudioClipRefsSO.cs"
+      ],
+      "gold_game_objects": [
+        "MusicManager",
+        "SoundManager",
+        "Canvas/OptionUI"
+      ],
+      "gold_assets": [
+        "Assets/Scenes/GameScene.unity",
+        "Assets/ScriptableObjects/AudioClipRefsSO.asset"
+      ],
+      "gold_dependency_paths": [
+        {
+          "source_contains": "soundEffectsButton",
+          "target_contains": "ChangeVolume",
+          "edge_kinds": ["UNITY_EVENT_CALL"]
+        }
+      ],
+      "tags": ["audio", "ui", "unity-event", "scriptable-object"]
+    }
+  ]
+}
