@@ -240,6 +240,12 @@ def run_agent_graph_audit(
             max_repeated_actions=2,
         )
         config.setdefault("skills", {}).update(enabled=False, paths=[])
+        config.setdefault("context", {}).update(
+            enabled=True,
+            graph_path=str(graph_path),
+            state_path="project-context-state.json",
+            auto_locate=True,
+        )
         config.setdefault("validation", {})["enabled"] = False
         config["logging"]["events_path"] = str(artifact_dir / "events.jsonl")
         config["logging"]["trajectory_path"] = str(artifact_dir / "trajectory.json")

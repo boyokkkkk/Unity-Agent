@@ -15,6 +15,7 @@ from game_agent.framework.models.utils.actions_toolcall_response import (
     finish_reason_from_responses_api,
     format_response_observations,
     parse_response_actions,
+    select_response_tools,
 )
 from game_agent.framework.models.utils.retry import retry
 
@@ -35,6 +36,7 @@ class LitellmResponseModel(LitellmModel):
 
     def __init__(self, *, config_class: Callable = LitellmResponseModelConfig, **kwargs):
         super().__init__(config_class=config_class, **kwargs)
+        self.response_tools = select_response_tools(self.config.structured_query_tools_enabled)
 
     def _prepare_messages_for_api(self, messages: list[dict]) -> list[dict]:
         prepared = []
@@ -55,13 +57,13 @@ class LitellmResponseModel(LitellmModel):
         return litellm.responses(
             model=self.config.model_name,
             input=messages,
-            tools=RESPONSE_TOOLS,
+            tools=self.response_tools,
             **parameters,
         )
 
     def estimate_input_tokens(self, messages: list[dict[str, str]]) -> int:
         prepared = self._prepare_messages_for_api(messages)
-        return self._conservative_token_estimate(prepared) + self._conservative_token_estimate(RESPONSE_TOOLS)
+        return self._conservative_token_estimate(prepared) + self._conservative_token_estimate(self.response_tools)
 
     def _calculate_usage(self, response: Any, messages: list[dict]) -> dict[str, int]:
         usage = getattr(response, "usage", None)
@@ -124,4 +126,3 @@ class LitellmResponseModel(LitellmModel):
             template_vars=template_vars,
             multimodal_regex=self.config.multimodal_regex,
         )
-

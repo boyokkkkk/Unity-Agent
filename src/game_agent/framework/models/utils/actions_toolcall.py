@@ -7,6 +7,7 @@ from jinja2 import StrictUndefined, Template
 
 from game_agent.framework.exceptions import FormatError
 from game_agent.framework.models.utils.openai_multimodal import expand_multimodal_content
+from game_agent.aci.schemas import QUERY_TOOL_NAMES, STRUCTURED_QUERY_TOOLS
 
 POWERSHELL_TOOL = {
     "type": "function",
@@ -44,7 +45,42 @@ SUBMIT_TOOL = {
     },
 }
 
-AGENT_TOOLS = [POWERSHELL_TOOL, SUBMIT_TOOL]
+CORE_AGENT_TOOLS = [POWERSHELL_TOOL, SUBMIT_TOOL]
+AGENT_TOOLS = [POWERSHELL_TOOL, *STRUCTURED_QUERY_TOOLS, SUBMIT_TOOL]
+TOOL_SCHEMAS = {tool["function"]["name"]: tool["function"]["parameters"] for tool in AGENT_TOOLS}
+
+
+def select_agent_tools(structured_queries_enabled: bool = True) -> list[dict]:
+    return AGENT_TOOLS if structured_queries_enabled else CORE_AGENT_TOOLS
+
+
+def validate_tool_arguments(tool_name: str, args: object) -> str:
+    """Return a compact validation error for a locally executed function call."""
+    schema = TOOL_SCHEMAS.get(tool_name)
+    if schema is None:
+        return f"Unknown tool '{tool_name}'."
+    if not isinstance(args, dict):
+        return f"Arguments for '{tool_name}' must be an object."
+    errors: list[str] = []
+    for key in schema.get("required", []):
+        if key not in args or (isinstance(args.get(key), str) and not args[key].strip()):
+            errors.append(f"Missing non-empty '{key}' argument.")
+    expected_types = {
+        "string": str,
+        "integer": int,
+        "boolean": bool,
+        "array": list,
+        "object": dict,
+    }
+    properties = schema.get("properties", {})
+    for key, value in args.items():
+        if key not in properties and schema.get("additionalProperties") is False:
+            errors.append(f"Unknown argument '{key}'.")
+            continue
+        expected = expected_types.get(properties.get(key, {}).get("type"))
+        if expected is not None and not isinstance(value, expected):
+            errors.append(f"Argument '{key}' must be {properties[key]['type']}.")
+    return " ".join(errors)
 
 
 def parse_toolcall_actions(
@@ -62,7 +98,7 @@ def parse_toolcall_actions(
             {
                 "role": "user",
                 "content": Template(format_error_template, undefined=StrictUndefined).render(
-                    error="No tool calls found. Call powershell to continue or submit to finish the task.",
+                    error="No tool calls found. Call an available query tool or powershell to continue, or submit to finish.",
                     actions=[],
                     has_tool_calls=False,
                     **template_kwargs,
@@ -79,14 +115,7 @@ def parse_toolcall_actions(
         except Exception as e:
             error_msg = f"Error parsing tool call arguments: {e}."
         tool_name = tool_call.function.name
-        if tool_name == "powershell":
-            if not isinstance(args, dict) or not isinstance(args.get("command"), str) or not args["command"].strip():
-                error_msg += "Missing non-empty 'command' argument in powershell tool call."
-        elif tool_name == "submit":
-            if not isinstance(args, dict) or not isinstance(args.get("answer"), str) or not args["answer"].strip():
-                error_msg += "Missing non-empty 'answer' argument in submit tool call."
-        else:
-            error_msg += f"Unknown tool '{tool_name}'. Expected powershell or submit."
+        error_msg += validate_tool_arguments(tool_name, args)
         if error_msg:
             raise FormatError(
                 {
@@ -101,8 +130,10 @@ def parse_toolcall_actions(
             actions.append(
                 {"tool": "powershell", "command": args["command"], "tool_call_id": tool_call.id}
             )
-        else:
+        elif tool_name == "submit":
             actions.append({"tool": "submit", "answer": args["answer"], "tool_call_id": tool_call.id})
+        elif tool_name in QUERY_TOOL_NAMES:
+            actions.append({"tool": tool_name, "arguments": args, "tool_call_id": tool_call.id})
     if any(action["tool"] == "submit" for action in actions) and len(actions) != 1:
         raise FormatError(
             {

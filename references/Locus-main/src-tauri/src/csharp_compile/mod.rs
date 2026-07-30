@@ -1,0 +1,1479 @@
+//! C# compilation offloaded to a CoreCLR sidecar (modern Roslyn on .NET 10).
+//!
+//! `unity_execute` / `unity_run_states` snippets are compiled here instead of
+//! inside the Unity Editor process when the `unity_sidecar_compiler` setting
+//! is on; Unity then only `Assembly.Load`s the emitted bytes
+//! (`execute_loaded` / `run_states_loaded` pipe messages). Any sidecar
+//! infrastructure failure falls back to the legacy in-Unity compile path —
+//! compile *diagnostics* are not failures, they surface to the agent
+//! directly.
+//!
+//! See `coreclr-compile-sidecar-plan.md` for the architecture, and
+//! `locus_compile_server/` for the server side of the protocol.
+
+mod client;
+pub mod manager;
+pub mod params;
+
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::OnceLock;
+
+use serde_json::{json, Value};
+use tauri::Emitter;
+
+pub const STATUS_EVENT: &str = "csharp-compile-status";
+
+static ENABLED: AtomicBool = AtomicBool::new(false);
+// Graceful fallback to the in-Unity Roslyn compile when the sidecar is on but
+// a compile is unavailable (sidecar down / transport error). Default true
+// (keeps current behavior). Set false for pure-sidecar / A-B: an unavailable
+// sidecar then surfaces as an error instead of an in-Unity compile.
+static IN_PROCESS_FALLBACK: AtomicBool = AtomicBool::new(true);
+static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
+
+// Session counters for the phase-6 rollout: how often tool calls actually
+// used the sidecar, hit deterministic compile errors, or fell back to the
+// in-Unity path. Surfaced in the settings status payload.
+static SIDECAR_COMPILES: AtomicU64 = AtomicU64::new(0);
+static SIDECAR_COMPILE_ERRORS: AtomicU64 = AtomicU64::new(0);
+static SIDECAR_FALLBACKS: AtomicU64 = AtomicU64::new(0);
+
+fn record_outcome(outcome: &Result<CompileOutcome, String>) {
+    match outcome {
+        Ok(Ok(_)) => {
+            SIDECAR_COMPILES.fetch_add(1, Ordering::Relaxed);
+        }
+        Ok(Err(_)) => {
+            SIDECAR_COMPILE_ERRORS.fetch_add(1, Ordering::Relaxed);
+        }
+        // Transport errors are counted at the fallback site (note_fallback),
+        // which also sees the non-transport reasons (disabled plugin, etc.).
+        Err(_) => {}
+    }
+    emit_status_in_background();
+}
+
+/// Push a fresh status snapshot to the UI (settings card subscribes), so
+/// asynchronous failures — warm-up errors, runtime download problems,
+/// runtime fallbacks — are visible without re-opening the page. No-op until
+/// app setup provides the handle (tests, early startup).
+pub(crate) fn emit_status_in_background() {
+    let Some(app_handle) = APP_HANDLE.get().cloned() else {
+        return;
+    };
+    tokio::spawn(async move {
+        let _ = app_handle.emit(STATUS_EVENT, status().await);
+    });
+}
+
+/// Called once from app setup with the persisted flag.
+pub fn initialize(enabled: bool, app_handle: tauri::AppHandle) {
+    ENABLED.store(enabled, Ordering::Relaxed);
+    let _ = APP_HANDLE.set(app_handle);
+}
+
+pub fn is_enabled() -> bool {
+    ENABLED.load(Ordering::Relaxed)
+}
+
+pub fn in_process_fallback_enabled() -> bool {
+    IN_PROCESS_FALLBACK.load(Ordering::Relaxed)
+}
+
+/// Set whether a sidecar `Unavailable` falls back to the in-Unity compile.
+pub fn set_in_process_fallback(value: bool) {
+    IN_PROCESS_FALLBACK.store(value, Ordering::Relaxed);
+}
+
+/// True when a sidecar `Unavailable` must NOT fall back to the in-Unity
+/// compile: the sidecar is the active compiler and the operator disabled the
+/// in-process fallback (pure-sidecar / A-B). When the sidecar is off the
+/// in-Unity path is the only path, so this is always false.
+pub fn block_in_process_fallback() -> bool {
+    is_enabled() && !in_process_fallback_enabled()
+}
+
+/// Flip the feature flag. Disabling stops the running sidecar.
+pub async fn set_enabled(value: bool) {
+    ENABLED.store(value, Ordering::Relaxed);
+    if !value {
+        manager::shutdown().await;
+    }
+    emit_status_in_background();
+}
+
+/// Best-effort synchronous kill for app-exit paths.
+pub fn kill_active_server_for_exit() {
+    manager::kill_for_exit();
+}
+
+/// Record that a tool call fell back to the legacy in-Unity compile path.
+/// Logged only when the reason changes so a persistent condition (sidecar
+/// missing, old Unity plugin) does not spam on every call.
+pub fn note_fallback(reason: &str) {
+    SIDECAR_FALLBACKS.fetch_add(1, Ordering::Relaxed);
+    emit_status_in_background();
+    static LAST: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+    let Ok(mut guard) = LAST.lock() else { return };
+    if guard.as_deref() != Some(reason) {
+        eprintln!("[CsharpCompile] falling back to in-Unity compile: {reason}");
+        *guard = Some(reason.to_string());
+    }
+}
+
+/// Status snapshot for the settings UI.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CsharpCompileStatusPayload {
+    pub enabled: bool,
+    pub platform_supported: bool,
+    /// Published sidecar binaries present on disk.
+    pub server_available: bool,
+    pub running: bool,
+    pub roslyn_version: Option<String>,
+    pub dotnet_source: Option<String>,
+    pub uptime_secs: Option<u64>,
+    pub last_error: Option<String>,
+    /// Session counters (rollout observability): tool compiles served by the
+    /// sidecar, deterministic compile errors, and fallbacks to Unity.
+    pub sidecar_compiles: u64,
+    pub compile_errors: u64,
+    pub fallbacks: u64,
+    /// Hot reload (`unity_hotreload`): feature flag and session counters.
+    pub hot_reload_enabled: bool,
+    pub hot_patches_applied: u64,
+    pub hot_patch_failures: u64,
+    pub hot_active_patches: u64,
+    pub hot_leaked_assembly_bytes: u64,
+    pub hot_patched_code_count: u64,
+    pub hot_unapplied_changes: u64,
+    pub hot_cold_queued: u64,
+}
+
+pub async fn status() -> CsharpCompileStatusPayload {
+    let running = manager::current_status().await;
+    let hot_reload = crate::unity_hotreload::coordinator::counters().await;
+    let hot_unapplied_changes = crate::unity_hotreload::coordinator::unapplied_change_count().await;
+    CsharpCompileStatusPayload {
+        enabled: is_enabled(),
+        platform_supported: crate::dotnet_runtime::is_platform_supported(),
+        server_available: manager::server_dll_available(),
+        running: running.is_some(),
+        roslyn_version: running.as_ref().map(|(roslyn, _, _)| roslyn.clone()),
+        dotnet_source: running.as_ref().map(|(_, source, _)| source.to_string()),
+        uptime_secs: running.as_ref().map(|(_, _, uptime)| uptime.as_secs()),
+        last_error: manager::last_error_for_diagnostics(),
+        sidecar_compiles: SIDECAR_COMPILES.load(Ordering::Relaxed),
+        compile_errors: SIDECAR_COMPILE_ERRORS.load(Ordering::Relaxed),
+        fallbacks: SIDECAR_FALLBACKS.load(Ordering::Relaxed),
+        hot_reload_enabled: crate::unity_hotreload::is_enabled(),
+        hot_patches_applied: hot_reload.patches_applied,
+        hot_patch_failures: hot_reload.patch_failures,
+        hot_active_patches: hot_reload.active_patches,
+        hot_leaked_assembly_bytes: hot_reload.active_patch_bytes,
+        hot_patched_code_count: hot_reload.active_patch_code,
+        hot_unapplied_changes,
+        hot_cold_queued: hot_reload.cold_queued,
+    }
+}
+
+/// Status refresh used by UI surfaces. When the sidecar is enabled, this also
+/// probes startup after a recorded startup error so stale errors clear as soon
+/// as the published server has been repaired.
+pub async fn refresh_status() -> CsharpCompileStatusPayload {
+    if is_enabled()
+        && crate::dotnet_runtime::is_platform_supported()
+        && manager::server_dll_available()
+        && manager::last_error_for_diagnostics().is_some()
+    {
+        let running = manager::current_status().await;
+        if running.is_none() {
+            let _ = manager::ensure_client().await;
+        }
+    }
+    status().await
+}
+
+/// Pre-start the sidecar and JIT-warm Roslyn with a tiny self-contained
+/// compile so the first real snippet does not pay the cold-start cost.
+/// No-op while the feature is disabled.
+pub fn warm_up_in_background() {
+    if !is_enabled() {
+        return;
+    }
+    tokio::spawn(async move {
+        let warm = json!({
+            "assemblyName": "__LocusWarmup",
+            "sources": [{ "path": "Warmup.cs", "text": "internal static class __LocusWarmup { }" }],
+            "useHostBcl": true,
+        });
+        match compile_raw(warm).await {
+            Ok(Ok(_)) => {}
+            Ok(Err(failure)) => eprintln!(
+                "[CsharpCompile] warm-up compile failed unexpectedly: {}",
+                failure.message
+            ),
+            Err(error) => eprintln!("[CsharpCompile] warm-up skipped: {error}"),
+        }
+        // Surface the outcome (running / lastError) in the settings card.
+        emit_status_in_background();
+    });
+}
+
+// ── request/response types ───────────────────────────────────────────
+
+/// Compile parameters provided by the Unity side (`get_compile_params`).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CompileParams {
+    pub fingerprint: String,
+    pub domain_generation: String,
+    #[serde(default)]
+    pub lang_version: String,
+    #[serde(default)]
+    pub reference_paths: Vec<String>,
+    #[serde(default)]
+    pub defines: Vec<String>,
+    /// Project "Allow unsafe code" (any script assembly with the flag on);
+    /// hot patches follow it. Old Unity plugins omit the field → false.
+    #[serde(default)]
+    pub allow_unsafe: bool,
+}
+
+/// A successfully emitted assembly, ready to ship to Unity.
+#[derive(Debug, Clone)]
+pub struct CompiledAssembly {
+    pub assembly_b64: String,
+    pub assembly_path: Option<String>,
+    pub assembly_name: String,
+    pub entry_type: Option<String>,
+    /// Snippet compiles: "statements" or "expression" (the mode that won).
+    pub mode: Option<String>,
+}
+
+/// A compile-level failure: diagnostics / validation text for the agent.
+/// Distinct from transport errors (`Err(String)`) which trigger fallback.
+#[derive(Debug, Clone)]
+pub struct CompileFailure {
+    pub stage: String,
+    pub message: String,
+}
+
+pub type CompileOutcome = Result<CompiledAssembly, CompileFailure>;
+
+// ── compile entry points ─────────────────────────────────────────────
+
+/// Compile a unity_execute snippet (statement mode with expression-mode
+/// fallback, same semantics as the Unity-side CompileAsyncSnippet).
+/// `register_image` should be true only when the result will be loaded into
+/// the Unity domain (so the session image registry mirrors loaded code).
+pub async fn compile_snippet(
+    compile_params: &CompileParams,
+    code: &str,
+    reference_session_images: bool,
+    register_image: bool,
+) -> Result<CompileOutcome, String> {
+    let request = json!({
+        "code": code,
+        "params": compile_params,
+        "referenceSessionImages": reference_session_images,
+        "registerImage": register_image,
+        "returnAssemblyPath": true,
+    });
+    let outcome = request_compile("compile/snippet", request).await;
+    record_outcome(&outcome);
+    outcome
+}
+
+/// Compile a unity_run_states request (also serves as the
+/// `compile_run_states` pre-check: validation errors come back as
+/// `CompileFailure { stage: "validation" }`).
+pub async fn compile_run_states(
+    compile_params: &CompileParams,
+    run_states_request: &Value,
+    reference_session_images: bool,
+    register_image: bool,
+) -> Result<CompileOutcome, String> {
+    let request = json!({
+        "request": run_states_request,
+        "params": compile_params,
+        "referenceSessionImages": reference_session_images,
+        "registerImage": register_image,
+        "returnAssemblyPath": true,
+    });
+    let outcome = request_compile("compile/runStates", request).await;
+    record_outcome(&outcome);
+    outcome
+}
+
+/// Compile a View Script (compile_named / invoke_named). The result rides
+/// inside the legacy pipe message as optional `assembly_path` (or base64
+/// fallback) plus `assembly_id`: a current Unity plugin loads the artifact on
+/// a cache miss, an older plugin ignores the fields and compiles from source.
+pub async fn compile_view_script(
+    compile_params: &CompileParams,
+    source: &str,
+    source_path: &str,
+    script_name: &str,
+) -> Result<CompileOutcome, String> {
+    let request = json!({
+        "source": source,
+        "path": source_path,
+        "scriptName": script_name,
+        "params": compile_params,
+        "returnAssemblyPath": true,
+    });
+    let outcome = request_compile("compile/viewScript", request).await;
+    record_outcome(&outcome);
+    outcome
+}
+
+/// Compile a Skill Package Unity script bundle. This rides on compile/raw so
+/// the sidecar owns Roslyn/reference materialization while Unity keeps the
+/// existing assembly load, activation, and type-index delta logic.
+pub async fn compile_skill_package(
+    compile_params: &CompileParams,
+    request: &Value,
+) -> Result<CompileOutcome, String> {
+    let package_id = request
+        .get("packageId")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "compile_skill_package request missing packageId".to_string())?;
+    let source_hash = request
+        .get("sourceHash")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "compile_skill_package request missing sourceHash".to_string())?;
+    let scripts = request
+        .get("scripts")
+        .and_then(Value::as_array)
+        .filter(|entries| !entries.is_empty())
+        .ok_or_else(|| "compile_skill_package request has no scripts".to_string())?;
+
+    let mut sources = Vec::with_capacity(scripts.len());
+    for script in scripts {
+        let path = script
+            .get("path")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| "compile_skill_package script missing path".to_string())?;
+        let source = script
+            .get("source")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("compile_skill_package script missing source: {path}"))?;
+        sources.push(json!({
+            "path": path.replace('\\', "/"),
+            "text": source,
+        }));
+    }
+
+    let raw_request = json!({
+        "assemblyName": build_skill_package_assembly_name(package_id, source_hash),
+        "sources": sources,
+        "params": compile_params,
+        "returnAssemblyPath": true,
+        "diagnosticStyle": "viewScript",
+        "emitDebugSymbols": false,
+    });
+    let outcome = request_compile("compile/raw", raw_request).await;
+    record_outcome(&outcome);
+    outcome
+}
+
+/// Compile an arbitrary source set (tests and the warm-up).
+pub async fn compile_raw(request: Value) -> Result<CompileOutcome, String> {
+    request_compile("compile/raw", request).await
+}
+
+fn build_skill_package_assembly_name(package_id: &str, source_hash: &str) -> String {
+    let mut short_hash = sanitize_assembly_name_part(source_hash);
+    if short_hash.len() > 12 {
+        short_hash.truncate(12);
+    }
+    format!(
+        "__LocusSkillPackage_{}_{}",
+        sanitize_assembly_name_part(package_id),
+        short_hash
+    )
+}
+
+fn sanitize_assembly_name_part(value: &str) -> String {
+    if value.is_empty() {
+        return "Script".to_string();
+    }
+
+    value
+        .chars()
+        .map(|ch| if ch.is_alphanumeric() { ch } else { '_' })
+        .collect()
+}
+
+// ── hot patch (unity_hot_reload) ─────────────────────────────────────
+
+/// One original→patch method redirection from `compile/hotPatch`.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HotPatchMethod {
+    pub declaring_type: String,
+    #[serde(default)]
+    pub patch_declaring_type: String,
+    pub name: String,
+    #[serde(default)]
+    pub param_type_names: Vec<String>,
+    /// Enriched per-parameter identity (namespace + closed generic arguments)
+    /// parallel to `param_type_names`; used by Unity only to disambiguate
+    /// overloads that share simple names. Empty for older sidecars.
+    #[serde(default)]
+    pub param_type_sigs: Vec<String>,
+    #[serde(default)]
+    pub is_static: bool,
+    #[serde(default)]
+    pub is_ctor: bool,
+    /// Edited source file (sidecar `sourcePath`) whose rewrite produced this
+    /// detour. Lets the coordinator map a returned inlined `MethodKey` back to a
+    /// single file_key and queue only that file for recompile convergence —
+    /// instead of the whole batch. Empty for older sidecars (→ batch fallback).
+    #[serde(default)]
+    pub source_path: String,
+    /// When set, the "original" side of the detour lives in this specific
+    /// assembly (an earlier patch's shim being re-edited, M2).
+    #[serde(default)]
+    pub original_assembly: Option<String>,
+    /// The patch side is a synthesized empty body — a deleted Unity message
+    /// method being silenced (M5).
+    #[serde(default)]
+    pub is_stub: bool,
+}
+
+/// A newly ADDED Unity message the engine never dispatches after load (each
+/// type's message set is fixed at load). The patch materializes it as an
+/// ordinary static shim and the plugin wires a driver by `kind`: "player_loop"
+/// (driven each frame by a PlayerLoop pump) or "component_proxy" (forwarded by a
+/// proxy MonoBehaviour attached to the target object).
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HotPatchMessageDriver {
+    /// Driver kind: "player_loop" | "component_proxy" | "catch_up" | "inert", or
+    /// "clear" — a marker (no shim) emitted when a play-mode-born re-edit REMOVED
+    /// a previously hot-applied message: it only carries `source_path` so the
+    /// plugin's replace-by-source teardown drops the stale driver. Clear-markers
+    /// are excluded from the pump-capability gate and the added-message summary.
+    #[serde(default)]
+    pub kind: String,
+    /// Original declaring type (CLR metadata name) whose instances are driven.
+    pub declaring_type: String,
+    /// Static shim class in the patch assembly that holds the new body.
+    pub shim_type: String,
+    /// Shim method name; its leading parameter is the instance.
+    pub shim_method: String,
+    /// Message name (e.g. "Update", "OnTriggerEnter").
+    pub message: String,
+    /// Engine-delivered argument type for component_proxy (e.g. "Collider");
+    /// empty for the parameterless player_loop callbacks.
+    #[serde(default)]
+    pub param_type: String,
+    /// Edited source file that produced this registration. The plugin clears a
+    /// file's driver registrations before re-adding, so a deleted/changed-away
+    /// message stops being driven (replace-by-source, not accumulate).
+    #[serde(default)]
+    pub source_path: String,
+    /// Agent-facing caveat (lifecycle timing / approximate order); empty when the
+    /// driver matches native behavior. Surfaced in the hot-reload summary.
+    #[serde(default)]
+    pub note: String,
+    /// Tier-2: when set, the driven type lives in this specific assembly (a
+    /// play-mode-born type whose only definition is the FIRST hot-patch assembly).
+    /// The plugin then resolves `declaring_type` there, bypassing its usual skip
+    /// of `__LocusHotPatch_` assemblies — mirroring `HotPatchMethod.original_assembly`.
+    /// Absent for ordinary compiled types (the plugin uses default resolution).
+    #[serde(default)]
+    pub original_assembly: Option<String>,
+}
+
+/// A type that only exists in the edited text (TI-C / snippet visibility).
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HotPatchNewType {
+    #[serde(default)]
+    pub metadata_name: String,
+    #[serde(default)]
+    pub ns: String,
+    #[serde(default)]
+    pub simple_name: String,
+    #[serde(default)]
+    pub is_public: bool,
+    #[serde(default)]
+    pub is_top_level: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForceDetour {
+    pub path: String,
+    pub method_keys: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallerQueryTarget {
+    pub declaring_type: String,
+    pub member_name: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallerLocation {
+    #[serde(default)]
+    pub file: String,
+    #[serde(default)]
+    pub method_key: String,
+    #[serde(default)]
+    pub declaring_type: String,
+    #[serde(default)]
+    pub member_name: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallerQueryTargetResult {
+    #[serde(default)]
+    pub declaring_type: String,
+    #[serde(default)]
+    pub member_name: String,
+    #[serde(default)]
+    pub key: String,
+    #[serde(default)]
+    pub callers: Vec<CallerLocation>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallerQueryResult {
+    #[serde(default)]
+    pub success: bool,
+    #[serde(default)]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub assembly_count: u64,
+    #[serde(default)]
+    pub targets: Vec<CallerQueryTargetResult>,
+}
+
+/// C0 runtime capability matrix: how the running editor's Mono enforces
+/// accessibility at JIT time (per operation × visibility cell) and whether
+/// the three reflection/emit primitives the C2′ access thunks build on work
+/// there. Measured by `compile/accessProbe` + the plugin's
+/// `hot_reload_access_probe`; cached per domain generation by the hot-reload
+/// coordinator. `Default` (all false, empty cells) = conservative: every
+/// non-public access stays cold, which is today's behavior.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccessCaps {
+    #[serde(default)]
+    pub create_delegate_non_public: bool,
+    #[serde(default)]
+    pub dynamic_method_skip_visibility: bool,
+    #[serde(default)]
+    pub dynamic_method_byref_return: bool,
+    /// "{op}_{visibility}" (e.g. "ldfld_private") → the JIT access check
+    /// passed on the editor's Mono.
+    #[serde(default)]
+    pub cells: std::collections::BTreeMap<String, bool>,
+}
+
+/// Parsed `compile/hotPatch` response. Transport failures stay `Err(String)`
+/// at the call site (no legacy fallback exists for hot patches — the
+/// recompile path is the recovery).
+#[derive(Debug, Clone)]
+pub enum HotPatchOutcome {
+    /// At least one file needs a real compile; per-file reasons.
+    Cold { files: Vec<(String, Vec<String>)> },
+    /// Only comments/formatting changed — or pure deletions whose loaded
+    /// code is already correct (`deletions_noted` tombstones recorded).
+    Noop {
+        deletions_noted: u64,
+        caller_scan_note: Option<String>,
+    },
+    /// Deterministic compiler diagnostics for the agent.
+    CompileError(String),
+    Compiled {
+        assembly_name: String,
+        assembly_b64: String,
+        assembly_path: Option<String>,
+        methods: Vec<HotPatchMethod>,
+        new_types: Vec<HotPatchNewType>,
+        message_drivers: Vec<HotPatchMessageDriver>,
+        caller_scan_note: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct HotDiffFileAnalysis {
+    pub path: String,
+    pub hot: bool,
+    pub reasons: Vec<String>,
+    pub syntax_error: Option<String>,
+    pub requires_caller_check: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct HotDiffAnalysis {
+    pub all_hot: bool,
+    pub files: Vec<HotDiffFileAnalysis>,
+}
+
+/// Classify edited files for the hot-reload path without compiling a patch.
+/// This mirrors the first phase of `compile/hotPatch`, so write/edit can
+/// report whether the current pending batch is hot-reloadable before the
+/// agent explicitly calls `unity_hot_reload`.
+pub async fn analyze_hot_diff(
+    compile_params: &CompileParams,
+    files: &[(String, String, String)],
+) -> Result<HotDiffAnalysis, String> {
+    let request = json!({
+        "files": files
+            .iter()
+            .map(|(path, old_text, new_text)| json!({
+                "path": path,
+                "oldText": old_text,
+                "newText": new_text,
+            }))
+            .collect::<Vec<_>>(),
+        "params": compile_params,
+    });
+
+    let client = manager::ensure_client().await?;
+    let value = client
+        .request_with_timeout("analyze/hotDiff", request, client::DEFAULT_REQUEST_TIMEOUT)
+        .await?;
+    parse_hot_diff_result(value)
+}
+
+/// Diff + rewrite + compile edited files into a hot-patch assembly.
+/// `files` entries are (path, baselineText, currentText).
+/// `baseline_siblings`: (path, currentText) candidates for the OTHER part
+/// files of partial types the batch declares (B6) — grep-grade candidates
+/// are fine, the sidecar parses each one and folds in only real matching
+/// parts as unchanged baselines. Empty slice omits the field (old sidecars
+/// ignore it; partial batches then fail closed through the sidecar's
+/// completeness gate).
+/// `extra_reference_paths`: per-call references outside Unity's set (the
+/// plugin's Locus.HotReload.Runtime.dll for M4 field stores) — kept out of
+/// `params` so the fingerprint-keyed reference cache stays untouched.
+/// `runtime_caps`: the C0 capability matrix for this domain generation;
+/// `None` omits the field (= sidecar's conservative default). C0 only
+/// echoes it in the verdict; C2′ starts gating classification on it.
+pub async fn compile_hot_patch(
+    compile_params: &CompileParams,
+    files: &[(String, String, String)],
+    baseline_siblings: &[(String, String)],
+    extra_reference_paths: &[String],
+    runtime_caps: Option<&AccessCaps>,
+    force_detours: &[ForceDetour],
+) -> Result<HotPatchOutcome, String> {
+    let mut request = json!({
+        "files": files
+            .iter()
+            .map(|(path, old_text, new_text)| json!({
+                "path": path,
+                "oldText": old_text,
+                "newText": new_text,
+            }))
+            .collect::<Vec<_>>(),
+        "params": compile_params,
+        "referenceSessionImages": true,
+        "registerImage": false,
+        "returnAssemblyPath": true,
+        "extraReferencePaths": extra_reference_paths,
+    });
+    if !baseline_siblings.is_empty() {
+        request["baselineSiblings"] = serde_json::Value::Array(
+            baseline_siblings
+                .iter()
+                .map(|(path, text)| json!({ "path": path, "text": text }))
+                .collect(),
+        );
+    }
+    if let Some(caps) = runtime_caps {
+        request["runtimeCaps"] = serde_json::to_value(caps)
+            .map_err(|error| format!("runtimeCaps serialization failed: {error}"))?;
+    }
+    if !force_detours.is_empty() {
+        request["forceDetours"] = serde_json::to_value(force_detours)
+            .map_err(|error| format!("forceDetours serialization failed: {error}"))?;
+    }
+
+    let client = manager::ensure_client().await?;
+    let value = client
+        .request_with_timeout("compile/hotPatch", request, client::COMPILE_REQUEST_TIMEOUT)
+        .await?;
+    parse_hot_patch_result(value)
+}
+
+pub async fn query_callers(
+    compile_params: &CompileParams,
+    targets: &[CallerQueryTarget],
+) -> Result<CallerQueryResult, String> {
+    let request = json!({
+        "params": compile_params,
+        "targets": targets,
+    });
+    let client = manager::ensure_client().await?;
+    let value = client
+        .request_with_timeout("caller/query", request, client::DEFAULT_REQUEST_TIMEOUT)
+        .await?;
+    let result: CallerQueryResult = serde_json::from_value(value)
+        .map_err(|error| format!("malformed caller/query response: {error}"))?;
+    if !result.success {
+        return Err(result
+            .error
+            .unwrap_or_else(|| "caller/query failed".to_string()));
+    }
+    Ok(result)
+}
+
+/// Register a sidecar-built hot-patch image only after Unity has accepted and
+/// loaded it. This keeps the compile server's session image registry aligned
+/// with the running AppDomain.
+pub async fn register_session_image(
+    domain_generation: &str,
+    assembly_name: &str,
+    assembly_b64: &str,
+    assembly_path: Option<&str>,
+) -> Result<(), String> {
+    let mut request = json!({
+        "domainGeneration": domain_generation,
+        "assemblyName": assembly_name,
+    });
+    if let Some(path) = assembly_path.filter(|path| !path.is_empty()) {
+        request["assemblyPath"] = json!(path);
+    } else {
+        request["assemblyB64"] = json!(assembly_b64);
+    }
+
+    let client = manager::ensure_client().await?;
+    let value = client
+        .request_with_timeout("image/register", request, client::DEFAULT_REQUEST_TIMEOUT)
+        .await?;
+    let success = value
+        .get("success")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if success {
+        Ok(())
+    } else {
+        Err("compile server rejected image/register".to_string())
+    }
+}
+
+/// C0: compile the fixed access-probe source against the project's
+/// reference set (`compile/accessProbe`). Returns the probe assembly
+/// (base64) plus the cell manifest `[{method, op, visibility}]` the Unity
+/// side force-JITs. Compile failures (e.g. an old plugin whose Locus.Editor
+/// lacks LocusAccessProbeTarget) come back as `Err` like transport failures:
+/// the caller falls back to conservative caps either way.
+pub async fn compile_access_probe(
+    compile_params: &CompileParams,
+) -> Result<(String, Vec<Value>), String> {
+    let client = manager::ensure_client().await?;
+    let value = client
+        .request_with_timeout(
+            "compile/accessProbe",
+            json!({ "params": compile_params }),
+            client::COMPILE_REQUEST_TIMEOUT,
+        )
+        .await?;
+
+    let success = value
+        .get("success")
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| "malformed compile/accessProbe response (missing success)".to_string())?;
+    if !success {
+        let message = value
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown compile failure");
+        return Err(format!("access probe compile failed: {message}"));
+    }
+
+    let assembly_b64 = value
+        .get("assemblyB64")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "malformed compile/accessProbe response (missing assemblyB64)".to_string())?
+        .to_string();
+    let cells = value
+        .get("cells")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    if cells.is_empty() {
+        return Err("malformed compile/accessProbe response (missing cells)".to_string());
+    }
+    Ok((assembly_b64, cells))
+}
+
+fn parse_hot_patch_result(value: Value) -> Result<HotPatchOutcome, String> {
+    let hot = value
+        .get("hot")
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| "malformed compile server response (missing hot)".to_string())?;
+
+    if !hot {
+        let mut files = Vec::new();
+        if let Some(entries) = value.get("files").and_then(|v| v.as_array()) {
+            for entry in entries {
+                let path = entry
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let reasons = entry
+                    .get("reasons")
+                    .and_then(|v| v.as_array())
+                    .map(|reasons| {
+                        reasons
+                            .iter()
+                            .filter_map(|r| r.as_str().map(str::to_string))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                files.push((path, reasons));
+            }
+        }
+        return Ok(HotPatchOutcome::Cold { files });
+    }
+
+    if value.get("noop").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return Ok(HotPatchOutcome::Noop {
+            deletions_noted: value
+                .get("deletionsNoted")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0),
+            caller_scan_note: value
+                .get("callerScan")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
+        });
+    }
+
+    let success = value
+        .get("success")
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| "malformed compile server response (missing success)".to_string())?;
+    if !success {
+        let message = value
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown compile failure")
+            .to_string();
+        return Ok(HotPatchOutcome::CompileError(message));
+    }
+
+    let assembly_b64 = value
+        .get("assemblyB64")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let assembly_path = value
+        .get("assemblyPath")
+        .and_then(|v| v.as_str())
+        .filter(|path| !path.is_empty())
+        .map(str::to_string);
+    if assembly_b64.is_empty() && assembly_path.is_none() {
+        return Err(
+            "malformed compile server response (missing assemblyB64/assemblyPath)".to_string(),
+        );
+    }
+    let assembly_name = value
+        .get("assemblyName")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let methods: Vec<HotPatchMethod> =
+        serde_json::from_value(value.get("methods").cloned().unwrap_or_else(|| json!([])))
+            .map_err(|e| format!("malformed hot patch methods: {e}"))?;
+    let new_types: Vec<HotPatchNewType> =
+        serde_json::from_value(value.get("newTypes").cloned().unwrap_or_else(|| json!([])))
+            .map_err(|e| format!("malformed hot patch newTypes: {e}"))?;
+    let message_drivers: Vec<HotPatchMessageDriver> = serde_json::from_value(
+        value
+            .get("messageDrivers")
+            .cloned()
+            .unwrap_or_else(|| json!([])),
+    )
+    .map_err(|e| format!("malformed hot patch messageDrivers: {e}"))?;
+
+    Ok(HotPatchOutcome::Compiled {
+        assembly_name,
+        assembly_b64,
+        assembly_path,
+        methods,
+        new_types,
+        message_drivers,
+        caller_scan_note: value
+            .get("callerScan")
+            .and_then(|v| v.as_str())
+            .map(str::to_string),
+    })
+}
+
+fn parse_hot_diff_result(value: Value) -> Result<HotDiffAnalysis, String> {
+    let all_hot = value
+        .get("hot")
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| "malformed analyze/hotDiff response (missing hot)".to_string())?;
+
+    let mut files = Vec::new();
+    if let Some(entries) = value.get("files").and_then(|v| v.as_array()) {
+        for entry in entries {
+            let path = entry
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let hot = entry.get("hot").and_then(|v| v.as_bool()).unwrap_or(false);
+            let reasons = entry
+                .get("reasons")
+                .and_then(|v| v.as_array())
+                .map(|reasons| {
+                    reasons
+                        .iter()
+                        .filter_map(|reason| reason.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let syntax_error = entry
+                .get("syntaxError")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            let requires_caller_check = entry
+                .get("requiresCallerCheck")
+                .and_then(|v| v.as_array())
+                .map(Vec::len)
+                .unwrap_or(0);
+            files.push(HotDiffFileAnalysis {
+                path,
+                hot,
+                reasons,
+                syntax_error,
+                requires_caller_check,
+            });
+        }
+    }
+
+    Ok(HotDiffAnalysis { all_hot, files })
+}
+
+// ── type index (TI-B) ────────────────────────────────────────────────
+
+/// Build the Unity type index from reference metadata in the sidecar
+/// (`index/types`). Returns the parsed entry set; the caller pairs it with a
+/// Unity-side fingerprint. Transport errors route back to the Unity export.
+pub async fn index_types(
+    compile_params: &CompileParams,
+) -> Result<Vec<crate::unity_type_index::UnityTypeIndexEntry>, String> {
+    let client = manager::ensure_client().await?;
+    let value = client
+        .request_with_timeout(
+            "index/types",
+            json!({ "params": compile_params }),
+            client::DEFAULT_REQUEST_TIMEOUT,
+        )
+        .await?;
+
+    let types = value
+        .get("types")
+        .cloned()
+        .ok_or_else(|| "malformed index/types response (missing types)".to_string())?;
+    serde_json::from_value(types).map_err(|e| format!("malformed index/types entries: {e}"))
+}
+
+/// Build the project SerializedProperty schema from reference metadata in the
+/// sidecar (`index/schema`). The caller owns cache currency and fallback to
+/// Unity-side reflection.
+pub async fn index_serialized_schema(compile_params: &CompileParams) -> Result<Value, String> {
+    let client = manager::ensure_client().await?;
+    client
+        .request_with_timeout_no_kill(
+            "index/schema",
+            json!({ "params": compile_params }),
+            client::SCHEMA_REQUEST_TIMEOUT,
+        )
+        .await
+}
+
+/// Test-only flag control (`initialize` needs an AppHandle).
+#[cfg(test)]
+pub fn initialize_enabled_for_tests(value: bool) {
+    ENABLED.store(value, Ordering::Relaxed);
+}
+
+async fn request_compile(method: &str, request: Value) -> Result<CompileOutcome, String> {
+    let client = manager::ensure_client().await?;
+    let result = client
+        .request_with_timeout(method, request, client::COMPILE_REQUEST_TIMEOUT)
+        .await?;
+    parse_compile_result(result)
+}
+
+fn parse_compile_result(value: Value) -> Result<CompileOutcome, String> {
+    let success = value
+        .get("success")
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| "malformed compile server response (missing success)".to_string())?;
+
+    if !success {
+        let message = value
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown compile failure")
+            .to_string();
+        let stage = value
+            .get("errorStage")
+            .and_then(|v| v.as_str())
+            .unwrap_or("compile")
+            .to_string();
+        return Ok(Err(CompileFailure { stage, message }));
+    }
+
+    let assembly_b64 = value
+        .get("assemblyB64")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let assembly_path = value
+        .get("assemblyPath")
+        .and_then(|v| v.as_str())
+        .filter(|path| !path.is_empty())
+        .map(str::to_string);
+    if assembly_b64.is_empty() && assembly_path.is_none() {
+        return Err(
+            "malformed compile server response (missing assemblyB64/assemblyPath)".to_string(),
+        );
+    }
+    let assembly_name = value
+        .get("assemblyName")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let entry_type = value
+        .get("entryType")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let mode = value
+        .get("mode")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+
+    Ok(Ok(CompiledAssembly {
+        assembly_b64,
+        assembly_path,
+        assembly_name,
+        entry_type,
+        mode,
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_compile_result_success() {
+        let value = json!({
+            "success": true,
+            "assemblyName": "__LocusRuntimeAsync_00000000_00000001",
+            "assemblyB64": "TVo=",
+            "entryType": "Locus.RuntimeSnippets.__LocusAsyncSnippetHost",
+            "mode": "statements",
+            "durationMs": 12,
+        });
+        let outcome = parse_compile_result(value).expect("parse");
+        let assembly = outcome.expect("success");
+        assert_eq!(assembly.assembly_b64, "TVo=");
+        assert_eq!(
+            assembly.assembly_name,
+            "__LocusRuntimeAsync_00000000_00000001"
+        );
+        assert_eq!(
+            assembly.entry_type.as_deref(),
+            Some("Locus.RuntimeSnippets.__LocusAsyncSnippetHost")
+        );
+        assert_eq!(assembly.mode.as_deref(), Some("statements"));
+    }
+
+    #[test]
+    fn parse_compile_result_accepts_assembly_path() {
+        let value = json!({
+            "success": true,
+            "assemblyName": "__LocusRuntimeAsync_00000000_00000001",
+            "assemblyPath": "C:/Temp/__LocusRuntimeAsync.dll",
+            "entryType": "Locus.RuntimeSnippets.__LocusAsyncSnippetHost",
+        });
+        let outcome = parse_compile_result(value).expect("parse");
+        let assembly = outcome.expect("success");
+        assert_eq!(assembly.assembly_b64, "");
+        assert_eq!(
+            assembly.assembly_path.as_deref(),
+            Some("C:/Temp/__LocusRuntimeAsync.dll")
+        );
+    }
+
+    #[test]
+    fn parse_compile_result_failure() {
+        let value = json!({
+            "success": false,
+            "error": "compilation failed:\n  CS0103 at 1:1: The name 'x' does not exist in the current context\n",
+            "errorStage": "compile",
+        });
+        let outcome = parse_compile_result(value).expect("parse");
+        let failure = outcome.expect_err("failure");
+        assert_eq!(failure.stage, "compile");
+        assert!(failure.message.starts_with("compilation failed:\n"));
+    }
+
+    #[test]
+    fn parse_compile_result_malformed() {
+        assert!(parse_compile_result(json!({ "bogus": true })).is_err());
+    }
+
+    #[test]
+    fn parse_hot_patch_result_cold() {
+        let value = json!({
+            "hot": false,
+            "files": [
+                { "path": "A.cs", "hot": false, "reasons": ["field layout changed: A"] }
+            ],
+        });
+        match parse_hot_patch_result(value).expect("parse") {
+            HotPatchOutcome::Cold { files } => {
+                assert_eq!(files.len(), 1);
+                assert_eq!(files[0].0, "A.cs");
+                assert_eq!(files[0].1, vec!["field layout changed: A".to_string()]);
+            }
+            other => panic!("expected Cold, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_hot_patch_result_noop_and_error() {
+        match parse_hot_patch_result(json!({ "hot": true, "success": true, "noop": true }))
+            .expect("parse")
+        {
+            HotPatchOutcome::Noop {
+                deletions_noted, ..
+            } => {
+                assert_eq!(deletions_noted, 0);
+            }
+            other => panic!("expected Noop, got {other:?}"),
+        }
+        match parse_hot_patch_result(json!({
+            "hot": true,
+            "success": false,
+            "error": "compilation failed:\n  CS0103 at 1:1: nope\n",
+            "errorStage": "compile",
+        }))
+        .expect("parse")
+        {
+            HotPatchOutcome::CompileError(message) => {
+                assert!(message.starts_with("compilation failed:"));
+            }
+            other => panic!("expected CompileError, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_hot_patch_result_compiled() {
+        let value = json!({
+            "hot": true,
+            "success": true,
+            "assemblyName": "__LocusHotPatch_00000000_00000001",
+            "assemblyB64": "TVo=",
+            "methods": [{
+                "declaringType": "Game.Player",
+                "patchDeclaringType": "Game.Player__LocusPatch",
+                "name": "Update",
+                "paramTypeNames": [],
+                "isStatic": false,
+                "isCtor": false,
+            }],
+            "newTypes": [{
+                "metadataName": "Game.Spawner",
+                "ns": "Game",
+                "simpleName": "Spawner",
+                "isPublic": true,
+                "isTopLevel": true,
+            }],
+        });
+        match parse_hot_patch_result(value).expect("parse") {
+            HotPatchOutcome::Compiled {
+                assembly_name,
+                assembly_b64,
+                methods,
+                new_types,
+                ..
+            } => {
+                assert_eq!(assembly_name, "__LocusHotPatch_00000000_00000001");
+                assert_eq!(assembly_b64, "TVo=");
+                assert_eq!(methods.len(), 1);
+                assert_eq!(methods[0].declaring_type, "Game.Player");
+                assert_eq!(methods[0].patch_declaring_type, "Game.Player__LocusPatch");
+                assert_eq!(methods[0].name, "Update");
+                assert!(!methods[0].is_static);
+                assert_eq!(new_types.len(), 1);
+                assert!(new_types[0].is_public && new_types[0].is_top_level);
+                assert_eq!(new_types[0].ns, "Game");
+            }
+            other => panic!("expected Compiled, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_hot_patch_result_accepts_assembly_path() {
+        let value = json!({
+            "hot": true,
+            "success": true,
+            "assemblyName": "__LocusHotPatch_00000000_00000001",
+            "assemblyPath": "C:/Temp/__LocusHotPatch.dll",
+            "methods": [],
+            "newTypes": [],
+        });
+        match parse_hot_patch_result(value).expect("parse") {
+            HotPatchOutcome::Compiled {
+                assembly_b64,
+                assembly_path,
+                ..
+            } => {
+                assert_eq!(assembly_b64, "");
+                assert_eq!(
+                    assembly_path.as_deref(),
+                    Some("C:/Temp/__LocusHotPatch.dll")
+                );
+            }
+            other => panic!("expected Compiled, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_hot_patch_result_reads_message_drivers() {
+        let value = json!({
+            "hot": true,
+            "success": true,
+            "assemblyName": "__LocusHotPatch_00000000_00000001",
+            "assemblyB64": "TVo=",
+            "methods": [],
+            "newTypes": [],
+            "messageDrivers": [
+                {
+                    "kind": "player_loop",
+                    "declaringType": "Game.Player",
+                    "shimType": "Game.Player__LocusShims",
+                    "shimMethod": "Update",
+                    "message": "Update",
+                    "paramType": "",
+                    "sourcePath": "Assets/Player.cs"
+                },
+                {
+                    "kind": "component_proxy",
+                    "declaringType": "Game.Mob",
+                    "shimType": "Game.Mob__LocusShims",
+                    "shimMethod": "OnTriggerEnter",
+                    "message": "OnTriggerEnter",
+                    "paramType": "Collider",
+                    "sourcePath": "Assets/Mob.cs"
+                }
+            ],
+        });
+        match parse_hot_patch_result(value).expect("parse") {
+            HotPatchOutcome::Compiled {
+                message_drivers, ..
+            } => {
+                assert_eq!(message_drivers.len(), 2);
+                assert_eq!(message_drivers[0].kind, "player_loop");
+                assert_eq!(message_drivers[0].message, "Update");
+                assert_eq!(message_drivers[0].param_type, "");
+                assert_eq!(message_drivers[1].kind, "component_proxy");
+                assert_eq!(message_drivers[1].declaring_type, "Game.Mob");
+                assert_eq!(message_drivers[1].shim_method, "OnTriggerEnter");
+                assert_eq!(message_drivers[1].param_type, "Collider");
+            }
+            other => panic!("expected Compiled, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn access_caps_serialize_camel_case_and_default_conservative() {
+        let caps = AccessCaps::default();
+        assert!(!caps.create_delegate_non_public);
+        assert!(!caps.dynamic_method_skip_visibility);
+        assert!(!caps.dynamic_method_byref_return);
+        assert!(caps.cells.is_empty());
+
+        let mut caps = AccessCaps {
+            create_delegate_non_public: true,
+            dynamic_method_byref_return: true,
+            ..AccessCaps::default()
+        };
+        caps.cells.insert("ldfld_private".to_string(), true);
+        let value = serde_json::to_value(&caps).expect("serialize");
+        assert_eq!(value["createDelegateNonPublic"], true);
+        assert_eq!(value["dynamicMethodSkipVisibility"], false);
+        assert_eq!(value["dynamicMethodByrefReturn"], true);
+        assert_eq!(value["cells"]["ldfld_private"], true);
+
+        // Round-trips through the sidecar's RuntimeCapsDto field names.
+        let parsed: AccessCaps = serde_json::from_value(value).expect("deserialize");
+        assert_eq!(parsed, caps);
+    }
+
+    #[test]
+    fn compile_params_serialize_camel_case() {
+        let params = CompileParams {
+            fingerprint: "fp".to_string(),
+            domain_generation: "gen".to_string(),
+            lang_version: "9".to_string(),
+            reference_paths: vec!["a.dll".to_string()],
+            defines: vec!["UNITY_EDITOR".to_string()],
+            allow_unsafe: true,
+        };
+        let value = serde_json::to_value(&params).expect("serialize");
+        assert_eq!(value["domainGeneration"], "gen");
+        assert_eq!(value["langVersion"], "9");
+        assert_eq!(value["referencePaths"][0], "a.dll");
+        assert_eq!(value["allowUnsafe"], true);
+    }
+
+    #[test]
+    fn skill_package_assembly_name_matches_unity_contract() {
+        assert_eq!(
+            build_skill_package_assembly_name("studio.tools.psd-to-ugui", "abcdef0123456789abcdef"),
+            "__LocusSkillPackage_studio_tools_psd_to_ugui_abcdef012345"
+        );
+    }
+
+    /// End-to-end sidecar smoke: spawn, BCL-only compile, crash recovery,
+    /// and a 5 MB request frame. Skips (passing) when the published server
+    /// DLL or a non-downloading dotnet host is unavailable so the suite
+    /// stays green on machines without the sidecar toolchain.
+    #[tokio::test]
+    async fn compile_raw_bcl_smoke_and_crash_recovery() {
+        if manager::find_server_dll().is_none() {
+            eprintln!("skip: compile server dll not built (bun run compile-server:bundle)");
+            return;
+        }
+        if crate::dotnet_runtime::try_resolve_cached_dotnet()
+            .await
+            .is_none()
+        {
+            eprintln!("skip: no cached/system dotnet runtime available");
+            return;
+        }
+
+        let compile_class_a = || async {
+            compile_raw(json!({
+                "assemblyName": "LocusSmokeA",
+                "sources": [{ "path": "A.cs", "text": "class A { }" }],
+                "useHostBcl": true,
+            }))
+            .await
+        };
+
+        let assembly = compile_class_a()
+            .await
+            .expect("sidecar transport")
+            .expect("compile success");
+        let bytes = {
+            use base64::Engine as _;
+            base64::engine::general_purpose::STANDARD
+                .decode(assembly.assembly_b64.as_bytes())
+                .expect("valid base64")
+        };
+        assert!(bytes.len() > 512, "suspiciously small assembly");
+        assert_eq!(&bytes[..2], b"MZ", "missing PE header");
+        assert_eq!(assembly.assembly_name, "LocusSmokeA");
+
+        // Diagnostics keep the legacy "compilation failed:" framing.
+        let failure = compile_raw(json!({
+            "sources": [{ "path": "B.cs", "text": "class B { void M() { int x = \"oops\"; } }" }],
+            "useHostBcl": true,
+        }))
+        .await
+        .expect("sidecar transport")
+        .expect_err("compile failure");
+        assert!(
+            failure.message.starts_with("compilation failed:\n"),
+            "unexpected diagnostics framing: {}",
+            failure.message
+        );
+        assert!(failure.message.contains("CS0029"), "{}", failure.message);
+
+        // Crash recovery: kill the process, the next call must respawn.
+        assert!(
+            manager::kill_current_for_test().await,
+            "server should be running"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        compile_class_a()
+            .await
+            .expect("sidecar transport after crash")
+            .expect("compile success after restart");
+
+        // 5 MB request frame round-trips (plan §6 transport-size check).
+        let padding = "// padding\n".repeat(5 * 1024 * 1024 / 11);
+        let big_source = format!("{padding}class Big {{ }}");
+        compile_raw(json!({
+            "assemblyName": "LocusSmokeBig",
+            "sources": [{ "path": "Big.cs", "text": big_source }],
+            "useHostBcl": true,
+        }))
+        .await
+        .expect("sidecar transport for 5MB frame")
+        .expect("compile success for 5MB frame");
+
+        // Session image registry: assembly A registers under a domain
+        // generation, B compiles against it via referenceSessionImages, and
+        // a new generation invalidates the old images.
+        compile_raw(json!({
+            "assemblyName": "LocusSessionA",
+            "sources": [{ "path": "A.cs", "text": "public class LocusSessionTypeA { public int Value = 7; }" }],
+            "useHostBcl": true,
+            "params": { "domainGeneration": "11112222333344445555666677778888" },
+            "registerImage": true,
+        }))
+        .await
+        .expect("sidecar transport")
+        .expect("session image A compiles");
+
+        let b_source = "public class LocusSessionTypeB { public int Read() { return new LocusSessionTypeA().Value; } }";
+        compile_raw(json!({
+            "assemblyName": "LocusSessionB",
+            "sources": [{ "path": "B.cs", "text": b_source }],
+            "useHostBcl": true,
+            "params": { "domainGeneration": "11112222333344445555666677778888" },
+            "referenceSessionImages": true,
+        }))
+        .await
+        .expect("sidecar transport")
+        .expect("B resolves A through the session image registry");
+
+        // A different generation must not see the old generation's images.
+        let stale = compile_raw(json!({
+            "assemblyName": "LocusSessionB2",
+            "sources": [{ "path": "B2.cs", "text": b_source }],
+            "useHostBcl": true,
+            "params": { "domainGeneration": "99990000999900009999000099990000" },
+            "referenceSessionImages": true,
+        }))
+        .await
+        .expect("sidecar transport")
+        .expect_err("stale generation should not resolve LocusSessionTypeA");
+        assert!(
+            stale.message.contains("CS0246"),
+            "expected unknown-type diagnostics, got: {}",
+            stale.message
+        );
+
+        manager::shutdown().await;
+    }
+}

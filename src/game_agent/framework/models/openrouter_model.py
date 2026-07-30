@@ -15,6 +15,7 @@ from game_agent.framework.models.utils.actions_toolcall import (
     AGENT_TOOLS,
     format_toolcall_observation_messages,
     parse_toolcall_actions,
+    select_agent_tools,
 )
 from game_agent.framework.models.utils.openai_multimodal import expand_multimodal_content
 from game_agent.framework.models.utils.retry import retry
@@ -34,6 +35,7 @@ class OpenRouterModelConfig(BaseModel):
     )
     multimodal_regex: str = ""
     request_timeout_seconds: int = 60
+    structured_query_tools_enabled: bool = True
 
 
 class OpenRouterAPIError(Exception):
@@ -61,6 +63,7 @@ class OpenRouterModel:
 
     def __init__(self, **kwargs):
         self.config = OpenRouterModelConfig(**kwargs)
+        self.agent_tools = select_agent_tools(self.config.structured_query_tools_enabled)
         self._api_url = "https://openrouter.ai/api/v1/chat/completions"
         self._api_key = os.getenv("OPENROUTER_API_KEY", "")
 
@@ -94,7 +97,7 @@ class OpenRouterModel:
             {
                 "model": self.config.model_name,
                 "messages": messages,
-                "tools": AGENT_TOOLS,
+                "tools": self.agent_tools,
                 "usage": {"include": True},
                 **(self.config.model_kwargs | kwargs),
             }
@@ -105,7 +108,7 @@ class OpenRouterModel:
         return max(1, len(json.dumps(value, ensure_ascii=False, default=str).encode("utf-8")))
 
     def estimate_input_tokens(self, messages: list[dict]) -> int:
-        return self._estimate(self._prepare_messages_for_api(messages)) + self._estimate(AGENT_TOOLS)
+        return self._estimate(self._prepare_messages_for_api(messages)) + self._estimate(self.agent_tools)
 
     def _calculate_cost(self, response: dict) -> dict[str, float]:
         cost = float(response.get("usage", {}).get("cost") or 0.0)

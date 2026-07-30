@@ -338,6 +338,10 @@ class StateEventBaselineRunner:
         config["environment"]["cwd"] = str(project)
         config.setdefault("skills", {})
         config["skills"].update(enabled=False, paths=[])
+        config.setdefault("context", {})
+        config["context"]["enabled"] = False
+        config.setdefault("model", {})
+        config["model"]["structured_query_tools_enabled"] = False
         config.setdefault("validation", {})
         config["validation"]["enabled"] = False
         config["logging"]["events_path"] = str(self.case.artifact_dir / "events.jsonl")
@@ -354,6 +358,8 @@ class StateEventBaselineRunner:
                 "project_path": str(project),
                 "isolation": self.case.isolation,
                 "skills_enabled": False,
+                "context_virtualization_enabled": False,
+                "structured_query_tools_enabled": False,
                 "editor_path": str(self.case.editor_path.resolve()),
             },
         )

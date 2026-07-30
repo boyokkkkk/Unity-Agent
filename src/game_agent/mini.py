@@ -203,6 +203,11 @@ def run(task: str, config_path: Path, *, run_id: str | None = None) -> dict:
     agent_config["event_sink"] = logger.emit
     agent_config["event_context_sink"] = logger.set_context
     agent_config["skill_runtime"] = build_skill_runtime(config, logger, config_path=config_path)
+    context_config = dict(config.get("context", {}))
+    configured_graph = str(context_config.get("graph_path", "")).strip()
+    if configured_graph and not Path(configured_graph).is_absolute():
+        context_config["graph_path"] = str((config_path.resolve().parent.parent / configured_graph).resolve())
+    agent_config["context"] = context_config
     agent_config.update(
         max_input_tokens=experiment["max_input_tokens"],
         max_output_tokens=experiment["max_output_tokens"],

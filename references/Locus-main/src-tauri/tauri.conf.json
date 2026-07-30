@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "locus",
+  "version": "0.6.0",
+  "identifier": "com.locus.app",
+  "build": {
+    "beforeDevCommand": "bun run compile-server:ensure && bun run ort:bundle && bun run github-cli:bundle && bun run dev",
+    "devUrl": "http://localhost:14901",
+    "beforeBuildCommand": "bun run build:tauri:without_embed_python_git",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "create": false,
+        "visible": false,
+        "title": "Locus",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 500,
+        "decorations": false,
+        "shadow": true,
+        "backgroundColor": "#1d1d21",
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "FarLocus",
+    "homepage": "https://unity.farlocus.com/",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../LICENSE": "licenses/LICENSE",
+      "../THIRD_PARTY_NOTICES": "licenses/THIRD_PARTY_NOTICES",
+      "./gen/licenses-bundle": "licenses/third_party/",
+      "./gen/ort-runtime": "ort-runtime/",
+      "./gen/gh-runtime": "gh-runtime/",
+      "./gen/compile-server": "compile-server/",
+      "../agent": "agent/",
+      "../knowledge": "knowledge/",
+      "../skills": "skills/",
+      "../locus_unity": "locus_unity/"
+    },
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "template": "nsis/installer.nsi",
+        "compression": "zlib"
+      }
+    }
+  }
+}

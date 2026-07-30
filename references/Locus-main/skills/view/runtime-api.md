@@ -1,0 +1,124 @@
+# View Runtime API Quick Reference
+
+Use this when building a Locus View package. Prefer `@locus/view-runtime` for services, Unity editing, drawers, drag/drop, graph/canvas helpers, session, LLM, storage, and logs. Import visual components from `@locus/components`.
+
+## Imports
+
+- `vue`: Vue runtime APIs are available; `createApp(...).mount(...)` is captured by the View host.
+- `@locus/view-runtime`: main service and helper SDK.
+- `@locus/components`: component module.
+- `node:fs/promises`, `fs/promises`: Promise-based filesystem APIs.
+- `node:fs`, `fs`: filesystem APIs with `promises` and common callback forms.
+- `node:path`, `path`: common path helpers.
+- Relative package modules: `.ts`, `.vue`, `.js`, `.css`, plus extension-qualified files that the runtime compiler can execute.
+- Shared View package modules: `@locus/project-view` and `@project-view`.
+
+## Main SDK Values
+
+`@locus/view-runtime` currently exposes these runtime values:
+
+- `view`: `manifest`, `summary`, `reload`, `callScript`, `assets.search`, `logs.read/latest/open`, `session`, `llm`, `storage`, `fs`, `path`, `unity`, `files`, `undo`, `propertyDrawer`, `unityObjectDrawer`, `objectReferencePicker`, `openLog`, `onUpdate`.
+- `session`: `create`, `show`, `display`, `load`, `activeRun`, `events`, `queueInput`, `chat`, `send`, `wait`, `onEvent`, `fork`, `forkFromMessage`, `list`, `listArchived`, `rename`, `archive`, `unarchive`, `delete`, `undo`, `rollback`.
+- `llm`: `call`.
+- `storage`: `get`, `set`, `remove`.
+- `fs`: `readFile`, `writeFile`, `appendFile`, `mkdir`, `readdir`, `stat`, `lstat`, `access`, `unlink`, `rm`, `rename`, `copyFile`, `constants`.
+- `path`: `join`, `resolve`, `normalize`, `dirname`, `basename`, `extname`, `relative`, `parse`, `format`, `isAbsolute`, `sep`, `delimiter`, `posix`, `win32`.
+- `unity`: `callScript`, `checkConnection`, `connectionStatus`, `normalizeReference`, `sceneObjectTarget`, `selectAsset`, `inspectAsset`, `openAssetInspector`, `selectSceneObject`, `inspectSceneObject`, `openSceneObjectInspector`, `select`, `inspect`, `drag.start/arm/commitDrop/onDrop/onState`, `onDrop`, `onDragState`, `objectDrawer`, `objectReferencePicker`.
+- `files`: `drag.start/arm/onDrop/onState`, `onDrop`, `onDragState`.
+- `undo`: `state`, `record`, `undo`, `redo`, `clear`, `handleKeydown`, `isRunning`.
+- `property`: `parsePath`, `objectTarget`, `write`, `apply`, `readTree`, `fromPath`, `readProperty`, `property`.
+- `propertyDrawer`: `library`, `projectLibrary`, `register`, `registerValue`, `registerField`, `registerAttribute`, `registerPropertyPath`, `define`, `normalize`, `createLibrary`.
+- `unityObjectDrawer`: `library`, `projectLibrary`, `register`, `define`, `normalize`, `createLibrary`, `resolve`.
+- `objectReferencePicker`: `roots`, `searchQuery`, `filterResults`, `isResult`, `typeHint`, `typeKey`, `typeRule`, `normalizePath`, `extension`.
+- Helpers: `defineView`, `useViewState`, `useViewScript`, `onEditorUpdate`, `useUnityReferenceDrag`, `useUnityAssetDropTarget`, `useLocusFileDrag`, `useLocusFileDropTarget`.
+- Graph helpers: `GraphViewController`, `defineGraphView`, `layoutGraphDocument`.
+- Serialized table helpers: `resolveSerializedTableSources`, `serializedTableSourcesFromAssets`, `normalizeSerializedTableSource`, `dedupeSerializedTableSources` (feed `SerializedTableView` from manual sources plus scripted providers).
+
+Legacy globals are still installed as `window.locus.view` and `window.locus.unity`.
+
+Some visual components are still available from `@locus/view-runtime` for compatibility. New View code should import them from `@locus/components`.
+
+## Filesystem
+
+Filesystem calls run through the Locus desktop bridge. Absolute paths are used directly. Relative paths resolve from the current Unity project root, matching the normal Node idea of a working directory.
+
+```ts
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+const shaderPath = path.join("Assets", "Shaders", "MyShader.shader");
+const source = await readFile(shaderPath, "utf8");
+await writeFile(shaderPath, source.replace("_Color", "_Tint"), "utf8");
+```
+
+`readFile(path, "utf8")` returns a string. `readFile(path)` returns a `Uint8Array` with `toString("utf8")` support. `readdir(path, { withFileTypes: true })` returns Dirent-like objects with `isFile()`, `isDirectory()`, and `isSymbolicLink()`.
+
+## Property Paths
+
+Use `property` for normal Unity `SerializedProperty` work:
+
+```ts
+const tree = await property.fromPath("asset/Assets/Data/Config.asset/property/m_Name");
+const name = await property.readProperty("selection/property/m_Name");
+await property.write("guid/<asset-guid>/property/m_Name", "Player");
+await property.apply([
+  { target: { kind: "asset", path: "Assets/Data/Config.asset", propertyPath: "m_Name" }, value: "Player" },
+]);
+```
+
+Common string path forms:
+
+- `selection/property/<propertyPath>`
+- `asset/<assetPath>/property/<propertyPath>`
+- `guid/<assetGuid>/property/<propertyPath>`
+- `scene/<scenePath>/object/<objectPath>/property/<propertyPath>`
+- `scene/<scenePath>/object/<objectPath>/component/<type>/<index>/property/<propertyPath>`
+- `prefab/<prefabPath>/object/<objectPath>/component/<type>/<index>/property/<propertyPath>`
+
+Bound property objects expose `write`, `preview`, `undo`, `redo`, `draw`, and `drawDefaultEditor`. Bound trees expose `root`, `properties`, `get`, `require`, `refresh`, `writeProperty`, `writeCommit`, `apply`, `undo`, `redo`, `drawDefaultEditor`, and `drawPropertyEditor`.
+
+## Expanded Helper Exports
+
+These are also available from `@locus/view-runtime` for custom renderers and advanced editors:
+
+- Property tree: `InspectorProperty`, `PropertyTree`, `createPropertyTree`, `createInspectorPropertyTreeBinding`, `resolveInspectorDrawer`, `resolveManagedReferenceTypeOption`, `searchManagedReferenceTypeOptions`, `defineInspectorPropertyDrawers`, `createInspectorPropertyDrawerLibrary`, `publicInspectorPropertyDrawerLibrary`, `projectInspectorPropertyDrawerLibrary`, `normalizeInspectorPropertyDrawers`, `registerInspectorPropertyDrawer`, `registerInspectorValueDrawer`, `registerInspectorFieldDrawer`, `registerInspectorAttributeDrawer`, `registerInspectorPropertyPathDrawer`, `propertyTreeService`.
+- Unity property binding: `UnityBoundProperty`, `UnityBoundPropertyTree`, `createUnityPropertyRuntime`, `unityBoundPropertySnapshots`.
+- Unity value formatting: `normalizeUnityPropertyType`, `isUnityIntegerPropertyType`, `isUnityNumberPropertyType`, `isUnityVectorPropertyType`, `isUnityQuaternionPropertyType`, `unityVectorKeysForType`, `normalizeUnityOptions`, `unitySerializedValueToEditText`, `tryParseUnitySerializedEditValue`, `parseUnitySerializedEditValue`, `constrainUnityNumberValue`, `formatUnityNumberValue`, `formatUnityEnumValue`, `unityEnumIndexValue`, `unityEnumNumericValue`, `parseUnityVectorValue`, `formatUnityVectorValue`, `parseUnityQuaternionEulerValue`, `formatUnityQuaternionEulerValue`, `parseUnityColorValue`, `formatUnityColorValue`, `unityColorTextToRgbHex`, `applyUnityRgbHexToColorText`.
+- Unity property target paths: `parseUnityPropertyPath`, `resolveUnityPropertyTarget`, `unityPropertyObjectTarget`, `unityPropertyTargetWithPath`, `unityPropertyTargetKey`.
+- Object drawers: `defineUnityObjectDrawers`, `createUnityObjectDrawerLibrary`, `publicUnityObjectDrawerLibrary`, `projectUnityObjectDrawerLibrary`, `normalizeUnityObjectDrawers`, `resolveUnityObjectDrawer`, `registerUnityObjectDrawer`, `unityObjectDrawerService`.
+- Object reference picker: `UNITY_OBJECT_REFERENCE_SEARCH_ROOTS`, `normalizeUnityObjectReferenceType`, `unityObjectReferenceTypeKey`, `unityObjectReferenceTypeHint`, `getUnityObjectReferenceTypeRule`, `unityObjectReferenceSearchQuery`, `normalizeUnityObjectReferencePath`, `unityObjectReferenceDisplayParts`, `unityObjectReferenceAssetKey`, `unityObjectReferenceValueForSearchResult`, `unityObjectReferenceExtension`, `isUnityObjectReferenceSearchResult`, `filterUnityObjectReferenceSearchResults`.
+
+## Component Module
+
+`@locus/components` exposes:
+
+- `BaseButton`, `BaseCheckbox`, `BaseDropdown`, `BaseSegmented`, `BaseSwitch`.
+- `CanvasView`, `GraphView`, `SerializedTableView`.
+- `UnityBoolField`, `UnityBoundsField`, `UnityColorField`, `UnityColorHdrField`, `UnityCurveField`, `UnityEnumField`, `UnityFlagsField`, `UnityGradientField`, `UnityLayerMaskField`, `UnityNumberField`, `UnityObjectReferenceField`, `UnityPropertyDraw`, `UnityPropertyEditor`, `UnitySerializedPropertyTree`, `UnityVectorField`.
+- `UnityObjectPreview`, `UnityReferenceChip`, `UnityDropZone`.
+
+`SerializedTableView` renders rows of Unity serialized cells with resizable persisted columns, a progress/status bar, and per-cell editors. Props: `columns`, `rows`, `loading`, `status`, `error`, `progress`, `savingCellKey`, `sourceCount`, `columnWidths` (v-model). Events: `commit` (`SerializedTableCommitEvent`), `update:columnWidths`. The `serialized-table` template shows the full wiring against a `SerializedTableApi` C# script.
+
+`UnityCurveField` and `UnityGradientField` render AnimationCurve / Gradient previews; when given `editable` plus a `bindingTarget` (the property tree passes both automatically), clicking them opens the floating Locus value editor window, which owns its own preview/commit write-back and broadcasts `locus-value-editor:committed` on apply.
+
+## Plugin Drawer Packages
+
+Locus plugins can ship `drawers/<drawer-id>/` packages that extend the in-app Inspector/property rendering (chat property fences, the Locus Inspector window, diff panes, and Views) in every Locus window — unlike per-View `propertyDrawers` props, these apply app-wide.
+
+- Manifest: `drawer.json` with `{ "id", "entry" }`; `entry` defaults to `src/index.ts`. Declared in `locus.plugin.json` under `components.drawers` (or discovered from the `drawers/` directory).
+- The entry runs once per window against `@locus/drawer-runtime`, a deliberately small runtime: `meta` (`pluginId`, `pluginName`, `drawerId`), `components` (same map as `@locus/components`), `propertyDrawer` (`register`, `registerValue`, `registerField`, `registerAttribute`, `registerPropertyPath`, `define`), `unityObjectDrawer` (`register`, `registerExtension`, `define`). No fs/session/llm surface.
+- Allowed imports: `vue`, `@locus/components`, `@locus/drawer-runtime`, and relative `.ts`/`.js`/`.vue`/`.css`/`.json` files inside the package.
+- Resolution priority: explicit `propertyDrawers` props > View/project registrations (`propertyDrawer.register*` from View code) > plugin drawer packages > built-in editors. A drawer that throws is isolated per property row and falls back to a raw value display.
+- Limits: at most 64 files and 512 KB per file per package; registrations are removed automatically when the plugin is disabled or uninstalled.
+
+## Agent Tools
+
+The View skill grants these normal tools: `view_list`, `view_create`, `view_reload`, `view_run`, `view_compile_script`, `view_call_script`, `view_property_read`, `view_property_discover`, `view_property_write`, `view_property_apply`.
+
+Debug-only tools live in `debug.md`: `view_capture`, `view_snapshot`, `view_action`, `view_wait`, `view_console_read`, `view_debug_eval`.
+
+## Usage Guidance
+
+Start with `view`, `unity`, `property`, and components from `@locus/components`. Reach for the expanded helper exports only when custom rendering or value parsing requires them.
+
+`session` covers the full session lifecycle: alongside `create`/`chat`/`wait`, it exposes `fork`/`forkFromMessage`, `list`/`listArchived`, `rename`, `archive`/`unarchive`, `delete`, and conversation-history `undo`/`rollback`. These operate on any session id in the current workspace — there is no per-View ownership scoping, so a View can manage sessions it did not create. `delete`, `undo`, and `rollback` are destructive and irreversible; confirm intent (and prefer `archive` for cleanup) before calling.

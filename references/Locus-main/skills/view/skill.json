@@ -1,0 +1,14 @@
+{
+  "schema": "locus.skill.v1",
+  "id": "view",
+  "name": "View",
+  "version": "1.0.0",
+  "injectMode": "excerpt",
+  "description": "Use when the user asks to build or edit a Locus View (视图/面板): a Vue UI panel, inspector, table, board, or graph editor for the connected Unity project. Ignore Unity project View classes, folders, assets, and camera/runtime views.",
+  "argumentHint": "<view requirement>",
+  "command": {
+    "enabled": true,
+    "trigger": "/view",
+    "argumentHint": "<view requirement>"
+  }
+}

@@ -1,0 +1,71 @@
+---
+title: 安装与配置
+description: 快速安装与配置Locus
+---
+
+<br/>
+<div style={{ textAlign: 'center', color: '#8f2f2f' }}>
+  **在开始使用 Locus 执行任何修改操作之前，请确保您已备份项目文件。**<br />
+  **AI Agent 在执行任务时可能存在不确定性，请审慎使用。**
+</div>
+
+<br/>
+
+## 配置模型服务
+
+Locus 须配置远程 AI 服务作为其推理引擎。**远程大模型的性能将直接影响 Locus 的工作效果。**
+
+> **Locus 当前支持的订阅服务及消息格式**
+> - OpenAI 订阅
+> - OpenAI Response API
+> - Anthropic Messages API
+> - OpenAI Chat Completions API
+
+除所配置的远程模型服务调用外，Locus 为纯客户端软件，其余任何信息均不会上传至互联网。
+
+建议使用官方安装包安装。安装完成后，首次启动软件时将自动进入引导流程。
+
+## 选择项目并安装插件
+
+![img](/images/overview/install-and-setup/unity-plugin-2.png)
+
+Locus 通过 Unity 插件与 Unity 编辑器进行通信，以实现编辑器状态检测、C# 代码执行等功能。
+
+插件默认安装路径为 `Packages/com.farlocus.locus`。检测到旧版 `Assets/Locus` 安装时，点击更新会自动迁移到新的包路径。
+
+## 版本管理/Git配置
+
+![img](/images/overview/install-and-setup/git-config.png)
+
+Locus 依赖版本管理工具实现「撤销」及「变更分析」等功能。
+
+此外，Locus 针对 Git 提供了图形化操作界面。
+
+> 未来计划支持 Perforce（P4）及 SVN 等版本管理工具，当前版本仅支持 Git。
+
+## 扫描资产数据库
+
+![img](/images/overview/install-and-setup/asset-scan.png)
+
+Locus 不通过 Unity 编辑器解析资产引用关系，而是直接读取磁盘上的 Unity 序列化文件，以分析资产间的引用关系。
+
+## 尝试第一次对话
+
+<br/>
+<div style={{ textAlign: 'center', color: '#8f2f2f' }}>
+  **在开始使用 Locus 执行任何修改操作之前，请确保您已备份项目文件。**<br />
+  **AI Agent 在执行任务时可能存在不确定性，请审慎使用。**
+</div>
+
+
+Locus 的基础配置已完成，后续可在「设置」页面中调整上述配置。
+
+**也可以在 Unity 编辑器中通过 `Window > Locus` 打开编辑器内置窗口。**
+
+现可尝试以下示例对话：
+
+- 分析项目代码结构，指出可优化之处。
+- 创建一个横版跳跃游戏：编写一个简单的 2D 横版跳跃控制器，并在当前场景中放置若干测试平台。
+- 将当前修改分批提交至 Git。
+- 创建卡通风格的自定义渲染管线：制定实施方案，经审阅后执行。
+- 为项目中所有 `Item` 资产下的描述字符串生成对应的多语言文本，并填入表格。

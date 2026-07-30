@@ -6,13 +6,21 @@ import time
 from jinja2 import StrictUndefined, Template
 
 from game_agent.framework.exceptions import FormatError
-from game_agent.framework.models.utils.actions_toolcall import AGENT_TOOLS
+from game_agent.aci.schemas import QUERY_TOOL_NAMES
+from game_agent.framework.models.utils.actions_toolcall import AGENT_TOOLS, validate_tool_arguments
 
 
 RESPONSE_TOOLS = [
     {"type": "function", **tool["function"]}
     for tool in AGENT_TOOLS
 ]
+
+
+def select_response_tools(structured_queries_enabled: bool = True) -> list[dict]:
+    source = AGENT_TOOLS if structured_queries_enabled else [
+        tool for tool in AGENT_TOOLS if tool["function"]["name"] in {"powershell", "submit"}
+    ]
+    return [{"type": "function", **tool["function"]} for tool in source]
 
 
 def _get(value, key):
@@ -49,7 +57,7 @@ def parse_response_actions(
             calls.append(item.model_dump() if hasattr(item, "model_dump") else dict(item))
     if not calls:
         text = Template(format_error_template, undefined=StrictUndefined).render(
-            error="No tool calls found. Call powershell to continue or submit to finish the task.",
+            error="No tool calls found. Call an available query tool or powershell to continue, or submit to finish.",
             actions=[], has_tool_calls=False, **template_kwargs,
         )
         raise _format_error(text)
@@ -63,14 +71,7 @@ def parse_response_actions(
         except Exception as exc:
             arguments = {}
             error = f"Error parsing tool call arguments: {exc}."
-        if name == "powershell":
-            if not isinstance(arguments.get("command"), str) or not arguments["command"].strip():
-                error += " Missing non-empty 'command' argument in powershell tool call."
-        elif name == "submit":
-            if not isinstance(arguments.get("answer"), str) or not arguments["answer"].strip():
-                error += " Missing non-empty 'answer' argument in submit tool call."
-        else:
-            error += f" Unknown tool '{name}'. Expected powershell or submit."
+        error += validate_tool_arguments(str(name), arguments)
         if error:
             text = Template(format_error_template, undefined=StrictUndefined).render(
                 error=error.strip(), actions=[], has_tool_calls=True, **template_kwargs,
@@ -79,8 +80,10 @@ def parse_response_actions(
         call_id = call.get("call_id") or call.get("id")
         if name == "powershell":
             actions.append({"tool": "powershell", "command": arguments["command"], "tool_call_id": call_id})
-        else:
+        elif name == "submit":
             actions.append({"tool": "submit", "answer": arguments["answer"], "tool_call_id": call_id})
+        elif name in QUERY_TOOL_NAMES:
+            actions.append({"tool": name, "arguments": arguments, "tool_call_id": call_id})
     if any(action["tool"] == "submit" for action in actions) and len(actions) != 1:
         text = Template(format_error_template, undefined=StrictUndefined).render(
             error="submit must be the only tool call in a response.",
@@ -115,4 +118,3 @@ def format_response_observations(
             }
         )
     return messages
-

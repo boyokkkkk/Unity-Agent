@@ -21,7 +21,8 @@
       "max_tokens": 2048,
       "seed": 42
     },
-    "cost_tracking": "ignore_errors"
+    "cost_tracking": "ignore_errors",
+    "structured_query_tools_enabled": true
   },
   "environment": {
     "cwd": "E:/Unity_project/Kitchen_Chaos/Kitchen_Chaos",
@@ -33,8 +34,8 @@
     "env": {"PAGER": "cat", "MANPAGER": "cat", "PIP_PROGRESS_BAR": "off", "TQDM_DISABLE": "1"}
   },
   "agent": {
-    "system_template": "You are a software engineering agent working inside a Unity project on Windows. Use the powershell tool with Windows PowerShell syntax. Inspect before editing, make the smallest safe change, compile and run relevant Unity tests. Use the submit tool with a complete final answer only after verification.",
-    "instance_template": "Solve this task in the Unity project:\n\n{{task}}\n\nUse Windows PowerShell commands to inspect and edit files. Scope recursive searches to Assets or Packages. Do not modify Library, Temp, Logs, obj, or generated project files. When the task is complete, call submit with the final answer.",
+    "system_template": "You are a software engineering agent working inside a Unity project on Windows. Prefer the structured Unity and code query tools for status, localization, object inspection, references, diagnostics, and artifact reads. Use powershell only when no structured query covers the operation. Inspect before editing, make the smallest safe change, compile and run relevant Unity tests. Use submit with a complete final answer only after verification.",
+    "instance_template": "Solve this task in the Unity project:\n\n{{task}}\n\nUse structured Unity/code queries before shell exploration. Use Windows PowerShell for edits and operations not covered by the read-only query interface. Scope recursive searches to Assets or Packages. Do not modify Library, Temp, Logs, obj, or generated project files. When the task is complete, call submit with the final answer.",
     "step_limit": 40,
     "cost_limit": 3.0,
     "wall_time_limit_seconds": 1800,
@@ -47,6 +48,21 @@
     "enabled": true,
     "max_prompt_chars": 8000,
     "paths": []
+  },
+  "context": {
+    "enabled": true,
+    "graph_path": "",
+    "state_path": "project-context-state.json",
+    "auto_locate": true,
+    "max_working_set_entries": 24,
+    "max_candidate_details": 5,
+    "max_recent_tool_results": 1,
+    "max_recent_messages": 4,
+    "compression_trigger_ratio": 0.65,
+    "working_set_detail_keep": 5,
+    "max_evidence_items": 20,
+    "max_memory_items_per_field": 20,
+    "max_durable_instruction_chars": 10000
   },
   "workspace": {
     "isolation": "auto",

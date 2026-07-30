@@ -1,0 +1,160 @@
+---
+title: "Latest Version"
+description: "Locus v0.6.0 (2026-07-17)"
+sidebarTitle: "Latest Version"
+version: "0.6.0"
+releasedAt: "2026-07-17"
+channel: "stable"
+updateTitle: "Update available"
+changelogUrl: "/en/overview/latest-version"
+---
+
+## Download
+
+- [Windows x64](https://github.com/r1n7aro/Locus/releases/download/v0.6.0/locus_0.6.0_x64-setup.exe)
+- [Windows x64 (system Python/Git)](https://github.com/r1n7aro/Locus/releases/download/v0.6.0/locus_0.6.0_x64-without_embed_python_git-setup.exe)
+- [GitHub Releases](https://github.com/r1n7aro/Locus/releases)
+
+## Changes
+
+### v0.6.0 (Added)
+
+- **MCP servers.** Connect external MCP servers over stdio or HTTP and use their tools from agent sessions. A new MCP settings page manages servers and their tools; MCP tool calls show confirmation cards and status in chat. Server entries can be imported from Claude Desktop, Claude Code, and Cursor configs (imported entries arrive disabled). The new `/connect` command starts a guided flow for connecting external software, picking between MCP, CLI, and HTTP channels and verifying the connection actually works.
+- **Multi-model providers and a bundled models.dev catalog.** Custom models are now grouped into providers, each hosting multiple models, replacing single custom-endpoint entries. Providers can be added from the bundled models.dev catalog (70+ services with prefilled official endpoints) or configured manually in a two-step dialog with per-field validation. Reasoning options such as `enable_thinking` and thinking type can be set per model, and the model selector groups custom models by provider. Existing configurations migrate automatically; old model ids keep working.
+- **External skill discovery.** Optionally discover read-only agent skills from Claude Code, Codex, and `.agents` directories — user-level and per-workspace — plus installed Claude Code plugins. Off by default. Skill activation is now split into separate auto-inject and command channels with per-skill controls; external command skills support `$ARGUMENTS` and `$1`–`$9` substitution.
+- **Extra working directories.** A workspace can attach additional directories through its context menu; file tools can read and edit within them, and the workspace selector shows attached paths inline.
+- **Unity object preview straight from disk.** Files Unity does not serialize (markdown, plain text, source code, binaries) now preview from disk, so previews keep working for assets Unity has not imported — such as AI-generated files under symlinked folders. Preview folding is now optional, and the asset inspector keeps previews expanded. (#114)
+- **Copy selection in chat.** Right-clicking selected text in a message offers copying the selection as the first menu item.
+- **View log bar toggle.** The log bar in view windows is hidden by default and can be enabled in display settings; the choice syncs across windows.
+
+### v0.6.0 (Fixed)
+
+- Command-tool friction on Windows: managed Python environment variables now apply only to Python invocations instead of the whole command environment; command output is decoded using the system ANSI code page, fixing garbled Chinese (GBK) output; long-output truncation keeps both head and tail instead of only the head.
+- Deferred tools now load through Anthropic native tool references and Codex native tool search, replacing the previous meta-tool activation.
+- The builtin Unity profiler sampling skill now defaults to summary injection so agents can discover it on demand; it previously shipped with injection off.
+- Helper windows (plan review, diff review, import dialogs, and others) open through a pre-warmed window pool and appear faster.
+- UI locale catalogs are code-split and loaded on demand.
+- Session and knowledge-index databases vacuum automatically once free pages dominate the file, reclaiming disk space.
+- Context menu items now carry icons with a unified layout.
+- Plugin toggles apply immediately in the plugin list instead of waiting for the backend round-trip.
+- The scroll wheel no longer changes focused number inputs in settings.
+
+### v0.6.0 (Removed)
+
+- The single-endpoint custom model configuration is gone, replaced by the multi-model provider dialog; existing custom endpoints migrate automatically.
+
+### v0.5.8 (Added)
+
+- **Standalone plan review.** Plan approvals can open automatically in a dedicated window selected from Display settings. The window supports reviewing the Markdown plan, approving implementation, or sending it back with an optional note.
+
+### v0.5.8 (Fixed)
+
+- **Resolved intermittent DeepSeek HTTP 400 failures on Windows.** Upgraded `schannel` from 0.1.28 to 0.1.29, preventing pending request data from being resent during TLS 1.3 renegotiation and corrupting large JSON bodies. This resolves the `400 Bad Request: Failed to parse the request body as JSON` failures tracked in [issue #48](https://github.com/r1n7aro/Locus/issues/48). ([PR #110](https://github.com/r1n7aro/Locus/pull/110))
+- **Plan approval flow.** Approval cards now render Markdown, attach optional feedback to Send back, and preserve approved plans or send-back feedback in the transcript with the correct lifecycle state. Selecting `/plan` in an idle session immediately enters sticky Plan mode.
+- Fast-capable Codex models now show `Fast` in their model labels while Fast mode is enabled.
+- **Exact edit tool contracts.** `edit` and `knowledge_edit` now expose one exact replacement per call. `knowledge_read` can return the stored `summary`, `body`, or `maintenanceRules` section verbatim—including whitespace and empty content—so edits can match the selected section exactly. Existing persisted batch file-edit calls remain executable.
+
+### v0.5.7 (Added)
+
+- **GPT-5.6 models and Fast mode.** ChatGPT subscriptions now include GPT-5.6 Sol, Terra, and Luna with a 353,400-token Codex runtime context budget and reasoning levels up to Max. The model picker also offers Fast mode for faster responses with increased subscription usage.
+- **Manual Codex usage-limit resets.** ChatGPT subscription settings list available usage-limit reset credits and expiry dates. After confirmation, a credit can be consumed to reset currently eligible Codex usage windows and refresh the displayed quota.
+- **Chat input history.** The chat composer recalls previous user messages with Up/Down, restores their attachments and composer intent, and returns to the current draft at the end of the history.
+- **Double-press shortcut to stop responses.** A configurable shortcut now stops the active response after a second press, with Esc as the default; the first press shows a confirmation notice.
+
+### v0.5.7 (Fixed)
+
+- Unity documentation imports now recognize the current `cloudmedia-docs.unity3d.com` download host and legacy Google Storage URLs.
+- Escape closes active previews, popovers, and diff overlays before the global response-stop shortcut is evaluated.
+
+### v0.5.6 (Added)
+
+- **Import local files as knowledge references.** External sources can now import a local file or folder as a reference folder, in two modes: *live link* mounts the path through an OS link (junction/symlink), so content always reflects the latest files on disk and stays read-only; *snapshot* copies the current content once, with optional AI editing and a manual re-sync action. Markdown and text documents (`.md` / `.markdown` / `.txt`) become searchable in knowledge. Deleting a live-linked reference only detaches the link — source files are never touched. (#85)
+- **LaTeX math in chat.** Messages render LaTeX formulas with KaTeX, recognizing `$…$`, `$$…$$`, `\(…\)`, and `\[…\]` delimiters.
+
+### v0.5.6 (Fixed)
+
+- Chat-completions requests are sent byte-for-byte as serialized, and request logs capture the same bytes that went on the wire. When a provider rejects a request with a JSON parse error, the message now explains that the body was most likely corrupted in transit (proxy, VPN, security software, or a gateway) and suggests a curl replay to confirm. (#106)
+- Long streaming replies no longer slow down as they grow: live text, thinking, and the typewriter append new chunks instead of re-rendering the whole message.
+- The message list no longer flashes for a frame when a streaming reply finishes.
+
+### v0.5.5 (Added)
+
+- **Per-file revert.** The changes panel, the diff review window, and a new row context menu can restore a single file to its snapshot from before the current round, without popping the undo stack. If the file has later edits, Locus asks before rolling them back. (#100)
+- **Automatic retry for model requests.** Connection errors, timeouts, HTTP 5xx, and 429 rate limits retry automatically, honoring `Retry-After` on 429. Retries only happen before any output has streamed; the attempt cap is adjustable in General settings (default 3, 0 disables). (#101)
+- **Inline `<think>` tags routed to the thinking channel.** On the chat-completions and OpenRouter paths, inline `<think>…</think>` segments in streamed replies are stripped from the message body and shown as thinking instead (enabled by default).
+- **Subagent limits.** General settings now cap `task` subagent nesting depth and per-session concurrency (default depth 1). Calls over the limit return an error explaining the current caps.
+- **`/dream` memory consolidation skill.** A built-in skill that merges duplicate memories, fixes stale facts, and prunes the Memory index.
+
+### v0.5.5 (Fixed)
+
+- Auto-compaction scales its retention and request budgets to the model's context window and recognizes more provider "prompt too long" errors, so compaction converges on small-context models.
+- Replayed tool-call arguments are normalized before being resent to chat-completions/OpenRouter providers — empty or malformed JSON becomes `{}`; Codex replays stay verbatim. (#94)
+- Workspace file paths resolve lexically, so symlinked files open and reveal correctly. (#100)
+- Smoother streaming of long replies: finished markdown blocks are frozen and only the tail re-parses during streaming.
+- Context token estimates no longer undercount CJK text.
+- Auth re-checks no longer tear down open tabs, and views preload to avoid a flash on first visit.
+
+### v0.5.4 (Added)
+
+- **Sticky plan mode.** Plan mode is now a persistent, per-session read-only mode: the agent researches and writes the plan but cannot edit files or run non-read-only tools until you approve it from an in-chat card. A status bar shows plan mode is active with a one-click exit, and subagents spawned during planning inherit the read-only restriction.
+- **Main log written to a file.** Locus mirrors its log (including the frontend console) to a rotating file at `%APPDATA%\locus\logs\locus.log`, flushed on crash. Console settings has a new "Locate Log File" button.
+- **Model catalog refresh.** Added Fable 5 and Sonnet 5 (1M context) and made Opus 4.8 the default; removed the older Sonnet 4.6, Haiku 4.5, and Opus 4.7 entries.
+
+### v0.5.4 (Fixed)
+
+- Model names no longer show the internal `[1m]` context-window marker in the pickers.
+- Unity YAML parsing no longer panics on a multi-byte character right after a GUID, and single-quoted scalar names are unquoted correctly.
+- Scene diffing now detects prefab source swaps and reparenting instead of reporting them unchanged, and skips rebuilding byte-identical scene targets.
+- Faster asset re-scans: unchanged files are no longer re-parsed during watcher reconciliation, and the asset database rebuilds once on first launch after updating (schema v13).
+- Smoother response streaming: cached diagnostics/trace checks, shallower tool-call watches, batched tool-result updates, and stabilized message groups cut redundant transcript work.
+- Hot reload now fails closed on unsafe edits: ref-struct instance members, members referenced inside expression trees, namespace-scoped `using` changes, and cold-diff reverts.
+- Hardened the Unity hot-reload bridge: applied detours roll back on apply failure, recompile completion is gated on a compile epoch so pre-request compiles can't finish the request, components are skipped on GameObjects being destroyed, and convergence races / monitor-stop handoff are fixed.
+
+### v0.5.4 (Removed)
+
+- Removed the old one-shot "plan → continue implementation" confirmation card; it's replaced by the sticky, approval-gated plan mode above.
+
+### v0.5.3 (Added)
+
+- **Tuanjie (Unity China fork) support**: Locus now discovers, launches, and connects to the Tuanjie editor (`Tuanjie.exe`) alongside standard Unity — covering process matching, the native engine module and its PDB, and window-title detection. Standard Unity installs are unaffected.
+- **Claude subscription support**: Sign in to a Claude subscription or import an existing Claude Code / Codex CLI login (including a custom endpoint), and see remaining subscription quota in the Anthropic panel.
+- **Gateway-truncation diagnostics**: Failed Anthropic requests now log transport facts and the upstream JSON parse offset, and when a 400 looks like a mid-transit truncation Locus saves the exact request bytes plus a runnable `curl` so the failure can be reproduced and reported. (#48)
+
+### v0.5.3 (Removed)
+
+- Removed the "Claude subscription paused" disclaimer modal and its notice; the subscription sign-in flow replaces it.
+
+### v0.5.2 (Added)
+
+- `unity_code_usages` member lookups now read from a serialized member-binding index built during asset scanning, so they catch broken/unbound UnityEvent calls named only by a type string (`m_Target: {fileID: 0}`, no GUID) and resolve AnimationEvent function names across the whole project, instead of re-scanning the referencing scenes/prefabs and every `.anim` clip on each query. The asset database rebuilds once on first launch after updating (schema v12).
+- Unity editor resolution now falls back to the Unity Hub install cache (`editors-v2.json`), so editors installed on non-default drives (for example `D:\` or `F:\`) are found.
+
+### v0.5.2 (Fixed)
+
+- Unity 6.5 (6000.5) compatibility: `GetInstanceID()` and `IsLoadingAssetPreview(int)` became errors and the 32-bit InstanceID was replaced by the 64-bit EntityId. A `LocusObjectIdentity` shim folds the EntityId back to its low 32 bits (keeping the existing InstanceID and wire protocol), and the deprecated build-target APIs are gated by editor version. Older editors are unaffected. (#95)
+- Fixed asset-database lock poisoning on CJK input: a bare CJK search term, or a `.meta` file with CJK text after `guid:`, sliced inside a multi-byte character and panicked while the asset-database lock was held, which broke every later asset query until restart. Slicing now happens on character boundaries. (#97)
+
+### v0.5.2 (Removed)
+
+- `unity_code_usages` member mode no longer reports a UnityEvent call whose serialized type name points to a different class; it now matches only the exact class short-name or the bound script GUID.
+
+### v0.5.1 (Fixed)
+
+- The grep tool now streams search results instead of reading whole files into memory and keeps only the first N matches in path order; on very broad patterns it stops early and reports that the results are an incomplete, non-deterministic subset.
+- Fixed a focus flicker when clicking the input box in the embedded Unity window; the window is only force-activated when it doesn't already hold the foreground, so the overlay no longer bounces between blur and focus.
+- Fixed the native-plugin overlay failing to mount because its control-pipe name wasn't normalized to the full pipe path, so the client never connected.
+
+### v0.5.0 (Added)
+
+- Editor hot reload is now available: the agent can modify C# scripts at runtime and apply the new logic live, matching the capabilities of mainstream commercial hot-reload plugins.
+- The Unity IPC connection has moved from the C# plugin to a native plugin written in Rust, which keeps the connection stable across domain reloads and while Unity's main thread is blocked, and reports Unity state in real time.
+- C# compilation has moved out of the Unity process into a standalone CoreCLR process; the old path is retained for now as a compatibility fallback.
+- The Rust backend's memory allocator was switched to mimalloc.
+- Settings has a new Testing page. This release involves significant architectural changes that may cause compatibility regressions, so if you run into problems you can run these tests for reference.
+- Exposed more APIs to the View Package.
+
+### v0.5.0 (Fixed)
+
+- Asset database performance and correctness improvements.
+- Fixed a case where the message history could hide the last tool call.
+- The grep tool now resolves paths against the workspace directory.

@@ -1,0 +1,43 @@
+---
+title: Asset Graph and Semantic Diff
+description: Capabilities built on the Unity asset database, reference graph, and semantic diff
+sidebarTitle: Assets and Diff
+---
+
+Locus treats Unity assets as graph-level working objects, and it offers semantic diff and merge views that match Unity's structure for the asset types that matter most.
+
+## Asset Database and Reference Graph
+
+The current implementation covers:
+
+- Scanning `Assets` and `Packages`
+- Parsing `.meta`, YAML assets, and script info
+- Building asset nodes and reference edges
+- Dependency lookup, reverse-reference lookup, GUID resolution, and path resolution
+- Asset risk reports
+- Detection of broken references, `Missing Script`, parse failures, and duplicate GUIDs
+- Incremental index updates via a filesystem watcher
+
+This lets Locus answer many high-value questions in Unity projects:
+
+- Who references this Prefab?
+- Which assets does a ScriptableObject change affect?
+- Where do duplicate GUID risks live in the project right now?
+- Which assets already have a `Missing Script`?
+
+## Semantic Diff and Merge
+
+The diff and merge modules already cover:
+
+- Scene hierarchy and Inspector structure views
+- Semantic target construction for `PrefabInstance`
+- Grouped field views for common types like materials and particle systems
+- Side-by-side semantic diff and text diff
+- Merge semantic sessions and target materialization for Unity assets
+- Conflict-resolution flow and merge panels
+
+## Where to Use It
+
+- Asset troubleshooting and impact analysis
+- Reviewing Scene, Prefab, Material, and ParticleSystem changes
+- Conflict handling and merge assistance for Unity assets

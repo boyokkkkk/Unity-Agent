@@ -1,0 +1,1429 @@
+<script setup lang="ts">
+import BaseButton from "../ui/BaseButton.vue";
+import BaseSegmented from "../ui/BaseSegmented.vue";
+import BaseSwitch from "../ui/BaseSwitch.vue";
+import { computed } from "vue";
+import { locale, t } from "../../i18n";
+import type {
+  ModelOption,
+  CustomProvider,
+  ApiFormat,
+  CodexTransportMode,
+} from "../../types";
+import { formatModelDisplayName } from "../../utils/modelDisplay";
+import type {
+  AnthropicQuotaState,
+  AnthropicQuotaWindowState,
+  CodexQuotaState,
+  CodexQuotaResetCreditState,
+  CodexQuotaWindowState,
+  CodexStatusState,
+  ProviderStatus,
+} from "../../composables/useSettingsState";
+import { visibleProviderOrder } from "../../config/providerVisibility";
+import type { DynamicToolLoadingMode } from "../../services/system";
+
+interface ModelGroup {
+  provider: string;
+  label: string;
+  models: ModelOption[];
+}
+
+const props = defineProps<{
+  providers: ProviderStatus[];
+  editingProvider: string | null;
+  editKey: string;
+  errorMsg: string;
+  successMsg: string;
+  isLoading: boolean;
+  oauthStep: "idle" | "waiting_code" | "exchanging";
+  oauthCode: string;
+  anthropicQuota: AnthropicQuotaState;
+  codexStep: "idle" | "opening" | "waiting" | "success";
+  codexStatus: CodexStatusState;
+  codexQuota: CodexQuotaState;
+  codexResetCreditBusyId: string | null;
+  codexRetrying: boolean;
+  codexTransport: CodexTransportMode;
+  dynamicToolLoadingMode: DynamicToolLoadingMode;
+  dynamicToolLoadingBusy?: boolean;
+  anthropicNativeLazyEnabled?: boolean;
+  anthropicNativeLazyBusy?: boolean;
+  codexUserCode: string;
+  codexUrl: string;
+  codexCodeCopied: boolean;
+  allModels: ModelOption[];
+  customProviders: CustomProvider[];
+  customProviderSaving?: boolean;
+  claudeCodeTestStatus?: "idle" | "testing" | "success" | "error";
+  claudeCodeTestResult?: string;
+  mode?: "full" | "onboarding";
+  onboardingFocus?: "custom" | "codex" | null;
+}>();
+
+const emit = defineEmits<{
+  startEdit: [providerId: string];
+  cancelEdit: [];
+  saveKey: [providerId: string];
+  deleteKey: [providerId: string];
+  handleKeydown: [e: KeyboardEvent, providerId: string];
+  startOAuthLogin: [];
+  submitOAuthCode: [];
+  cancelOAuth: [];
+  oauthLogout: [];
+  importClaudeCodeOAuth: [];
+  handleOAuthKeydown: [e: KeyboardEvent];
+  refreshAnthropicQuota: [];
+  startCodexLogin: [];
+  importCodexCli: [];
+  cancelCodexLogin: [];
+  codexLogout: [];
+  retryCodexValidation: [];
+  refreshCodexQuota: [];
+  consumeCodexResetCredit: [creditId: string | null];
+  copyCode: [];
+  "update:codexTransport": [value: CodexTransportMode];
+  "update:dynamicToolLoadingMode": [value: DynamicToolLoadingMode];
+  "update:anthropicNativeLazyEnabled": [value: boolean];
+  startAddProvider: [];
+  startEditProvider: [provider: CustomProvider];
+  deleteProvider: [id: string];
+  testClaudeCode: [];
+  "update:editKey": [value: string];
+  "update:oauthCode": [value: string];
+}>();
+
+const anthropicProvider = computed(() => props.providers.find((p) => p.id === "anthropic"));
+const claudeCodeProvider = computed(() => props.providers.find((p) => p.id === "claude_code"));
+const claudeCodeLoggedOut = computed(
+  () => claudeCodeProvider.value?.hasKey === true && claudeCodeProvider.value?.loggedIn === false,
+);
+const claudeCodeStatusLabel = computed(() => {
+  if (!claudeCodeProvider.value?.hasKey) return t("settings.claudeCode.notInstalled");
+  if (claudeCodeLoggedOut.value) return t("settings.claudeCode.notLoggedIn");
+  return t("settings.claudeCode.installed");
+});
+const isOnboardingMode = computed(() => props.mode === "onboarding");
+const thirdPartyProviders = computed(() =>
+  props.providers.filter(
+    (p) => p.id !== "anthropic" && p.id !== "claude_code" && p.id !== "openrouter",
+  ),
+);
+
+function providerMeta(id: string): { desc: string; url: string; placeholder: string } {
+  switch (id) {
+    case "openrouter":
+      return {
+        desc: t("settings.provider.openrouter.desc"),
+        url: "https://openrouter.ai/keys",
+        placeholder: "sk-or-...",
+      };
+    case "anthropic":
+      return {
+        desc: t("settings.provider.anthropic.desc"),
+        url: "",
+        placeholder: "",
+      };
+    default:
+      return { desc: "", url: "", placeholder: "sk-..." };
+  }
+}
+
+function providerLabel(provider: string): string {
+  const labels: Record<string, string> = {
+    openrouter: "OpenRouter",
+    anthropic: t("model.provider.anthropic"),
+    claude_code: t("model.provider.claude_code"),
+    openai_codex: t("model.provider.openai"),
+    custom: t("model.provider.custom"),
+  };
+  return labels[provider] || provider;
+}
+
+function groupedAllModels(): ModelGroup[] {
+  const map = new Map<string, ModelOption[]>();
+  for (const m of props.allModels) {
+    const list = map.get(m.provider) || [];
+    list.push(m);
+    map.set(m.provider, list);
+  }
+  const groups: ModelGroup[] = [];
+  for (const provider of visibleProviderOrder) {
+    const models = map.get(provider);
+    if (models && models.length > 0) {
+      groups.push({ provider, label: providerLabel(provider), models });
+    }
+  }
+  return groups;
+}
+
+function formatLabel(fmt: ApiFormat): string {
+  switch (fmt) {
+    case "openai_chat": return t("settings.custom.formatOpenaiChat");
+    case "openai_responses": return t("settings.custom.formatOpenaiResponses");
+    case "anthropic_messages": return t("settings.custom.formatAnthropicMessages");
+    default: return fmt;
+  }
+}
+
+function customProviderModelSummary(provider: CustomProvider): string {
+  const names = provider.models.map((model) => model.apiModel).filter(Boolean);
+  if (names.length === 0) return t("settings.custom.noModels");
+  const shown = names.slice(0, 3).join(", ");
+  return names.length > 3 ? `${shown} +${names.length - 3}` : shown;
+}
+
+const codexTransportOptions = [
+  {
+    value: "http",
+    label: t("settings.codex.transportHttp"),
+    hint: t("settings.codex.transportHttpHint"),
+  },
+  {
+    value: "websocket",
+    label: t("settings.codex.transportWebsocket"),
+    hint: t("settings.codex.transportWebsocketHint"),
+  },
+] satisfies Array<{ value: CodexTransportMode; label: string; hint: string }>;
+
+const dynamicToolLoadingOptions = [
+  {
+    value: "native",
+    label: t("settings.dynamicToolLoading.native"),
+    hint: t("settings.dynamicToolLoading.nativeDesc"),
+  },
+  {
+    value: "metaTool",
+    label: t("settings.dynamicToolLoading.metaTool"),
+    hint: t("settings.dynamicToolLoading.metaToolDesc"),
+  },
+  {
+    value: "direct",
+    label: t("settings.dynamicToolLoading.direct"),
+    hint: t("settings.dynamicToolLoading.directDesc"),
+  },
+] satisfies Array<{ value: DynamicToolLoadingMode; label: string; hint: string }>;
+
+function updateCodexTransport(value: string) {
+  emit("update:codexTransport", value === "websocket" ? "websocket" : "http");
+}
+
+function updateDynamicToolLoadingMode(value: string) {
+  emit(
+    "update:dynamicToolLoadingMode",
+    value === "direct" || value === "native" ? value : "metaTool",
+  );
+}
+
+function focusSectionClass(section: "custom" | "codex") {
+  return {
+    "focus-section": isOnboardingMode.value && props.onboardingFocus === section,
+  };
+}
+
+function formatQuotaPercent(value: number): string {
+  return Math.round(Math.max(0, Math.min(100, value))).toString();
+}
+
+function formatAnthropicQuotaWindowLabel(window: AnthropicQuotaWindowState): string {
+  switch (window.limitId) {
+    case "five_hour":
+      return t("settings.anthropic.quotaFiveHour");
+    case "seven_day":
+      return t("settings.anthropic.quotaWeeklyAll");
+    case "seven_day_sonnet":
+      return t("settings.anthropic.quotaSonnetOnly");
+    case "seven_day_opus":
+      return t("settings.anthropic.quotaOpusOnly");
+    case "seven_day_oauth_apps":
+      return t("settings.anthropic.quotaOauthApps");
+    case "extra_usage":
+      return t("settings.anthropic.quotaExtraUsage");
+    default:
+      if (window.limitId.startsWith("weekly_scoped") && window.limitName) {
+        return t("settings.anthropic.quotaWeeklyModel", window.limitName);
+      }
+      return window.limitId;
+  }
+}
+
+function formatQuotaWindowLabel(window: CodexQuotaWindowState): string {
+  const minutes = window.windowMinutes;
+  let label: string;
+  if (!minutes || minutes <= 0) {
+    label = window.windowType === "primary"
+      ? t("settings.codex.quotaWindowPrimary")
+      : t("settings.codex.quotaWindowSecondary");
+  } else if (minutes % 10080 === 0) {
+    label = t("settings.codex.quotaWindowWeeks", minutes / 10080);
+  } else if (minutes % 1440 === 0) {
+    label = t("settings.codex.quotaWindowDays", minutes / 1440);
+  } else if (minutes % 60 === 0) {
+    label = t("settings.codex.quotaWindowHours", minutes / 60);
+  } else {
+    label = t("settings.codex.quotaWindowMinutes", minutes);
+  }
+
+  if (window.limitId !== "codex") {
+    return `${window.limitName || window.limitId} ${label}`;
+  }
+  return label;
+}
+
+function formatQuotaReset(resetsAt: number | null): string {
+  if (!resetsAt) return "";
+  const date = new Date(resetsAt * 1000);
+  if (Number.isNaN(date.getTime())) return "";
+  const dateLocale = locale.value === "zh" ? "zh-CN" : "en-US";
+  const dateLabel = date.toLocaleDateString(dateLocale, {
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const timeLabel = date.toLocaleTimeString(dateLocale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${dateLabel} ${timeLabel}`;
+}
+
+function quotaBarStyle(window: CodexQuotaWindowState | AnthropicQuotaWindowState) {
+  return {
+    width: `${formatQuotaPercent(window.remainingPercent)}%`,
+  };
+}
+
+function quotaCreditsLabel() {
+  const credits = props.codexQuota.credits;
+  if (!credits) return "";
+  if (credits.unlimited) return t("settings.codex.quotaCreditsUnlimited");
+  if (credits.balance) return t("settings.codex.quotaCredits", credits.balance);
+  return "";
+}
+
+function formatResetCreditTitle(credit: CodexQuotaResetCreditState): string {
+  return credit.title || t("settings.codex.resetCreditFallbackTitle");
+}
+
+function formatResetCreditExpiry(credit: CodexQuotaResetCreditState): string {
+  if (credit.expiresAt === null) {
+    return credit.id
+      ? t("settings.codex.resetCreditNoExpiry")
+      : t("settings.codex.resetCreditExpiryUnavailable");
+  }
+  const date = new Date(credit.expiresAt * 1000);
+  if (Number.isNaN(date.getTime())) {
+    return t("settings.codex.resetCreditExpiryUnavailable");
+  }
+  const dateLabel = date.toLocaleDateString(locale.value === "zh" ? "zh-CN" : "en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return t("settings.codex.resetCreditExpires", dateLabel);
+}
+
+function resetCreditBusyKey(credit: CodexQuotaResetCreditState): string {
+  return credit.id ?? "__next_available__";
+}
+</script>
+
+<template>
+  <div class="settings-api-providers" :class="{ 'is-onboarding': isOnboardingMode }">
+  <div class="settings-section" v-if="!isOnboardingMode && allModels.length > 0">
+    <div class="section-label">{{ t("settings.models.available") }}</div>
+    <div class="available-models-grid">
+      <div
+        v-for="group in groupedAllModels()"
+        :key="group.provider"
+        class="available-models-group"
+      >
+        <div class="available-models-provider">{{ group.label }}</div>
+        <div class="available-models-list">
+          <span
+            v-for="m in group.models"
+            :key="m.id"
+            class="available-model-tag"
+          >{{ formatModelDisplayName(m.name) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="settings-section" v-else-if="!isOnboardingMode">
+    <div class="section-label">{{ t("settings.models.available") }}</div>
+    <p class="section-desc" style="opacity:0.6;">{{ t("settings.models.noModels") }}</p>
+  </div>
+
+  <div class="settings-section" v-if="!isOnboardingMode">
+    <div class="section-label">{{ t("settings.dynamicToolLoading.title") }}</div>
+    <div class="provider-card dynamic-tool-card">
+      <div class="provider-header dynamic-tool-header">
+        <div class="provider-info">
+          <span class="provider-name">{{ t("settings.dynamicToolLoading.mode") }}</span>
+          <span class="provider-desc">
+            {{
+              dynamicToolLoadingMode === "native"
+                ? t("settings.dynamicToolLoading.nativeDesc")
+                : dynamicToolLoadingMode === "direct"
+                  ? t("settings.dynamicToolLoading.directDesc")
+                  : t("settings.dynamicToolLoading.metaToolDesc")
+            }}
+          </span>
+        </div>
+        <BaseSegmented
+          size="sm"
+          :model-value="dynamicToolLoadingMode"
+          :options="dynamicToolLoadingOptions"
+          :class="{ 'is-saving': dynamicToolLoadingBusy }"
+          @update:model-value="updateDynamicToolLoadingMode"
+        />
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" v-if="!isOnboardingMode && anthropicProvider">
+    <div class="section-label">{{ t("settings.anthropic.title") }}</div>
+    <div class="provider-card">
+      <div class="provider-header">
+        <div class="provider-info">
+          <span class="provider-name">Anthropic (OAuth)</span>
+          <span class="provider-desc">{{ providerMeta('anthropic').desc }}</span>
+        </div>
+        <span class="provider-status" :class="{ active: anthropicProvider?.hasKey }">
+          {{
+            anthropicProvider?.hasKey
+              ? t("settings.anthropic.loggedIn")
+              : t("settings.anthropic.disabledStatus")
+          }}
+        </span>
+      </div>
+
+      <div class="provider-detail">
+        <span class="key-hint">
+          {{
+            anthropicProvider?.hasKey
+              ? (anthropicProvider.keyHint || t("settings.anthropic.loggedIn"))
+              : t("settings.anthropic.disabledHint")
+          }}
+        </span>
+        <div class="provider-actions">
+          <BaseButton
+            v-if="!anthropicProvider?.hasKey && oauthStep === 'idle'"
+            variant="neutral"
+            size="sm"
+            :disabled="isLoading"
+            @click="emit('startOAuthLogin')"
+          >
+            {{ t("settings.anthropic.loginBtn") }}
+          </BaseButton>
+          <BaseButton
+            v-if="!anthropicProvider?.hasKey && oauthStep === 'idle'"
+            variant="neutral"
+            size="sm"
+            :disabled="isLoading"
+            @click="emit('importClaudeCodeOAuth')"
+          >
+            {{ t("settings.anthropic.importClaudeCode") }}
+          </BaseButton>
+          <BaseButton
+            v-if="anthropicProvider?.hasKey"
+            variant="danger"
+            size="sm"
+            :disabled="isLoading"
+            @click="emit('oauthLogout')"
+          >
+            {{ t("settings.anthropic.logout") }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <div class="provider-detail anthropic-lazy-detail">
+        <div class="provider-info">
+          <span class="provider-name">{{ t("settings.anthropic.nativeLazyTitle") }}</span>
+          <span class="provider-desc">{{ t("settings.anthropic.nativeLazyDesc") }}</span>
+        </div>
+        <BaseSwitch
+          :model-value="anthropicNativeLazyEnabled ?? true"
+          :disabled="anthropicNativeLazyBusy"
+          :aria-label="t('settings.anthropic.nativeLazyTitle')"
+          @update:model-value="emit('update:anthropicNativeLazyEnabled', $event)"
+        />
+      </div>
+
+      <div
+        v-if="anthropicProvider?.hasKey"
+        class="provider-detail codex-quota-detail"
+      >
+        <div class="codex-quota-copy">
+          <span class="key-hint codex-quota-label">{{ t("settings.anthropic.quotaLabel") }}</span>
+          <div v-if="anthropicQuota.windows.length > 0" class="codex-quota-list">
+            <div
+              v-for="window in anthropicQuota.windows"
+              :key="window.id"
+              class="codex-quota-row"
+            >
+              <span class="codex-quota-name">{{ formatAnthropicQuotaWindowLabel(window) }}</span>
+              <span class="codex-quota-track" aria-hidden="true">
+                <span class="codex-quota-fill" :style="quotaBarStyle(window)"></span>
+              </span>
+              <span class="codex-quota-percent">
+                {{ t("settings.codex.quotaPercent", formatQuotaPercent(window.remainingPercent)) }}
+              </span>
+              <span v-if="formatQuotaReset(window.resetsAt)" class="codex-quota-reset">
+                {{ formatQuotaReset(window.resetsAt) }}
+              </span>
+            </div>
+            <span v-if="anthropicQuota.error" class="oauth-hint codex-validation-error">
+              {{ anthropicQuota.error }}
+            </span>
+          </div>
+          <span v-else-if="anthropicQuota.loading" class="oauth-hint">{{ t("settings.anthropic.quotaLoading") }}</span>
+          <span v-else-if="anthropicQuota.error" class="oauth-hint codex-validation-error">
+            {{ anthropicQuota.error }}
+          </span>
+          <span v-else class="oauth-hint">{{ t("settings.anthropic.quotaUnavailable") }}</span>
+        </div>
+        <div class="provider-actions">
+          <BaseButton
+            variant="neutral"
+            size="sm"
+            type="button"
+            :disabled="anthropicQuota.loading"
+            @click="emit('refreshAnthropicQuota')"
+          >
+            {{ anthropicQuota.loading ? t("settings.anthropic.quotaRefreshing") : t("settings.anthropic.refreshQuota") }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <div
+        v-if="!anthropicProvider?.hasKey && (oauthStep === 'waiting_code' || oauthStep === 'exchanging')"
+        class="edit-form"
+      >
+        <div class="oauth-instruction">{{ t("settings.anthropic.instruction") }}</div>
+        <div class="edit-row">
+          <input
+            class="key-input"
+            type="text"
+            :value="oauthCode"
+            :placeholder="t('settings.anthropic.codePlaceholder')"
+            :disabled="isLoading"
+            @input="emit('update:oauthCode', ($event.target as HTMLInputElement).value)"
+            @keydown="emit('handleOAuthKeydown', $event)"
+          />
+          <BaseButton variant="primary" size="md" :disabled="isLoading" @click="emit('submitOAuthCode')">
+            {{
+              oauthStep === "exchanging"
+                ? t("settings.anthropic.verifying")
+                : t("settings.anthropic.confirm")
+            }}
+          </BaseButton>
+          <BaseButton variant="neutral" size="md" :disabled="isLoading" @click="emit('cancelOAuth')">
+            {{ t("settings.anthropic.cancel") }}
+          </BaseButton>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" v-if="!isOnboardingMode && claudeCodeProvider">
+    <div class="section-label">{{ t("settings.claudeCode.title") }}</div>
+    <div class="provider-card">
+      <div class="provider-header">
+        <div class="provider-info">
+          <span class="provider-name">{{ claudeCodeProvider?.name || 'Claude Code CLI' }}</span>
+          <span class="provider-desc">{{ t("settings.provider.claude_code.desc") }}</span>
+        </div>
+        <span
+          class="provider-status"
+          :class="{ active: claudeCodeProvider?.hasKey && !claudeCodeLoggedOut }"
+        >
+          {{ claudeCodeStatusLabel }}
+        </span>
+      </div>
+
+      <div class="provider-detail">
+        <span
+          class="key-hint"
+          :class="{ mono: claudeCodeProvider?.hasKey }"
+        >
+          {{ claudeCodeProvider?.hasKey
+            ? (claudeCodeProvider?.keyHint || t("settings.claudeCode.installed"))
+            : t("settings.claudeCode.installHint") }}
+        </span>
+      </div>
+
+      <div class="provider-detail" v-if="claudeCodeLoggedOut" style="padding-top: 0;">
+        <span class="oauth-hint">{{ t("settings.claudeCode.loginHint") }}</span>
+      </div>
+
+      <div class="provider-detail" style="padding-top: 0;">
+        <span class="oauth-hint">{{ t("settings.claudeCode.hint") }}</span>
+      </div>
+
+      <div class="provider-detail">
+        <div class="codex-status-copy">
+          <span
+            v-if="claudeCodeTestResult"
+            class="key-hint"
+            :class="{ 'codex-validation-error': claudeCodeTestStatus === 'error' }"
+          >{{ claudeCodeTestResult }}</span>
+          <span v-else class="oauth-hint">{{ t("settings.claudeCode.testHint") }}</span>
+        </div>
+        <div class="provider-actions">
+          <BaseButton
+            variant="neutral"
+            size="sm"
+            type="button"
+            :disabled="!claudeCodeProvider?.hasKey || claudeCodeTestStatus === 'testing'"
+            @click="emit('testClaudeCode')"
+          >
+            {{ claudeCodeTestStatus === 'testing'
+              ? t("settings.claudeCode.testing")
+              : t("settings.claudeCode.test") }}
+          </BaseButton>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" :class="focusSectionClass('codex')">
+    <div class="section-label">{{ t("settings.codex.title") }}</div>
+    <div class="provider-card">
+      <div class="provider-header">
+        <div class="provider-info">
+          <span class="provider-name">OpenAI Codex</span>
+          <span class="provider-desc">{{ t("settings.codex.desc") }}</span>
+        </div>
+        <span
+          class="provider-status"
+          :class="{
+            active: codexStatus.authenticated && !codexStatus.validationFailed,
+            error: codexStatus.validationFailed,
+          }"
+        >
+          {{
+            codexStatus.validationFailed
+              ? t("settings.codex.validationFailed")
+              : codexStatus.authenticated
+                ? t("settings.codex.loggedIn")
+                : t("settings.codex.notLoggedIn")
+          }}
+        </span>
+      </div>
+
+      <div v-if="codexStatus.authenticated" class="provider-detail codex-detail">
+        <div class="codex-status-copy">
+          <span class="key-hint">{{ codexStatus.accountId ?? t("settings.codex.authenticated") }}</span>
+          <span v-if="codexStatus.validationFailed" class="codex-validation-label">
+            {{ t("settings.codex.validationFailedHint") }}
+          </span>
+          <span v-if="codexStatus.validationError" class="oauth-hint codex-validation-error">
+            {{ codexStatus.validationError }}
+          </span>
+        </div>
+        <div class="provider-actions">
+          <BaseButton
+            v-if="codexStatus.validationFailed"
+            variant="neutral"
+            size="sm"
+            :disabled="codexRetrying"
+            @click="emit('retryCodexValidation')"
+          >
+            {{ codexRetrying ? t("settings.codex.retrying") : t("settings.codex.retryValidation") }}
+          </BaseButton>
+          <BaseButton variant="danger" size="sm" @click="emit('codexLogout')">{{ t("settings.codex.logout") }}</BaseButton>
+        </div>
+      </div>
+
+      <div
+        v-if="codexStatus.authenticated && !codexStatus.validationFailed"
+        class="provider-detail codex-quota-detail"
+      >
+        <div class="codex-quota-copy">
+          <span class="key-hint codex-quota-label">{{ t("settings.codex.quotaLabel") }}</span>
+          <div
+            v-if="codexQuota.windows.length > 0 || codexQuota.resetCreditsAvailable !== null"
+            class="codex-quota-list"
+          >
+            <div
+              v-for="window in codexQuota.windows"
+              :key="window.id"
+              class="codex-quota-row"
+            >
+              <span class="codex-quota-name">{{ formatQuotaWindowLabel(window) }}</span>
+              <span class="codex-quota-track" aria-hidden="true">
+                <span class="codex-quota-fill" :style="quotaBarStyle(window)"></span>
+              </span>
+              <span class="codex-quota-percent">
+                {{ t("settings.codex.quotaPercent", formatQuotaPercent(window.remainingPercent)) }}
+              </span>
+              <span v-if="formatQuotaReset(window.resetsAt)" class="codex-quota-reset">
+                {{ formatQuotaReset(window.resetsAt) }}
+              </span>
+            </div>
+            <div
+              v-if="codexQuota.resetCreditsAvailable !== null"
+              class="codex-reset-credits"
+            >
+              <div class="codex-reset-credits-header">
+                <span>{{ t("settings.codex.resetCredits") }}</span>
+                <span class="codex-reset-credits-value">
+                  {{ t("settings.codex.resetCreditsAvailable", codexQuota.resetCreditsAvailable) }}
+                </span>
+              </div>
+              <div
+                v-for="credit in codexQuota.resetCredits"
+                :key="credit.id ?? 'next-available'"
+                class="codex-reset-credit-item"
+              >
+                <div class="codex-reset-credit-copy" :title="credit.description ?? undefined">
+                  <span class="codex-reset-credit-title">{{ formatResetCreditTitle(credit) }}</span>
+                  <span class="codex-reset-credit-expiry">{{ formatResetCreditExpiry(credit) }}</span>
+                </div>
+                <BaseButton
+                  variant="neutral"
+                  size="sm"
+                  type="button"
+                  :disabled="codexResetCreditBusyId !== null || codexQuota.loading"
+                  @click="emit('consumeCodexResetCredit', credit.id)"
+                >
+                  {{
+                    codexResetCreditBusyId === resetCreditBusyKey(credit)
+                      ? t("settings.codex.resetCreditConsuming")
+                      : t("settings.codex.resetCreditConsume")
+                  }}
+                </BaseButton>
+              </div>
+            </div>
+            <span v-if="quotaCreditsLabel()" class="oauth-hint">{{ quotaCreditsLabel() }}</span>
+            <span v-if="codexQuota.error" class="oauth-hint codex-validation-error">
+              {{ codexQuota.error }}
+            </span>
+          </div>
+          <span v-else-if="codexQuota.loading" class="oauth-hint">{{ t("settings.codex.quotaLoading") }}</span>
+          <span v-else-if="codexQuota.error" class="oauth-hint codex-validation-error">
+            {{ codexQuota.error }}
+          </span>
+          <span v-else class="oauth-hint">{{ t("settings.codex.quotaUnavailable") }}</span>
+        </div>
+        <div class="provider-actions">
+          <BaseButton
+            variant="neutral"
+            size="sm"
+            type="button"
+            :disabled="codexQuota.loading || codexResetCreditBusyId !== null"
+            @click="emit('refreshCodexQuota')"
+          >
+            {{ codexQuota.loading ? t("settings.codex.quotaRefreshing") : t("settings.codex.refreshQuota") }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <div v-if="!codexStatus.authenticated && codexStep === 'idle'" class="provider-detail">
+        <span class="key-hint">{{ t("settings.codex.hint") }}</span>
+        <div class="provider-actions">
+          <BaseButton variant="neutral" size="sm" :disabled="isLoading" @click="emit('startCodexLogin')">
+            {{ t("settings.codex.loginBtn") }}
+          </BaseButton>
+          <BaseButton variant="neutral" size="sm" :disabled="isLoading" @click="emit('importCodexCli')">
+            {{ t("settings.codex.importCli") }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <div v-else-if="!codexStatus.authenticated && codexStep === 'opening'" class="provider-detail">
+        <span class="key-hint">{{ t("settings.codex.hint") }}</span>
+        <div class="provider-actions">
+          <BaseButton variant="neutral" size="sm" type="button" disabled>
+            {{ t("settings.codex.opening") }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <div v-else-if="!codexStatus.authenticated && codexStep === 'waiting'" class="edit-form">
+        <div class="oauth-instruction">{{ t("settings.codex.instruction") }}</div>
+        <div class="codex-code-row">
+          <a :href="codexUrl" target="_blank" class="codex-url">{{ codexUrl }}</a>
+          <button
+            class="codex-code-wrap"
+            :class="{ copied: codexCodeCopied }"
+            type="button"
+            :title="codexCodeCopied ? t('common.copied') : t('common.clickToCopy')"
+            @click="emit('copyCode')"
+          >
+            <span class="codex-code">{{ codexUserCode }}</span>
+            <span class="codex-copy-indicator">
+              {{ codexCodeCopied ? t("common.copied") : t("common.clickToCopy") }}
+            </span>
+          </button>
+        </div>
+        <div class="codex-poll-row">
+          <span class="codex-spinner"></span>
+          <span class="oauth-hint">{{ t("settings.codex.waiting") }}</span>
+          <BaseButton variant="neutral" size="sm" style="margin-left:auto" @click="emit('cancelCodexLogin')">{{ t("settings.codex.cancel") }}</BaseButton>
+        </div>
+      </div>
+
+      <div v-if="codexStep !== 'waiting'" class="provider-detail codex-transport-detail">
+        <div class="codex-transport-copy">
+          <span class="key-hint codex-transport-label">{{ t("settings.codex.transportLabel") }}</span>
+          <span class="oauth-hint">{{ t("settings.codex.transportDesc") }}</span>
+        </div>
+        <BaseSegmented
+          size="sm"
+          :model-value="codexTransport"
+          :options="codexTransportOptions"
+          @update:model-value="updateCodexTransport"
+        />
+      </div>
+    </div>
+  </div>
+
+  <div v-if="!isOnboardingMode && thirdPartyProviders.length > 0" class="settings-section">
+    <div class="section-label">{{ t("settings.provider.title") }}</div>
+
+    <div
+      v-for="provider in thirdPartyProviders"
+      :key="provider.id"
+      class="provider-card"
+    >
+      <div class="provider-header">
+        <div class="provider-info">
+          <span class="provider-name">{{ provider.name }}</span>
+          <span class="provider-desc">{{ providerMeta(provider.id).desc }}</span>
+        </div>
+        <span
+          class="provider-status"
+          :class="{ active: provider.hasKey }"
+        >
+          {{ provider.hasKey ? t("settings.provider.configured") : t("settings.provider.notConfigured") }}
+        </span>
+      </div>
+
+      <template>
+        <div v-if="provider.hasKey && editingProvider !== provider.id" class="provider-detail">
+          <span class="key-hint mono">{{ provider.keyHint }}</span>
+          <div class="provider-actions">
+            <BaseButton variant="neutral" size="sm" @click="emit('startEdit', provider.id)">{{ t("settings.provider.edit") }}</BaseButton>
+            <BaseButton variant="danger" size="sm" @click="emit('deleteKey', provider.id)">{{ t("settings.provider.delete") }}</BaseButton>
+          </div>
+        </div>
+
+        <div v-if="!provider.hasKey && editingProvider !== provider.id" class="provider-detail">
+          <BaseButton variant="neutral" size="sm" @click="emit('startEdit', provider.id)">
+            {{ t("settings.provider.addKey") }}
+          </BaseButton>
+          <a
+            v-if="providerMeta(provider.id).url"
+            :href="providerMeta(provider.id).url"
+            target="_blank"
+            class="get-key-link"
+          >{{ t("settings.provider.getKey") }}</a>
+        </div>
+
+        <div v-if="editingProvider === provider.id" class="edit-form">
+          <div class="edit-row">
+            <input
+              :value="editKey"
+              @input="emit('update:editKey', ($event.target as HTMLInputElement).value)"
+              class="key-input"
+              type="password"
+              :placeholder="providerMeta(provider.id).placeholder"
+              autofocus
+              @keydown="(e) => emit('handleKeydown', e, provider.id)"
+            />
+            <BaseButton
+              variant="primary"
+              size="md"
+              :disabled="isLoading || !editKey.trim()"
+              @click="emit('saveKey', provider.id)"
+            >
+              {{ isLoading ? '...' : t("settings.provider.save") }}
+            </BaseButton>
+            <BaseButton variant="neutral" size="md" @click="emit('cancelEdit')">{{ t("settings.provider.cancel") }}</BaseButton>
+          </div>
+          <a
+            v-if="providerMeta(provider.id).url"
+            :href="providerMeta(provider.id).url"
+            target="_blank"
+            class="get-key-link"
+          >{{ t("settings.provider.goGetKey", provider.name) }}</a>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <div class="settings-section" :class="focusSectionClass('custom')">
+    <div class="section-label">{{ t("settings.custom.title") }}</div>
+    <p class="section-desc">{{ t("settings.custom.desc") }}</p>
+
+    <div v-if="customProviders.length > 0" class="custom-endpoints-list">
+      <div
+        v-for="cp in customProviders"
+        :key="cp.id"
+        class="provider-card"
+      >
+        <div class="provider-header">
+          <div class="provider-info">
+            <span class="provider-name">{{ cp.name }}</span>
+            <span class="provider-desc">
+              {{ t("settings.custom.modelCount", String(cp.models.length)) }} · {{ formatLabel(cp.apiFormat) }}
+            </span>
+          </div>
+          <span class="provider-status active">{{ cp.endpoint }}</span>
+        </div>
+        <div class="provider-detail">
+          <span class="key-hint mono">{{ customProviderModelSummary(cp) }}</span>
+          <div class="provider-actions">
+            <BaseButton
+              variant="neutral"
+              size="sm"
+              type="button"
+              :disabled="customProviderSaving"
+              @click="emit('startEditProvider', cp)"
+            >
+              {{ t("settings.custom.edit") }}
+            </BaseButton>
+            <BaseButton
+              variant="danger"
+              size="sm"
+              type="button"
+              :disabled="customProviderSaving"
+              @click="emit('deleteProvider', cp.id)"
+            >
+              {{ t("settings.custom.delete") }}
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p v-else class="section-desc" style="opacity:0.5;">{{ t("settings.custom.noEndpoints") }}</p>
+
+    <button
+      class="add-provider-cta"
+      type="button"
+      :disabled="customProviderSaving"
+      @click="emit('startAddProvider')"
+    >
+      + {{ t("settings.custom.addProvider") }}
+    </button>
+  </div>
+  </div>
+</template>
+
+<style scoped>
+.settings-api-providers {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.settings-section {
+  padding: 18px 28px;
+}
+
+.settings-api-providers.is-onboarding .settings-section {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-api-providers.is-onboarding .settings-section:last-child {
+  border-bottom: none;
+}
+
+.settings-api-providers.is-onboarding .focus-section {
+  order: -1;
+}
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.section-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: -4px 0 14px;
+  line-height: 1.5;
+}
+
+.provider-card {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  background: color-mix(in srgb, var(--panel-bg) 84%, var(--sidebar-bg) 16%);
+}
+
+.provider-card:hover {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--panel-bg) 88%, var(--hover-bg) 12%);
+}
+
+.provider-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dynamic-tool-header {
+  align-items: center;
+}
+
+.dynamic-tool-header :deep(.base-segmented.is-saving) {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.provider-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.provider-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.provider-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.provider-status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  flex-shrink: 0;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.provider-status.active {
+  background: var(--status-good-bg);
+  color: var(--status-good-fg);
+  border-color: var(--status-good-border);
+}
+
+.provider-status.error {
+  background: var(--status-danger-bg);
+  color: var(--status-danger-fg);
+  border-color: var(--status-danger-border);
+}
+
+.provider-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.key-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.key-hint.mono {
+  font-family: var(--font-mono-identifier);
+}
+
+.provider-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.codex-detail {
+  align-items: flex-start;
+}
+
+.codex-status-copy,
+.codex-transport-copy,
+.codex-quota-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.codex-quota-copy {
+  flex: 1 1 auto;
+}
+
+.codex-transport-detail {
+  align-items: center;
+}
+
+.codex-transport-label {
+  color: var(--text-color);
+}
+
+.codex-quota-detail {
+  align-items: flex-start;
+}
+
+.codex-quota-label {
+  color: var(--text-color);
+}
+
+.codex-quota-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.codex-quota-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 128px) minmax(96px, 1fr) 40px minmax(86px, max-content);
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.codex-quota-name,
+.codex-quota-percent,
+.codex-quota-reset {
+  white-space: nowrap;
+}
+
+.codex-quota-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.codex-quota-reset {
+  text-align: right;
+}
+
+.codex-quota-track {
+  position: relative;
+  height: 4px;
+  min-width: 72px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--hover-bg);
+}
+
+.codex-quota-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--accent-color);
+}
+
+.codex-reset-credits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.codex-reset-credits-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.codex-reset-credits-value {
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.codex-reset-credit-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-color);
+}
+
+.codex-reset-credit-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.codex-reset-credit-title {
+  overflow: hidden;
+  color: var(--text-color);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codex-reset-credit-expiry {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.codex-validation-label {
+  font-size: 11px;
+  color: var(--status-danger-fg);
+  line-height: 1.4;
+}
+
+.codex-validation-error {
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.get-key-link,
+.codex-url {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+
+.codex-url {
+  color: var(--accent-color);
+  word-break: break-all;
+}
+
+.get-key-link:hover {
+  color: var(--text-color);
+}
+
+.edit-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.edit-row {
+  display: flex;
+  gap: 6px;
+}
+
+.key-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  color: var(--text-color);
+  font-size: 13px;
+  font-family: var(--font-mono-editor);
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.key-input:focus {
+  border-color: var(--accent-border);
+  background: color-mix(in srgb, var(--input-bg) 88%, var(--accent-soft) 12%);
+}
+
+.oauth-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.oauth-instruction {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.codex-code-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.codex-code-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.codex-code-wrap:hover {
+  background: var(--hover-bg);
+  border-color: var(--border-strong);
+}
+
+.codex-code-wrap:focus-visible {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.codex-code-wrap.copied {
+  border-color: var(--status-good-border);
+  background: var(--status-good-bg);
+}
+
+.codex-code {
+  flex: 1;
+  font-family: var(--font-mono-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--accent-color);
+}
+
+.codex-copy-indicator {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+
+.codex-code-wrap.copied .codex-copy-indicator {
+  color: var(--status-good-fg);
+}
+
+.codex-poll-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.codex-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.available-models-grid,
+.custom-endpoints-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Full-width dashed "add" affordance, matching the provider cards' shape. */
+.add-provider-cta {
+  width: 100%;
+  margin-top: 10px;
+  padding: 13px 16px;
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: none;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.add-provider-cta:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: var(--accent-color);
+  background: color-mix(in srgb, transparent 92%, var(--accent-soft) 8%);
+}
+
+.add-provider-cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.available-models-grid {
+  gap: 12px;
+}
+
+.available-models-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.available-models-provider {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.available-models-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.available-model-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-badge);
+  background: color-mix(in srgb, var(--panel-bg) 60%, var(--hover-bg) 40%);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+  .settings-section {
+    padding: 14px 18px;
+  }
+
+  .provider-header,
+  .provider-detail,
+  .edit-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .provider-status,
+  .provider-actions {
+    align-self: flex-start;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>

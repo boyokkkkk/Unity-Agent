@@ -205,3 +205,9 @@ game-agent-graph audit-agent `
 ```
 
 该命令会调用配置中的外部模型 API。运行前必须明确确认任务描述和 Agent 按需读取的源码片段允许发送到该 API。
+
+## 7. 项目上下文虚拟化
+
+项目图现可由 ProjectContextStore 作为版本化项目级语义内存加载。每个任务使用独立 TaskWorkingSet，图推荐、已读取内容、已核验证据、dirty 节点和 artifact 引用通过 ContextAssembler 形成每轮最小模型视图；完整消息历史不再默认重放给模型。
+
+配置、失效/remap 规则、证据状态及 context hit/miss、working-set precision 指标见 [Unity 项目上下文虚拟化](context-virtualization.md)。

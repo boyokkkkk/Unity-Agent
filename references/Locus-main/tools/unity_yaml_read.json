@@ -1,0 +1,34 @@
+{
+  "description": "Read precise Unity asset detail after locating the target with unity_yaml_list or unity_yaml_search.\n\nFor .unity/.prefab files, provide `object_path`. Live Unity Editor state is read first (unsaved changes visible), falling back to direct text YAML parsing when the Editor is unavailable. Live reads return Inspector-style GameObject and component fields (plus prefab-instance property modifications) and expand nested serialized fields such as arrays, structs, Serializable classes, and UnityEvents with bounded depth and item limits. YAML fallback returns serialized fields with references resolved to readable asset paths or object names, including structured PrefabInstance override detail.\n\nUse `detail=document` when you need direct serialized YAML document fields. For non-hierarchical YAML assets such as materials, animation clips, animator controllers, and ScriptableObjects, omit `object_path` to read all YAML documents.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "file_path": {
+        "type": "string",
+        "description": "Path to the Unity YAML file, relative to the project root (e.g. 'Assets/Scenes/Main.unity') or absolute path."
+      },
+      "object_path": {
+        "type": "string",
+        "description": "Optional hierarchy path to a specific GameObject or PrefabInstance, such as 'Player', 'Environment/Buildings/House01', or a returned duplicate-safe path like 'Root/Enemy[2]'. Use unwrapped paths from unity_yaml_list or unity_yaml_search. If unity_yaml_list displays a name as `⟦Name⟧`, omit the `⟦` and `⟧` markers in object_path."
+      },
+      "detail": {
+        "type": "string",
+        "enum": ["components", "prefab_overrides", "document"],
+        "description": "Optional detail mode. 'components' reads a GameObject and its attached component YAML fields with references resolved. 'prefab_overrides' reads structured PrefabInstance override detail. 'document' reads only the targeted YAML document fields with references resolved and internal ids omitted. Defaults to the natural detail for the target."
+      },
+      "max_field_depth": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 2,
+        "description": "Optional live Editor component-field expansion depth for Generic serialized fields such as arrays, structs, Serializable classes, and UnityEvents. Defaults to 2 and is clamped to 6."
+      },
+      "max_array_items": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 20,
+        "description": "Optional live Editor array/list item limit when expanding Generic serialized fields. Defaults to 20 and is clamped to 200."
+      }
+    },
+    "required": ["file_path"]
+  }
+}

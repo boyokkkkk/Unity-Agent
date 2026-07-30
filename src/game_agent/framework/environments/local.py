@@ -98,6 +98,10 @@ class LocalEnvironment:
         finalized["extra"] = metadata
         return finalized
 
+    def finalize_output(self, output: dict[str, Any]) -> dict[str, Any]:
+        """Apply the same artifact and preview policy to non-shell tool output."""
+        return self._finalize_output(output)
+
     def _write_tool_output(self, raw_output: str, digest: str) -> str:
         if not self.config.artifact_dir:
             return ""

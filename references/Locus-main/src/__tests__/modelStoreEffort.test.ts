@@ -1,0 +1,346 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
+import { nextTick } from "vue";
+import { useModelStore } from "../stores/model";
+import { useAuthStore } from "../stores/auth";
+
+const modelServiceMocks = vi.hoisted(() => ({
+  getModelDefaults: vi.fn(),
+  getLastModel: vi.fn(),
+  getLastEffort: vi.fn(),
+  getCodexFastMode: vi.fn(),
+  getCustomProviders: vi.fn(),
+  getCodexModelConfig: vi.fn(),
+  getCodexAvailableModels: vi.fn(),
+  saveLastModel: vi.fn(),
+  saveLastEffort: vi.fn(),
+  saveCodexFastMode: vi.fn(),
+}));
+
+vi.mock("../services/model", () => modelServiceMocks);
+
+describe("useModelStore OpenAI effort mapping", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    modelServiceMocks.getModelDefaults.mockResolvedValue({
+      mainModel: "",
+      planModel: "",
+      subagentModels: {},
+    });
+    modelServiceMocks.getLastModel.mockResolvedValue("");
+    modelServiceMocks.getLastEffort.mockResolvedValue("");
+    modelServiceMocks.getCodexFastMode.mockResolvedValue(false);
+    modelServiceMocks.getCustomProviders.mockResolvedValue([]);
+    modelServiceMocks.getCodexModelConfig.mockResolvedValue({ transport: "websocket" });
+    modelServiceMocks.getCodexAvailableModels.mockResolvedValue([]);
+    modelServiceMocks.saveLastModel.mockResolvedValue(undefined);
+    modelServiceMocks.saveLastEffort.mockResolvedValue(undefined);
+    modelServiceMocks.saveCodexFastMode.mockResolvedValue(undefined);
+  });
+
+  it("includes the GPT-5.6 family in the Codex fallback catalog", () => {
+    const authStore = useAuthStore();
+    authStore.codexAuthenticated = true;
+    const modelStore = useModelStore();
+
+    expect(modelStore.codexModels.map((model) => model.id)).toEqual([
+      "openai/gpt-5.6-sol",
+      "openai/gpt-5.6-terra",
+      "openai/gpt-5.6-luna",
+      "openai/gpt-5.5",
+      "openai/gpt-5.4",
+    ]);
+    expect(modelStore.codexModels[0]).toEqual(expect.objectContaining({
+      name: "GPT-5.6 Sol",
+      contextWindow: 353_400,
+      defaultEffort: "low",
+      supportedEfforts: ["low", "medium", "high", "xhigh", "max"],
+      isDefault: true,
+    }));
+    expect(modelStore.availableModels.some((model) => model.id === "openai/gpt-5.6-sol")).toBe(true);
+    expect(modelStore.availableModels.some((model) => model.id === "openai/gpt-5.5")).toBe(true);
+    expect(modelStore.availableModels.some((model) => model.id === "openai/gpt-5.4")).toBe(true);
+  });
+
+  it("uses the remote Codex catalog when it is available", async () => {
+    const authStore = useAuthStore();
+    authStore.codexAuthenticated = true;
+    modelServiceMocks.getCodexAvailableModels.mockResolvedValue([
+      {
+        id: "openai/gpt-5.5",
+        name: "GPT-5.5",
+        provider: "openai_codex",
+        defaultEffort: "medium",
+        supportedEfforts: ["low", "medium", "high", "xhigh"],
+      },
+    ]);
+    const modelStore = useModelStore();
+
+    await modelStore.loadCodexAvailableModels();
+
+    expect(modelStore.availableModels.some((model) => model.id === "openai/gpt-5.5")).toBe(true);
+    expect(modelStore.availableModels.some((model) => model.id === "openai/gpt-5.4")).toBe(false);
+  });
+
+  it("normalizes remote Codex model labels from model slugs", async () => {
+    const authStore = useAuthStore();
+    authStore.codexAuthenticated = true;
+    modelServiceMocks.getCodexAvailableModels.mockResolvedValue([
+      { id: "openai/gpt-5.4", name: "gpt-5.4", provider: "openai_codex" },
+      { id: "openai/gpt-5.6-sol", name: "GPT-5.6-Sol", provider: "openai_codex" },
+      { id: "openai/gpt-5.6-terra", name: "GPT-5.6-Terra", provider: "openai_codex" },
+      { id: "openai/gpt-5.6-luna", name: "GPT-5.6-Luna", provider: "openai_codex" },
+      { id: "openai/gpt-5.5", name: "GPT-5.5", provider: "openai_codex" },
+      { id: "openai/gpt-5.4-mini", name: "GPT-5.4-Mini", provider: "openai_codex" },
+      { id: "openai/gpt-5.3-codex", name: "gpt-5.3-codex", provider: "openai_codex" },
+      { id: "openai/gpt-5.3-codex-spark", name: "GPT-5.3 Codex-Spark", provider: "openai_codex" },
+    ]);
+    const modelStore = useModelStore();
+
+    await modelStore.loadCodexAvailableModels();
+
+    expect(modelStore.codexModels.map((model) => model.name)).toEqual([
+      "GPT-5.4",
+      "GPT-5.6 Sol",
+      "GPT-5.6 Terra",
+      "GPT-5.6 Luna",
+      "GPT-5.5",
+      "GPT-5.4 Mini",
+      "GPT-5.3 Codex",
+      "GPT-5.3 Codex Spark",
+    ]);
+  });
+
+  it("exposes xhigh and hides none for GPT-5.5", () => {
+    const modelStore = useModelStore();
+
+    modelStore.selectedModelId = "openai/gpt-5.5";
+
+    expect(modelStore.availableEfforts).toEqual(["low", "medium", "high", "xhigh"]);
+    expect(modelStore.effortSupported).toBe(true);
+  });
+
+  it("includes current Anthropic models with context windows", () => {
+    const authStore = useAuthStore();
+    authStore.isAuthenticated = true;
+    const modelStore = useModelStore();
+
+    expect(
+      modelStore.availableModels
+        .map((model) => model.id)
+        .filter((id) => id.startsWith("claude-")),
+    ).toEqual(["claude-fable-5", "claude-opus-4.8", "claude-sonnet-5", "claude-opus-4.6"]);
+    expect(modelStore.availableModels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "claude-fable-5",
+          name: "Claude Fable 5[1m]",
+          contextWindow: 1_000_000,
+        }),
+        expect.objectContaining({
+          id: "claude-opus-4.8",
+          name: "Claude Opus 4.8[1m]",
+          contextWindow: 1_000_000,
+        }),
+        expect.objectContaining({
+          id: "claude-sonnet-5",
+          name: "Claude Sonnet 5[1m]",
+          contextWindow: 1_000_000,
+        }),
+        expect.objectContaining({
+          id: "claude-opus-4.6",
+          name: "Claude Opus 4.6[1m]",
+          contextWindow: 1_000_000,
+        }),
+      ]),
+    );
+    expect(modelStore.availableModels.some((model) => model.id === "claude-sonnet-4.6")).toBe(
+      false,
+    );
+    expect(modelStore.availableModels.some((model) => model.id === "claude-haiku-4.5")).toBe(
+      false,
+    );
+    expect(modelStore.availableModels.some((model) => model.id === "claude-opus-4.7")).toBe(false);
+  });
+
+  it("exposes max and hides none for GPT-5.6", () => {
+    const modelStore = useModelStore();
+
+    modelStore.selectedModelId = "openai/gpt-5.6-sol";
+
+    expect(modelStore.availableEfforts).toEqual(["low", "medium", "high", "xhigh", "max"]);
+    expect(modelStore.effortSupported).toBe(true);
+  });
+
+  it("enables one Fast mode state only for supported Codex models", async () => {
+    const modelStore = useModelStore();
+    modelStore.selectedModelId = "openai/gpt-5.6-sol";
+
+    expect(modelStore.codexFastModeAvailable).toBe(true);
+    expect(modelStore.effectiveCodexFastMode).toBe(false);
+
+    modelStore.selectCodexFastMode(true);
+    expect(modelStore.effectiveCodexFastMode).toBe(true);
+    expect(modelStore.codexFastModeForModel("openai/gpt-5.6-terra")).toBe(true);
+    expect(modelStore.codexFastModeForModel("openrouter/claude-opus-4.8")).toBe(false);
+    expect(modelServiceMocks.saveCodexFastMode).toHaveBeenCalledWith(true);
+
+    modelStore.selectedModelId = "openrouter/claude-opus-4.8";
+    expect(modelStore.codexFastModeAvailable).toBe(false);
+    expect(modelStore.effectiveCodexFastMode).toBe(false);
+
+    modelServiceMocks.getCodexFastMode.mockResolvedValue(true);
+    await modelStore.loadCodexFastMode();
+    expect(modelStore.codexFastMode).toBe(true);
+  });
+
+  it("uses Claude model effort metadata from the catalog", () => {
+    const modelStore = useModelStore();
+
+    modelStore.selectedModelId = "claude-opus-4.8";
+    expect(modelStore.availableEfforts).toEqual(["none", "low", "medium", "high", "xhigh", "max"]);
+
+    modelStore.selectedModelId = "claude-sonnet-5";
+    expect(modelStore.availableEfforts).toEqual(["none", "low", "medium", "high", "xhigh", "max"]);
+
+    modelStore.selectedModelId = "claude-fable-5";
+    expect(modelStore.availableEfforts).toEqual(["none", "low", "medium", "high", "xhigh", "max"]);
+  });
+
+  it("keeps Claude Code 1m model ids unchanged when selected", () => {
+    const modelStore = useModelStore();
+
+    modelStore.selectModel("claude_code/claude-opus-4.8[1m]");
+
+    expect(modelStore.selectedModelId).toBe("claude_code/claude-opus-4.8[1m]");
+    expect(modelServiceMocks.saveLastModel).toHaveBeenCalledWith(
+      "claude_code/claude-opus-4.8[1m]",
+    );
+  });
+
+  it("keeps codex mini limited to medium and high on OpenAI Responses endpoints", () => {
+    const modelStore = useModelStore();
+
+    modelStore.applyCustomProviders([{
+      id: "endpoint-1",
+      name: "OpenAI Responses",
+      endpoint: "https://example.com/v1/responses",
+      apiFormat: "openai_responses",
+      apiKey: "",
+      catalogId: null,
+      models: [{
+        id: "gpt-5.1-codex-mini",
+        apiModel: "gpt-5.1-codex-mini",
+        name: "gpt-5.1-codex-mini",
+        contextLength: 256000,
+        betaFlags: [],
+        supportedReasoningEfforts: ["medium", "high"],
+        reasoningParamFormat: "openai_responses_reasoning_effort",
+        replayReasoningContent: false,
+        reasoningReplayField: null,
+        serverTools: { webSearch: false },
+        supportsVision: true,
+      }],
+    }]);
+    modelStore.selectedModelId = "custom/endpoint-1/gpt-5.1-codex-mini";
+
+    expect(modelStore.availableEfforts).toEqual(["medium", "high"]);
+  });
+
+  it("defaults custom endpoints to low medium high xhigh max reasoning controls", () => {
+    const modelStore = useModelStore();
+
+    modelStore.applyCustomProviders([{
+      id: "endpoint-1",
+      name: "Custom Chat",
+      endpoint: "https://example.com/v1",
+      apiFormat: "openai_chat",
+      apiKey: "",
+      catalogId: null,
+      models: [{
+        id: "deepseek-v4-pro",
+        apiModel: "deepseek-v4-pro",
+        name: "deepseek-v4-pro",
+        contextLength: 256000,
+        betaFlags: [],
+        reasoningParamFormat: "openai_chat_reasoning_effort",
+        replayReasoningContent: true,
+        reasoningReplayField: null,
+        serverTools: { webSearch: false },
+        supportsVision: true,
+      } as any],
+    }]);
+    // Legacy single-segment ids keep resolving to the provider's first model.
+    modelStore.selectedModelId = "custom/endpoint-1";
+
+    expect(modelStore.availableEfforts).toEqual(["low", "medium", "high", "xhigh", "max"]);
+    expect(modelStore.effortSupported).toBe(true);
+  });
+
+  it("upgrades legacy custom endpoint defaults to include xhigh", () => {
+    const modelStore = useModelStore();
+
+    modelStore.applyCustomProviders([{
+      id: "endpoint-1",
+      name: "Custom Chat",
+      endpoint: "https://example.com/v1",
+      apiFormat: "openai_chat",
+      apiKey: "",
+      catalogId: null,
+      models: [{
+        id: "deepseek-v4-pro",
+        apiModel: "deepseek-v4-pro",
+        name: "deepseek-v4-pro",
+        contextLength: 256000,
+        betaFlags: [],
+        supportedReasoningEfforts: ["low", "medium", "high", "max"],
+        reasoningParamFormat: "openai_chat_reasoning_effort",
+        replayReasoningContent: true,
+        reasoningReplayField: null,
+        serverTools: { webSearch: false },
+        supportsVision: true,
+      }],
+    }]);
+    modelStore.selectedModelId = "custom/endpoint-1/deepseek-v4-pro";
+
+    expect(modelStore.availableEfforts).toEqual(["low", "medium", "high", "xhigh", "max"]);
+  });
+
+  it("loads the saved effort selection from persistence", async () => {
+    const modelStore = useModelStore();
+    modelStore.selectedModelId = "openai/gpt-5.5";
+    modelServiceMocks.getLastEffort.mockResolvedValue("high");
+
+    await modelStore.loadLastEffort();
+
+    expect(modelStore.effort).toBe("high");
+    expect(modelStore.defaultEffort).toBe("high");
+    expect(modelStore.hasUserDefaultEffort).toBe(true);
+  });
+
+  it("persists effort changes after hydration", async () => {
+    const modelStore = useModelStore();
+
+    await modelStore.loadLastEffort();
+    // Select a non-default effort so the change actually triggers persistence
+    // (the global default is now "high", so selecting "high" would be a no-op).
+    modelStore.selectEffort("low");
+    await nextTick();
+
+    expect(modelStore.defaultEffort).toBe("low");
+    expect(modelStore.hasUserDefaultEffort).toBe(true);
+    expect(modelServiceMocks.saveLastEffort).toHaveBeenCalledWith("low");
+  });
+
+  it("does not persist context effort changes from session or agent selection", async () => {
+    const modelStore = useModelStore();
+
+    await modelStore.loadLastEffort();
+    modelStore.applyContextEffort("medium");
+    await nextTick();
+
+    expect(modelStore.effort).toBe("medium");
+    expect(modelServiceMocks.saveLastEffort).not.toHaveBeenCalled();
+  });
+});

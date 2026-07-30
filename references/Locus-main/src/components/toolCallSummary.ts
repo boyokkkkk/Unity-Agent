@@ -1,0 +1,139 @@
+type ToolCallArguments = Record<string, unknown>;
+
+const MCP_TOOL_PREFIX = "mcp__";
+
+export interface McpToolNameParts {
+  serverId: string;
+  toolName: string;
+}
+
+/// `mcp__<server>__<tool>` → parts; null for non-MCP names. Best-effort
+/// string split — the backend owns the authoritative wire-name map.
+export function parseMcpToolName(name: string): McpToolNameParts | null {
+  if (!name.startsWith(MCP_TOOL_PREFIX)) return null;
+  const rest = name.slice(MCP_TOOL_PREFIX.length);
+  const sep = rest.indexOf("__");
+  if (sep <= 0 || sep + 2 >= rest.length) {
+    return { serverId: "", toolName: rest };
+  }
+  return { serverId: rest.slice(0, sep), toolName: rest.slice(sep + 2) };
+}
+
+/// UI display name for a tool call: MCP wire names shed their
+/// `mcp__<server>__` prefix, everything else passes through.
+export function toolCallDisplayName(name: string): string {
+  return parseMcpToolName(name)?.toolName ?? name;
+}
+
+function getStringArg(args: ToolCallArguments, keys: string[]): string {
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function shortenPath(p: string): string {
+  const parts = p.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts.length <= 2) return parts.join("/");
+  return "…/" + parts.slice(-2).join("/");
+}
+
+function joinUnityYamlPath(filePath: string, objectPath: string): string {
+  const normalizedFilePath = filePath.replace(/\\/g, "/").replace(/\/+$/, "");
+  const normalizedObjectPath = objectPath.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (normalizedFilePath && normalizedObjectPath) {
+    return `${normalizedFilePath}/${normalizedObjectPath}`;
+  }
+  return normalizedFilePath || normalizedObjectPath;
+}
+
+export function buildToolCallArgsSummary(toolName: string, argumentsText: string): string {
+  try {
+    const args = JSON.parse(argumentsText);
+    if (!args || typeof args !== "object" || Array.isArray(args)) return "";
+
+    if (toolName === "read" || toolName === "write" || toolName === "edit" || toolName === "list") {
+      const p = getStringArg(args, ["filePath", "file_path", "path"]);
+      if (!p) return "";
+      return shortenPath(p);
+    }
+
+    if (toolName === "unity_yaml_read") {
+      const filePath = getStringArg(args, ["filePath", "file_path", "path"]);
+      const objectPath = getStringArg(args, ["objectPath", "object_path"]);
+      const targetPath = joinUnityYamlPath(filePath, objectPath);
+      if (targetPath) return targetPath;
+    }
+
+    if (toolName === "grep") {
+      const pat = getStringArg(args, ["pattern"]);
+      const path = getStringArg(args, ["filePath", "file_path", "path"]);
+      if (pat && path) return `/${pat}/ in ${shortenPath(path)}`;
+      if (pat) return `/${pat}/`;
+      return "";
+    }
+
+    if (toolName === "bash") {
+      const cmd = getStringArg(args, ["command"]);
+      if (cmd.length <= 60) return cmd;
+      return cmd.slice(0, 57) + "...";
+    }
+
+    if (
+      toolName === "code_find_references" ||
+      toolName === "code_goto_definition" ||
+      toolName === "code_hover"
+    ) {
+      const symbol = getStringArg(args, ["symbol"]);
+      const filePath = getStringArg(args, ["filePath", "file_path"]);
+      if (symbol && filePath) return `${symbol} @ ${shortenPath(filePath)}`;
+      return symbol;
+    }
+
+    if (toolName === "code_symbol_search") {
+      return getStringArg(args, ["query"]);
+    }
+
+    if (toolName === "code_diagnostics") {
+      const filePath = getStringArg(args, ["filePath", "file_path"]);
+      if (filePath) return shortenPath(filePath);
+      return "workspace";
+    }
+
+    if (toolName === "unity_code_usages") {
+      const member = getStringArg(args, ["member"]);
+      const filePath = getStringArg(args, ["filePath", "file_path"]);
+      if (member && filePath) return `${member} @ ${shortenPath(filePath)}`;
+      if (filePath) return shortenPath(filePath);
+      return member;
+    }
+
+    if (toolName === "task") {
+      const desc = getStringArg(args, ["description"]);
+      if (desc.length <= 60) return desc;
+      return desc.slice(0, 57) + "...";
+    }
+
+    if (toolName === "graph_view") {
+      const title = getStringArg(args, ["title"]);
+      if (title.length <= 60) return title;
+      return title.slice(0, 57) + "...";
+    }
+
+    if (toolName === "web_fetch") {
+      return getStringArg(args, ["url"]);
+    }
+
+    for (const v of Object.values(args)) {
+      if (typeof v === "string" && v.length > 0) {
+        return v.length <= 60 ? v : v.slice(0, 57) + "...";
+      }
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}

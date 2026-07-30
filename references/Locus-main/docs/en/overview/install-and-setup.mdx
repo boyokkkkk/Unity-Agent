@@ -1,0 +1,72 @@
+---
+title: Installation and Setup
+description: Install and configure Locus quickly
+---
+
+<br/>
+<div style={{ textAlign: 'center', color: '#8f2f2f' }}>
+  **Back up your project files before letting Locus modify anything.**<br />
+  **AI agents can produce unexpected results—use them with care.**
+</div>
+
+<br/>
+
+## Configure Model Services
+
+Locus needs a remote AI service as its inference engine. **The chosen model's performance directly determines how well Locus works.**
+
+> **Currently supported subscriptions and message formats:**
+> - OpenAI subscription
+> - Anthropic subscription (Anthropic explicitly bans third-party clients from accessing its subscription—use at your own risk.)
+> - OpenAI Response API
+> - Anthropic Messages API
+> - OpenAI Chat Completions API
+
+Aside from calls to your configured model provider, Locus runs entirely on your machine—nothing else leaves it.
+
+We recommend the official installer. On first launch, the app drops you into the onboarding flow automatically.
+
+## Select a Project and Install the Plugin
+
+![img](/images/overview/install-and-setup/unity-plugin-2.png)
+
+A Unity plugin handles editor communication: state detection, C# execution, and asset import.
+
+The plugin installs to `Packages/com.farlocus.locus` by default. If we find an older `Assets/Locus` install, clicking Update migrates it to the new package path.
+
+## Version Control / Git Configuration
+
+![img](/images/overview/install-and-setup/git-config.png)
+
+Locus uses your version control system for features like undo and change analysis.
+
+It also ships a graphical UI for Git.
+
+> Perforce (P4) and SVN support is planned. Today, only Git is supported.
+
+## Scan the Asset Database
+
+![img](/images/overview/install-and-setup/asset-scan.png)
+
+Locus reads Unity's serialized files directly from disk—not through the Editor—to map references between assets.
+
+## Try Your First Conversation
+
+<br/>
+<div style={{ textAlign: 'center', color: '#8f2f2f' }}>
+  **Back up your project files before letting Locus modify anything.**<br />
+  **AI agents can produce unexpected results—use them with care.**
+</div>
+
+
+Setup is done. You can revisit any of the above on the Settings page later.
+
+**You can also open the embedded editor window in the Unity Editor through `Window > Locus`.**
+
+Try one of these to start:
+
+- Analyze the project's code structure and call out anything worth refactoring.
+- Build a 2D platformer: write a simple jump controller and drop a few test platforms into the current scene.
+- Commit my pending changes to Git in batches.
+- Cartoon-style custom render pipeline: draft a plan, then execute once I've reviewed it.
+- Localize the description strings on every `Item` asset and write the results into a table.

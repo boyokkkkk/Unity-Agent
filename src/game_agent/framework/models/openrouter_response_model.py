@@ -11,6 +11,7 @@ from game_agent.framework.models.utils.actions_toolcall_response import (
     finish_reason_from_responses_api,
     format_response_observations,
     parse_response_actions,
+    select_response_tools,
 )
 from game_agent.framework.models.utils.retry import retry
 
@@ -26,6 +27,7 @@ class OpenRouterResponseModel(OpenRouterModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.config = OpenRouterResponseModelConfig(**kwargs)
+        self.response_tools = select_response_tools(self.config.structured_query_tools_enabled)
         self._api_url = "https://openrouter.ai/api/v1/responses"
 
     def _prepare_messages_for_api(self, messages: list[dict]) -> list[dict]:
@@ -44,11 +46,11 @@ class OpenRouterResponseModel(OpenRouterModel):
         parameters = self.config.model_kwargs | kwargs
         if "max_tokens" in parameters and "max_output_tokens" not in parameters:
             parameters["max_output_tokens"] = parameters.pop("max_tokens")
-        return self._post({"model": self.config.model_name, "input": messages, "tools": RESPONSE_TOOLS, **parameters})
+        return self._post({"model": self.config.model_name, "input": messages, "tools": self.response_tools, **parameters})
 
     def estimate_input_tokens(self, messages: list[dict]) -> int:
         prepared = self._prepare_messages_for_api(messages)
-        return self._estimate(prepared) + self._estimate(RESPONSE_TOOLS)
+        return self._estimate(prepared) + self._estimate(self.response_tools)
 
     def query(self, messages: list[dict], **kwargs) -> dict:
         prepared = self._prepare_messages_for_api(messages)

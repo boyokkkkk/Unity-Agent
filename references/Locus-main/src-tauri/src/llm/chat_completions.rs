@@ -1,0 +1,2564 @@
+use futures::StreamExt;
+use serde::Deserialize;
+use std::time::Instant;
+
+use super::openrouter::LlmResponse;
+use super::think_tag_filter::{ThinkTagEmit, ThinkTagFilter};
+use crate::session::models::{ChatMessage, ImageData, MessageRole, ToolCallInfo};
+
+const CHAT_COMPLETIONS_PATH: &str = "/chat/completions";
+const RAW_CHUNK_DEBUG_PREVIEW_CHARS: usize = 1600;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChatCompletionsFlavor {
+    Generic,
+    DeepSeek,
+    MiniMax,
+}
+
+/// Body-level switch that asks the endpoint to emit reasoning at all
+/// (models that stay silent without it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThinkingToggle {
+    /// DashScope/Qwen style: `"enable_thinking": true`.
+    EnableThinking,
+    /// Zhipu GLM style: `"thinking": {"type": "enabled"}`.
+    ThinkingType,
+}
+
+/// Reasoning knobs for a custom OpenAI-chat endpoint.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CustomChatTuning<'a> {
+    pub reasoning_effort: Option<&'a str>,
+    pub thinking_level: Option<&'a str>,
+    pub replay_reasoning_content: bool,
+    /// Explicit message-level replay field (models.dev `interleaved.field`).
+    /// None keeps the legacy model-name flavor detection.
+    pub reasoning_replay_field: Option<crate::commands::ReasoningReplayField>,
+    pub thinking_toggle: Option<ThinkingToggle>,
+}
+
+pub async fn stream_chat<F, G, H>(
+    api_key: &str,
+    model: &str,
+    system_prompt: &str,
+    history: &[ChatMessage],
+    tools: &[serde_json::Value],
+    base_url: &str,
+    tuning: CustomChatTuning<'_>,
+    debug: bool,
+    on_text_delta: F,
+    on_thinking_delta: G,
+    on_tool_call_start: H,
+) -> Result<LlmResponse, String>
+where
+    F: Fn(String) + Send + 'static,
+    G: Fn(String) + Send + 'static,
+    H: Fn(String, String) + Send + 'static,
+{
+    let tag = "Custom Chat";
+    let flavor = detect_flavor(model, base_url);
+    let client = crate::network::reqwest_client(
+        crate::network::ReqwestClientOptions::new()
+            .tcp_keepalive(std::time::Duration::from_secs(20))
+            .connect_timeout(std::time::Duration::from_secs(30)),
+    )?;
+
+    let messages = build_api_messages(
+        system_prompt,
+        history,
+        flavor,
+        deepseek_thinking_mode_enabled(tuning.thinking_level),
+        tuning.replay_reasoning_content,
+        tuning.reasoning_replay_field,
+    );
+    let body = build_request_body(model, messages, tools, flavor, tuning);
+    // Serialize once and send these exact bytes, so debug dumps and rejected-body
+    // diagnostics are byte-for-byte what went on the wire — server-side JSON parse
+    // errors report line/column against the compact wire form (issue #106).
+    let request_bytes = serde_json::to_vec(&body)
+        .map_err(|e| format!("{} request serialization failed: {}", tag, e))?;
+    let raw_request = String::from_utf8_lossy(&request_bytes).into_owned();
+
+    eprintln!(
+        "[{}] POST model={} messages={} tools={} flavor={:?} replay_reasoning_content={}",
+        tag,
+        model,
+        history.len(),
+        tools.len(),
+        flavor,
+        tuning.replay_reasoning_content
+    );
+
+    let api_url = format!(
+        "{}{}",
+        base_url.trim_end_matches('/'),
+        CHAT_COMPLETIONS_PATH
+    );
+
+    if debug {
+        eprintln!("[DEBUG][{}] request body:\n{}", tag, &raw_request);
+        let mut headers: Vec<(&str, &str)> = vec![("Content-Type", "application/json")];
+        if !api_key.is_empty() {
+            headers.push(("Authorization", "Bearer <token>"));
+        }
+        super::debug::save_request("custom_chat_completions", &api_url, &headers, &raw_request);
+    }
+
+    let max_retries = super::retry::max_retries();
+    const BASE_DELAY_MS: u64 = 1000;
+
+    let mut last_error = String::new();
+    let mut response = None;
+
+    for attempt in 0..=max_retries {
+        let mut req = client
+            .post(&api_url)
+            .header("Content-Type", "application/json")
+            .body(request_bytes.clone());
+        if !api_key.is_empty() {
+            req = req.header("Authorization", format!("Bearer {}", api_key));
+        }
+
+        match req.send().await {
+            Ok(resp) => {
+                let status = resp.status();
+                if status.is_success() {
+                    response = Some(resp);
+                    break;
+                }
+
+                // Non-2xx before any stream output exists: decide retry from
+                // the status line. Reading the body both surfaces the server's
+                // error message and drains the connection so the pool can
+                // reuse it across attempts.
+                let retry_after_secs = super::retry::retry_after_secs_from_headers(resp.headers());
+                let error_body = resp.text().await.unwrap_or_default();
+                let mut error = format!("{} API error ({}): {}", tag, status, error_body);
+                if let Some(hint) =
+                    server_json_parse_error_hint(status, &error_body, request_bytes.len())
+                {
+                    error.push_str(&hint);
+                }
+
+                if debug {
+                    eprintln!(
+                        "[DEBUG][{}] API error (status={}):\n{}",
+                        tag, status, error_body
+                    );
+                    if status.is_client_error() {
+                        // A 4xx means the endpoint rejected this request body
+                        // (issue #94), so dump a truncated copy for diagnosis.
+                        // Auth material lives in headers, never in the body.
+                        dump_rejected_request_body(tag, status, &raw_request);
+                    }
+                }
+
+                if super::retry::is_retryable_http_status(status) && attempt < max_retries {
+                    let delay =
+                        super::retry::status_retry_delay_ms(status, retry_after_secs, attempt);
+                    eprintln!(
+                        "[{}] HTTP {} (attempt {}/{}, retrying in {}ms...)",
+                        tag,
+                        status.as_u16(),
+                        attempt + 1,
+                        max_retries + 1,
+                        delay
+                    );
+                    last_error = error;
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                    continue;
+                }
+
+                return Err(error);
+            }
+            Err(e) => {
+                let mut error_chain = format!("Request failed: {}", e);
+                let mut source = std::error::Error::source(&e);
+                while let Some(cause) = source {
+                    error_chain.push_str(&format!("\n  caused by: {}", cause));
+                    source = std::error::Error::source(cause);
+                }
+
+                let is_retryable = e.is_connect() || e.is_timeout();
+                if is_retryable && attempt < max_retries {
+                    let delay = BASE_DELAY_MS * 2u64.pow(attempt);
+                    eprintln!(
+                        "[{}] {} (attempt {}/{}, retrying in {}ms...)",
+                        tag,
+                        error_chain,
+                        attempt + 1,
+                        max_retries + 1,
+                        delay
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                } else {
+                    eprintln!("[{}] {}", tag, error_chain);
+                    last_error = error_chain;
+                }
+            }
+        }
+    }
+
+    let response = response.ok_or(last_error)?;
+
+    let mut stream = response.bytes_stream();
+    let mut buffer = String::new();
+    let mut raw_response = String::new();
+    let mut state = ChatStreamState::new();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = match chunk {
+            Ok(c) => c,
+            Err(e) => {
+                return Err(format!("Stream read error: {}", e));
+            }
+        };
+
+        let chunk_text = String::from_utf8_lossy(&chunk);
+        raw_response.push_str(&chunk_text);
+        buffer.push_str(&chunk_text);
+
+        if drain_sse_buffer(
+            &mut buffer,
+            false,
+            debug,
+            &mut state,
+            &on_text_delta,
+            &on_thinking_delta,
+            &on_tool_call_start,
+        )? {
+            state.flush_think_filter(&on_text_delta, &on_thinking_delta);
+            return finalize_stream_response(
+                tag,
+                model,
+                &api_url,
+                flavor,
+                debug,
+                true,
+                state,
+                raw_request,
+                raw_response,
+            );
+        }
+    }
+
+    if drain_sse_buffer(
+        &mut buffer,
+        true,
+        debug,
+        &mut state,
+        &on_text_delta,
+        &on_thinking_delta,
+        &on_tool_call_start,
+    )? {
+        state.flush_think_filter(&on_text_delta, &on_thinking_delta);
+        return finalize_stream_response(
+            tag,
+            model,
+            &api_url,
+            flavor,
+            debug,
+            true,
+            state,
+            raw_request,
+            raw_response,
+        );
+    }
+
+    state.flush_think_filter(&on_text_delta, &on_thinking_delta);
+    let saw_finish_reason = state.saw_finish_reason;
+    finalize_stream_response(
+        tag,
+        model,
+        &api_url,
+        flavor,
+        debug,
+        saw_finish_reason,
+        state,
+        raw_request,
+        raw_response,
+    )
+}
+
+/// Cap on the request-body preview dumped to stderr when the endpoint
+/// rejects a request with a 4xx (debug mode only).
+const REQUEST_DUMP_MAX_CHARS: usize = 4096;
+
+/// Debug-only stderr dump of the request body a 4xx rejected, truncated to a
+/// few KB. The body carries no credentials (Authorization is a header), so
+/// this is safe to log; it never reaches the user-visible error string.
+fn dump_rejected_request_body(tag: &str, status: reqwest::StatusCode, raw_request: &str) {
+    let truncated: String = raw_request.chars().take(REQUEST_DUMP_MAX_CHARS).collect();
+    let suffix = if truncated.len() < raw_request.len() {
+        format!(
+            "\n... (truncated, {} of {} bytes shown)",
+            truncated.len(),
+            raw_request.len()
+        )
+    } else {
+        String::new()
+    };
+    eprintln!(
+        "[DEBUG][{}] request body rejected with HTTP {}:\n{}{}",
+        tag,
+        status.as_u16(),
+        truncated,
+        suffix
+    );
+}
+
+/// Detect a 4xx whose body blames JSON syntax in the request we sent.
+///
+/// Locus serializes request bodies with serde_json, which cannot emit
+/// syntactically invalid JSON, so such a rejection means the bytes were
+/// corrupted after leaving this process — a proxy, security middlebox, or a
+/// gateway buffer/size limit in front of the endpoint (issue #106). Surface
+/// that context plus the exact request size so users verify with the debug
+/// dump instead of chasing tool-schema ghosts.
+fn server_json_parse_error_hint(
+    status: reqwest::StatusCode,
+    error_body: &str,
+    request_len: usize,
+) -> Option<String> {
+    if !status.is_client_error() {
+        return None;
+    }
+    let lower = error_body.to_ascii_lowercase();
+    const MARKERS: [&str; 6] = [
+        "json parse error",
+        "jsonparseexception",
+        "jsonmappingexception",
+        // Jackson's signature phrasing: "was expecting a colon/comma/...".
+        "was expecting",
+        "invalid json",
+        "malformed json",
+    ];
+    if !MARKERS.iter().any(|marker| lower.contains(marker)) {
+        return None;
+    }
+    Some(format!(
+        "\n[Locus] The endpoint rejected the request body as malformed JSON, but Locus sent \
+         {request_len} bytes serialized by serde_json, which cannot produce invalid JSON. The \
+         body was most likely corrupted in transit (proxy, VPN, security software, or a gateway \
+         buffer/size limit in front of the endpoint). Enable Debug mode in Locus settings (or \
+         set LOCUS_DEBUG=1) to save the exact outgoing request to disk, validate it with a JSON \
+         checker, and replay it with curl to confirm the corruption happens outside Locus."
+    ))
+}
+
+fn detect_flavor(model: &str, base_url: &str) -> ChatCompletionsFlavor {
+    let model = model.trim().to_ascii_lowercase();
+    let base_url = base_url.trim().to_ascii_lowercase();
+    if model.starts_with("deepseek-") || base_url.contains("deepseek") {
+        ChatCompletionsFlavor::DeepSeek
+    } else if model.contains("minimax")
+        || base_url.contains("minimax")
+        || base_url.contains("minimaxi")
+    {
+        ChatCompletionsFlavor::MiniMax
+    } else {
+        ChatCompletionsFlavor::Generic
+    }
+}
+
+fn build_request_body(
+    model: &str,
+    messages: Vec<serde_json::Value>,
+    tools: &[serde_json::Value],
+    flavor: ChatCompletionsFlavor,
+    tuning: CustomChatTuning<'_>,
+) -> serde_json::Value {
+    let mut body = serde_json::json!({
+        "model": model,
+        "messages": messages,
+        "stream": true,
+        "stream_options": { "include_usage": true },
+    });
+
+    if !tools.is_empty() {
+        body["tools"] = serde_json::json!(tools);
+    }
+
+    match flavor {
+        ChatCompletionsFlavor::DeepSeek => {
+            apply_deepseek_thinking_params(&mut body, tuning.reasoning_effort, tuning.thinking_level);
+        }
+        ChatCompletionsFlavor::MiniMax => {
+            body["reasoning_split"] = serde_json::json!(true);
+            apply_generic_reasoning_effort(&mut body, tuning.reasoning_effort);
+        }
+        ChatCompletionsFlavor::Generic => {
+            apply_generic_reasoning_effort(&mut body, tuning.reasoning_effort);
+        }
+    }
+
+    // Explicit toggles win over flavor heuristics.
+    match tuning.thinking_toggle {
+        Some(ThinkingToggle::EnableThinking) => {
+            body["enable_thinking"] = serde_json::json!(true);
+        }
+        Some(ThinkingToggle::ThinkingType) => {
+            body["thinking"] = serde_json::json!({ "type": "enabled" });
+        }
+        None => {}
+    }
+
+    body
+}
+
+fn apply_generic_reasoning_effort(body: &mut serde_json::Value, reasoning_effort: Option<&str>) {
+    if let Some(effort) = reasoning_effort
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("none"))
+    {
+        body["reasoning_effort"] = serde_json::json!(effort);
+    }
+}
+
+fn apply_deepseek_thinking_params(
+    body: &mut serde_json::Value,
+    reasoning_effort: Option<&str>,
+    thinking_level: Option<&str>,
+) {
+    if thinking_level
+        .map(str::trim)
+        .is_some_and(|level| level.eq_ignore_ascii_case("none"))
+    {
+        body["thinking"] = serde_json::json!({ "type": "disabled" });
+        return;
+    }
+
+    let Some(effort) = reasoning_effort.and_then(normalize_deepseek_reasoning_effort) else {
+        return;
+    };
+    body["thinking"] = serde_json::json!({ "type": "enabled" });
+    body["reasoning_effort"] = serde_json::json!(effort);
+}
+
+fn normalize_deepseek_reasoning_effort(value: &str) -> Option<&'static str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "low" | "medium" | "high" => Some("high"),
+        "xhigh" | "max" => Some("max"),
+        _ => None,
+    }
+}
+
+fn deepseek_thinking_mode_enabled(thinking_level: Option<&str>) -> bool {
+    !thinking_level
+        .map(str::trim)
+        .is_some_and(|level| level.eq_ignore_ascii_case("none"))
+}
+
+fn minimax_reasoning_details(thinking: &str) -> serde_json::Value {
+    serde_json::json!([{
+        "type": "reasoning.text",
+        "id": "reasoning-text-1",
+        "format": "MiniMax-response-v1",
+        "index": 0,
+        "text": thinking,
+    }])
+}
+
+/// Replay assistant reasoning onto the outgoing message.
+///
+/// With an explicit field (models.dev `interleaved.field`) the string-valued
+/// fields are ALWAYS set — DeepSeek-style APIs expect `reasoning_content`
+/// back on every assistant turn even when it is empty. Without one, the
+/// legacy flavor heuristics apply (only non-empty reasoning is attached).
+fn apply_reasoning_replay(
+    message: &mut serde_json::Value,
+    thinking_content: Option<&str>,
+    flavor: ChatCompletionsFlavor,
+    replay_field: Option<crate::commands::ReasoningReplayField>,
+) {
+    use crate::commands::ReasoningReplayField;
+
+    let thinking = thinking_content.unwrap_or("");
+    match replay_field {
+        Some(ReasoningReplayField::ReasoningContent) => {
+            message["reasoning_content"] = serde_json::json!(thinking);
+        }
+        Some(ReasoningReplayField::Reasoning) => {
+            message["reasoning"] = serde_json::json!(thinking);
+        }
+        Some(ReasoningReplayField::ReasoningDetails) => {
+            // Structured array form: only attach real content.
+            if !thinking.trim().is_empty() {
+                message["reasoning_details"] = minimax_reasoning_details(thinking);
+            }
+        }
+        None => {
+            if thinking.trim().is_empty() {
+                return;
+            }
+            if flavor == ChatCompletionsFlavor::MiniMax {
+                message["reasoning_details"] = minimax_reasoning_details(thinking);
+            } else {
+                message["reasoning_content"] = serde_json::json!(thinking);
+            }
+        }
+    }
+}
+
+fn build_api_messages(
+    system_prompt: &str,
+    history: &[ChatMessage],
+    flavor: ChatCompletionsFlavor,
+    deepseek_thinking_enabled: bool,
+    replay_reasoning_content: bool,
+    reasoning_replay_field: Option<crate::commands::ReasoningReplayField>,
+) -> Vec<serde_json::Value> {
+    let mut messages = Vec::new();
+    if !system_prompt.is_empty() {
+        messages.push(serde_json::json!({
+            "role": "system",
+            "content": system_prompt,
+        }));
+    }
+
+    let mut i = 0usize;
+    while i < history.len() {
+        let msg = &history[i];
+        match msg.role {
+            MessageRole::User => {
+                messages.push(serde_json::json!({
+                    "role": "user",
+                    "content": build_user_content(msg, flavor),
+                }));
+            }
+            MessageRole::Assistant => {
+                if should_flatten_deepseek_tool_round(msg, flavor, deepseek_thinking_enabled) {
+                    let (content, consumed) = render_legacy_tool_round(history, i);
+                    messages.push(serde_json::json!({
+                        "role": "assistant",
+                        "content": content,
+                    }));
+                    i += consumed;
+                    continue;
+                }
+
+                let mut m = serde_json::json!({
+                    "role": "assistant",
+                    "content": msg.content,
+                });
+                if replay_reasoning_content {
+                    apply_reasoning_replay(
+                        &mut m,
+                        msg.thinking_content.as_deref(),
+                        flavor,
+                        reasoning_replay_field,
+                    );
+                }
+                if let Some(ref tool_calls) = msg.tool_calls {
+                    if !tool_calls.is_empty() {
+                        m["tool_calls"] = serde_json::json!(build_tool_call_values(tool_calls));
+                    }
+                }
+                messages.push(m);
+            }
+            MessageRole::Tool => {
+                let mut tool_image_text_parts = Vec::new();
+                let mut tool_images = Vec::new();
+                while i < history.len() && history[i].role == MessageRole::Tool {
+                    let tool_msg = &history[i];
+                    messages.push(serde_json::json!({
+                        "role": "tool",
+                        "tool_call_id": tool_msg.tool_call_id.as_deref().unwrap_or(""),
+                        "content": tool_msg.content,
+                    }));
+                    if let Some(images) = tool_msg.images.as_ref().filter(|imgs| !imgs.is_empty()) {
+                        tool_image_text_parts.push(format_tool_image_text(tool_msg));
+                        tool_images.extend(images.iter().cloned());
+                    }
+                    i += 1;
+                }
+                if !tool_images.is_empty() {
+                    messages.push(serde_json::json!({
+                        "role": "user",
+                        "content": build_tool_image_user_content(
+                            &tool_image_text_parts.join("\n\n"),
+                            &tool_images,
+                            flavor,
+                        ),
+                    }));
+                }
+                continue;
+            }
+        }
+        i += 1;
+    }
+
+    messages
+}
+
+fn format_tool_image_text(msg: &ChatMessage) -> String {
+    let call_id = msg.tool_call_id.as_deref().unwrap_or("").trim();
+    let header = if call_id.is_empty() {
+        "Tool result image attachment:".to_string()
+    } else {
+        format!("Tool result image attachment for `{}`:", call_id)
+    };
+    if msg.content.trim().is_empty() {
+        header
+    } else {
+        format!("{}\n{}", header, msg.content)
+    }
+}
+
+fn build_tool_image_user_content(
+    text: &str,
+    images: &[ImageData],
+    flavor: ChatCompletionsFlavor,
+) -> serde_json::Value {
+    match flavor {
+        ChatCompletionsFlavor::DeepSeek => {
+            serde_json::Value::String(deepseek_text_content(text, Some(images)))
+        }
+        ChatCompletionsFlavor::Generic | ChatCompletionsFlavor::MiniMax => {
+            let mut blocks = Vec::new();
+            if !text.is_empty() {
+                blocks.push(serde_json::json!({
+                    "type": "text",
+                    "text": text,
+                }));
+            }
+            for img in images {
+                blocks.push(serde_json::json!({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": format!("data:{};base64,{}", img.mime_type, img.data),
+                    }
+                }));
+            }
+            serde_json::Value::Array(blocks)
+        }
+    }
+}
+
+fn should_flatten_deepseek_tool_round(
+    msg: &ChatMessage,
+    flavor: ChatCompletionsFlavor,
+    deepseek_thinking_enabled: bool,
+) -> bool {
+    if flavor != ChatCompletionsFlavor::DeepSeek || !deepseek_thinking_enabled {
+        return false;
+    }
+    if msg.role != MessageRole::Assistant {
+        return false;
+    }
+    let has_tool_calls = msg
+        .tool_calls
+        .as_ref()
+        .is_some_and(|tool_calls| !tool_calls.is_empty());
+    if !has_tool_calls {
+        return false;
+    }
+    msg.thinking_content
+        .as_deref()
+        .map(str::trim)
+        .map(str::is_empty)
+        .unwrap_or(true)
+}
+
+fn render_legacy_tool_round(history: &[ChatMessage], assistant_index: usize) -> (String, usize) {
+    let assistant = &history[assistant_index];
+    let mut content = String::new();
+    if !assistant.content.trim().is_empty() {
+        content.push_str(&assistant.content);
+        content.push_str("\n\n");
+    }
+    content.push_str("[Earlier tool call transcript]");
+
+    let mut consumed = 1usize;
+    let following_tools =
+        collect_following_tool_outputs(history, assistant_index + 1, &mut consumed);
+    if let Some(tool_calls) = assistant.tool_calls.as_ref() {
+        for tool_call in tool_calls {
+            content.push_str("\n\nTool call ");
+            content.push_str(&tool_call.name);
+            if !tool_call.id.is_empty() {
+                content.push_str(" (");
+                content.push_str(&tool_call.id);
+                content.push(')');
+            }
+            if !tool_call.arguments.trim().is_empty() {
+                content.push_str("\nArguments:\n");
+                content.push_str(&tool_call.arguments);
+            }
+            let output = tool_call
+                .server_tool_output
+                .as_deref()
+                .or_else(|| {
+                    following_tools
+                        .get(tool_call.id.as_str())
+                        .map(String::as_str)
+                })
+                .or(tool_call.recorded_output.as_deref());
+            if let Some(output) = output.filter(|value| !value.is_empty()) {
+                content.push_str("\nOutput:\n");
+                content.push_str(output);
+            }
+        }
+    }
+
+    (content, consumed)
+}
+
+fn collect_following_tool_outputs(
+    history: &[ChatMessage],
+    start_index: usize,
+    consumed: &mut usize,
+) -> std::collections::HashMap<String, String> {
+    let mut outputs = std::collections::HashMap::new();
+    let mut index = start_index;
+    while index < history.len() && history[index].role == MessageRole::Tool {
+        if let Some(tool_call_id) = history[index]
+            .tool_call_id
+            .as_deref()
+            .filter(|value| !value.is_empty())
+        {
+            outputs.entry(tool_call_id.to_string()).or_insert_with(|| {
+                deepseek_text_content(&history[index].content, history[index].images.as_deref())
+            });
+        }
+        *consumed += 1;
+        index += 1;
+    }
+    outputs
+}
+
+fn build_user_content(msg: &ChatMessage, flavor: ChatCompletionsFlavor) -> serde_json::Value {
+    match flavor {
+        ChatCompletionsFlavor::DeepSeek => {
+            serde_json::Value::String(deepseek_text_content(&msg.content, msg.images.as_deref()))
+        }
+        ChatCompletionsFlavor::Generic | ChatCompletionsFlavor::MiniMax => {
+            if let Some(images) = msg.images.as_deref().filter(|images| !images.is_empty()) {
+                let mut blocks: Vec<serde_json::Value> = images
+                    .iter()
+                    .map(|img| {
+                        serde_json::json!({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": format!("data:{};base64,{}", img.mime_type, img.data),
+                            }
+                        })
+                    })
+                    .collect();
+                if !msg.content.is_empty() {
+                    blocks.push(serde_json::json!({
+                        "type": "text",
+                        "text": msg.content,
+                    }));
+                }
+                serde_json::Value::Array(blocks)
+            } else {
+                serde_json::Value::String(msg.content.clone())
+            }
+        }
+    }
+}
+
+fn deepseek_text_content(text: &str, images: Option<&[ImageData]>) -> String {
+    let Some(images) = images.filter(|images| !images.is_empty()) else {
+        return text.to_string();
+    };
+
+    let note = format!(
+        "[{} image attachment(s) omitted because this Chat Completions endpoint accepts text only.]",
+        images.len()
+    );
+    if text.trim().is_empty() {
+        note
+    } else {
+        format!("{}\n\n{}", text, note)
+    }
+}
+
+fn build_tool_call_values(tool_calls: &[ToolCallInfo]) -> Vec<serde_json::Value> {
+    tool_calls
+        .iter()
+        .map(|tc| {
+            serde_json::json!({
+                "id": tc.id,
+                "type": "function",
+                "function": {
+                    "name": tc.name,
+                    "arguments": super::normalize_tool_call_arguments(&tc.name, &tc.arguments),
+                }
+            })
+        })
+        .collect()
+}
+
+struct ChatStreamState {
+    full_text: String,
+    thinking_text: String,
+    thinking_started_at: Option<Instant>,
+    thinking_duration_secs: u32,
+    /// Reroutes literal `<think>`/`<thinking>` prefixes of the content
+    /// channel into the thinking channel (third-party endpoints that inline
+    /// reasoning as text tags instead of `reasoning_content`).
+    think_filter: ThinkTagFilter,
+    reasoning_detail_text_by_key: std::collections::HashMap<String, String>,
+    tool_calls_map: std::collections::HashMap<i64, PartialToolCall>,
+    /// Slot of the most recent tool-call delta; index-less fragments without
+    /// an id continue this entry.
+    last_tool_call_slot: Option<i64>,
+    /// Chunks that failed to deserialize and were skipped. A round that ends
+    /// with no usable output while chunks were dropped is reported as an
+    /// error instead of a silent empty reply (issue #77).
+    dropped_chunks: u32,
+    first_dropped_chunk_error: Option<String>,
+    finish_reason: String,
+    saw_finish_reason: bool,
+    input_tokens: u32,
+    output_tokens: u32,
+    cache_read_tokens: u32,
+    cache_write_tokens: u32,
+    cost_usd: f64,
+}
+
+impl ChatStreamState {
+    fn new() -> Self {
+        Self {
+            full_text: String::new(),
+            thinking_text: String::new(),
+            thinking_started_at: None,
+            thinking_duration_secs: 0,
+            think_filter: ThinkTagFilter::new(super::think_tag_filter::strip_enabled()),
+            reasoning_detail_text_by_key: std::collections::HashMap::new(),
+            tool_calls_map: std::collections::HashMap::new(),
+            last_tool_call_slot: None,
+            dropped_chunks: 0,
+            first_dropped_chunk_error: None,
+            finish_reason: String::from("stop"),
+            saw_finish_reason: false,
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+            cost_usd: 0.0,
+        }
+    }
+
+    /// Map a tool-call delta to its accumulation slot. With an explicit
+    /// `index` this is the OpenAI incremental protocol. Without one
+    /// (Gemini-style), fragments carrying an id get their own slot (reusing
+    /// it if the id was seen before), and id-less fragments continue the most
+    /// recent slot (argument streaming).
+    fn tool_call_slot(&mut self, delta: &StreamToolCallDelta) -> i64 {
+        let slot = if let Some(index) = delta.index {
+            index
+        } else if let Some(id) = delta
+            .id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            self.tool_calls_map
+                .iter()
+                .find(|(_, entry)| entry.id == id)
+                .map(|(&slot, _)| slot)
+                .unwrap_or_else(|| {
+                    self.tool_calls_map
+                        .keys()
+                        .max()
+                        .map_or(0, |max| max.saturating_add(1))
+                })
+        } else {
+            self.last_tool_call_slot.unwrap_or(0)
+        };
+        self.last_tool_call_slot = Some(slot);
+        slot
+    }
+
+    fn note_dropped_chunk(&mut self, error: &str, data: &str) {
+        self.dropped_chunks = self.dropped_chunks.saturating_add(1);
+        if self.first_dropped_chunk_error.is_none() {
+            let preview: String = data.chars().take(400).collect();
+            self.first_dropped_chunk_error = Some(format!("{error} | data: {preview}"));
+        }
+    }
+
+    fn push_thinking<G>(&mut self, delta: &str, on_thinking_delta: &G)
+    where
+        G: Fn(String) + Send + 'static,
+    {
+        if delta.is_empty() {
+            return;
+        }
+        if self.thinking_started_at.is_none() {
+            self.thinking_started_at = Some(Instant::now());
+        }
+        self.thinking_text.push_str(delta);
+        on_thinking_delta(delta.to_string());
+    }
+
+    fn push_reasoning_details<G>(
+        &mut self,
+        details: &[StreamReasoningDetail],
+        on_thinking_delta: &G,
+    ) where
+        G: Fn(String) + Send + 'static,
+    {
+        for detail in details {
+            let Some(text) = detail.text.as_deref().filter(|value| !value.is_empty()) else {
+                continue;
+            };
+            let key = detail
+                .id
+                .as_deref()
+                .filter(|value| !value.trim().is_empty())
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("index:{}", detail.index.unwrap_or(0)));
+            let previous = self
+                .reasoning_detail_text_by_key
+                .get(&key)
+                .cloned()
+                .unwrap_or_default();
+            let delta = if text.starts_with(&previous) {
+                text[previous.len()..].to_string()
+            } else {
+                text.to_string()
+            };
+            if delta.is_empty() {
+                self.reasoning_detail_text_by_key
+                    .insert(key, text.to_string());
+                continue;
+            }
+            let next_accumulated = if text.starts_with(&previous) {
+                text.to_string()
+            } else {
+                format!("{}{}", previous, text)
+            };
+            self.push_thinking(&delta, on_thinking_delta);
+            self.reasoning_detail_text_by_key
+                .insert(key, next_accumulated);
+        }
+    }
+
+    fn finish_thinking_timing(&mut self) {
+        if self.thinking_duration_secs > 0 || self.thinking_text.is_empty() {
+            return;
+        }
+        if let Some(started_at) = self.thinking_started_at {
+            self.thinking_duration_secs = started_at.elapsed().as_secs() as u32;
+        }
+    }
+
+    /// Route one content delta through the think-tag filter: rerouted
+    /// reasoning feeds the thinking channel, the remainder stays content.
+    fn route_content_delta<F, G>(&mut self, raw: &str, on_text_delta: &F, on_thinking_delta: &G)
+    where
+        F: Fn(String) + Send + 'static,
+        G: Fn(String) + Send + 'static,
+    {
+        let emit = self.think_filter.push(raw);
+        self.apply_think_emit(emit, on_text_delta, on_thinking_delta);
+    }
+
+    /// Flush the filter at stream end so an undecided probe prefix or a
+    /// dangling partial close tag still lands in the right channel.
+    fn flush_think_filter<F, G>(&mut self, on_text_delta: &F, on_thinking_delta: &G)
+    where
+        F: Fn(String) + Send + 'static,
+        G: Fn(String) + Send + 'static,
+    {
+        let emit = self.think_filter.finalize();
+        self.apply_think_emit(emit, on_text_delta, on_thinking_delta);
+    }
+
+    fn apply_think_emit<F, G>(&mut self, emit: ThinkTagEmit, on_text_delta: &F, on_thinking_delta: &G)
+    where
+        F: Fn(String) + Send + 'static,
+        G: Fn(String) + Send + 'static,
+    {
+        if emit.is_empty() {
+            return;
+        }
+        if !emit.thinking.is_empty() {
+            self.push_thinking(&emit.thinking, on_thinking_delta);
+        }
+        if !emit.content.is_empty() {
+            self.finish_thinking_timing();
+            self.full_text.push_str(&emit.content);
+            on_text_delta(emit.content);
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PartialToolCall {
+    id: String,
+    name: String,
+    arguments: String,
+    notified: bool,
+}
+
+impl PartialToolCall {
+    fn has_complete_metadata(&self) -> bool {
+        !self.id.trim().is_empty() && !self.name.trim().is_empty()
+    }
+}
+
+fn assign_non_empty(target: &mut String, value: &str) {
+    let trimmed = value.trim();
+    if !trimmed.is_empty() {
+        *target = trimmed.to_string();
+    }
+}
+
+fn missing_tool_call_metadata(tc: &PartialToolCall) -> String {
+    let mut missing = Vec::new();
+    if tc.id.trim().is_empty() {
+        missing.push("id");
+    }
+    if tc.name.trim().is_empty() {
+        missing.push("name");
+    }
+    missing.join(", ")
+}
+
+fn validate_tool_call_arguments(tool_name: &str, arguments: &str) -> Result<(), String> {
+    let trimmed = arguments.trim();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+    serde_json::from_str::<serde_json::Value>(trimmed)
+        .map(|_| ())
+        .map_err(|error| {
+            format!(
+                "Refusing to execute malformed tool arguments for '{}': {}",
+                tool_name, error
+            )
+        })
+}
+
+fn next_sse_separator(buffer: &str) -> Option<(usize, usize)> {
+    let lf = buffer.find("\n\n").map(|pos| (pos, 2usize));
+    let crlf = buffer.find("\r\n\r\n").map(|pos| (pos, 4usize));
+    match (lf, crlf) {
+        (Some(left), Some(right)) => Some(if left.0 <= right.0 { left } else { right }),
+        (Some(found), None) | (None, Some(found)) => Some(found),
+        (None, None) => None,
+    }
+}
+
+fn drain_sse_buffer<F, G, H>(
+    buffer: &mut String,
+    flush_final_block: bool,
+    debug: bool,
+    state: &mut ChatStreamState,
+    on_text_delta: &F,
+    on_thinking_delta: &G,
+    on_tool_call_start: &H,
+) -> Result<bool, String>
+where
+    F: Fn(String) + Send + 'static,
+    G: Fn(String) + Send + 'static,
+    H: Fn(String, String) + Send + 'static,
+{
+    while let Some((pos, sep_len)) = next_sse_separator(buffer) {
+        let event_block = buffer[..pos].to_string();
+        *buffer = buffer[pos + sep_len..].to_string();
+        if process_sse_event_block(
+            &event_block,
+            debug,
+            state,
+            on_text_delta,
+            on_thinking_delta,
+            on_tool_call_start,
+        )? {
+            return Ok(true);
+        }
+    }
+
+    if flush_final_block {
+        let trailing = buffer.trim_matches(|c| c == '\r' || c == '\n').to_string();
+        buffer.clear();
+        if !trailing.is_empty()
+            && process_sse_event_block(
+                &trailing,
+                debug,
+                state,
+                on_text_delta,
+                on_thinking_delta,
+                on_tool_call_start,
+            )?
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn process_sse_event_block<F, G, H>(
+    event_block: &str,
+    debug: bool,
+    state: &mut ChatStreamState,
+    on_text_delta: &F,
+    on_thinking_delta: &G,
+    on_tool_call_start: &H,
+) -> Result<bool, String>
+where
+    F: Fn(String) + Send + 'static,
+    G: Fn(String) + Send + 'static,
+    H: Fn(String, String) + Send + 'static,
+{
+    for line in event_block.lines() {
+        let line = line.trim();
+        let Some(data) = line.strip_prefix("data: ") else {
+            continue;
+        };
+        let data = data.trim();
+        if data == "[DONE]" {
+            return Ok(true);
+        }
+        if debug {
+            eprintln!("[DEBUG][Custom Chat] chunk: {}", data);
+        }
+        match serde_json::from_str::<StreamChunk>(data) {
+            Ok(chunk) => {
+                apply_stream_chunk(
+                    chunk,
+                    state,
+                    on_text_delta,
+                    on_thinking_delta,
+                    on_tool_call_start,
+                );
+            }
+            Err(e) => {
+                eprintln!(
+                    "[Custom Chat] Failed to parse chunk: {} | data: {}",
+                    e, data
+                );
+                state.note_dropped_chunk(&e.to_string(), data);
+            }
+        }
+    }
+
+    Ok(false)
+}
+
+fn apply_stream_chunk<F, G, H>(
+    chunk: StreamChunk,
+    state: &mut ChatStreamState,
+    on_text_delta: &F,
+    on_thinking_delta: &G,
+    on_tool_call_start: &H,
+) where
+    F: Fn(String) + Send + 'static,
+    G: Fn(String) + Send + 'static,
+    H: Fn(String, String) + Send + 'static,
+{
+    if let Some(choice) = chunk.choices.first() {
+        if let Some(ref reasoning) = choice.delta.reasoning_content {
+            state.push_thinking(reasoning, on_thinking_delta);
+        }
+        if let Some(ref reasoning_details) = choice.delta.reasoning_details {
+            state.push_reasoning_details(reasoning_details, on_thinking_delta);
+        }
+        if let Some(ref content) = choice.delta.content {
+            state.route_content_delta(content, on_text_delta, on_thinking_delta);
+        }
+        if let Some(ref tcs) = choice.delta.tool_calls {
+            for tc in tcs {
+                let slot = state.tool_call_slot(tc);
+                let entry =
+                    state
+                        .tool_calls_map
+                        .entry(slot)
+                        .or_insert_with(|| PartialToolCall {
+                            id: String::new(),
+                            name: String::new(),
+                            arguments: String::new(),
+                            notified: false,
+                        });
+                if let Some(ref id) = tc.id {
+                    assign_non_empty(&mut entry.id, id);
+                }
+                if let Some(ref func) = tc.function {
+                    if let Some(ref name) = func.name {
+                        assign_non_empty(&mut entry.name, name);
+                    }
+                    if let Some(ref args) = func.arguments {
+                        entry.arguments.push_str(args);
+                    }
+                }
+                if !entry.notified && !entry.id.is_empty() && !entry.name.is_empty() {
+                    on_tool_call_start(entry.id.clone(), entry.name.clone());
+                    entry.notified = true;
+                }
+            }
+        }
+        if let Some(ref reason) = choice.finish_reason {
+            let reason = reason.trim();
+            if !reason.is_empty() {
+                state.finish_reason = reason.to_string();
+                state.saw_finish_reason = true;
+            }
+        }
+    }
+    if let Some(ref usage) = chunk.usage {
+        let usage_totals = usage_totals(usage);
+        state.input_tokens = usage_totals.input_tokens;
+        state.output_tokens = usage_totals.output_tokens;
+        state.cache_read_tokens = usage_totals.cache_read_tokens;
+        state.cache_write_tokens = usage_totals.cache_write_tokens;
+        state.cost_usd = usage_totals.cost_usd.unwrap_or(state.cost_usd);
+    }
+}
+
+fn finalize_stream_response(
+    tag: &str,
+    model: &str,
+    api_url: &str,
+    flavor: ChatCompletionsFlavor,
+    debug: bool,
+    got_terminal_event: bool,
+    mut state: ChatStreamState,
+    raw_request: String,
+    raw_response: String,
+) -> Result<LlmResponse, String> {
+    state.finish_thinking_timing();
+
+    if !got_terminal_event {
+        if !state.full_text.is_empty()
+            || !state.thinking_text.is_empty()
+            || !state.tool_calls_map.is_empty()
+            || !raw_response.is_empty()
+        {
+            return Err(format!(
+                "Stream ended without [DONE] (incomplete response, text_len={}, thinking_len={}, tool_calls={}). Refusing to return partial output.",
+                state.full_text.len(),
+                state.thinking_text.len(),
+                state.tool_calls_map.len()
+            ));
+        }
+        return Err("Stream ended with no data and no [DONE]".to_string());
+    }
+
+    let tool_calls = match collect_tool_calls(&state.tool_calls_map) {
+        Ok(tool_calls) => tool_calls,
+        Err(error) => {
+            if debug {
+                log_tool_call_collection_failure(
+                    tag,
+                    model,
+                    api_url,
+                    flavor,
+                    &state.tool_calls_map,
+                    &raw_response,
+                    &error,
+                );
+            }
+            return Err(error);
+        }
+    };
+    if !tool_calls.is_empty() {
+        state.finish_reason = "tool_calls".to_string();
+    }
+
+    // A "successful" round with nothing usable while chunks were dropped is a
+    // stream-schema mismatch, not an empty reply — surface it (issue #77:
+    // Gemini tool-call chunks failed to parse and the user saw no response).
+    if state.dropped_chunks > 0
+        && tool_calls.is_empty()
+        && state.full_text.trim().is_empty()
+        && state.thinking_text.trim().is_empty()
+    {
+        return Err(format!(
+            "{} stream produced no usable output while {} chunk(s) failed to parse — the endpoint's stream format is likely not OpenAI-compatible. First failure: {}",
+            tag,
+            state.dropped_chunks,
+            state
+                .first_dropped_chunk_error
+                .as_deref()
+                .unwrap_or("(unrecorded)")
+        ));
+    }
+
+    let resp = LlmResponse {
+        text: state.full_text,
+        tool_calls,
+        finish_reason: state.finish_reason,
+        response_id: None,
+        input_tokens: state.input_tokens,
+        output_tokens: state.output_tokens,
+        cache_read_tokens: state.cache_read_tokens,
+        cache_write_tokens: state.cache_write_tokens,
+        cost_usd: state.cost_usd,
+        raw_request,
+        raw_response,
+        thinking_text: state.thinking_text,
+        thinking_duration_secs: state.thinking_duration_secs,
+        thinking_signature: String::new(),
+        continuation_request: None,
+    };
+
+    if debug {
+        eprintln!(
+            "[DEBUG][{}] response complete: finish_reason={}, text_len={}, thinking_len={}, tool_calls={}",
+            tag,
+            resp.finish_reason,
+            resp.text.len(),
+            resp.thinking_text.len(),
+            resp.tool_calls.len()
+        );
+    }
+
+    Ok(resp)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct IncompleteToolCallDiagnostic {
+    index: i64,
+    missing: String,
+    arguments_len: usize,
+}
+
+fn first_incomplete_tool_call(
+    map: &std::collections::HashMap<i64, PartialToolCall>,
+) -> Option<IncompleteToolCallDiagnostic> {
+    let mut entries: Vec<_> = map.iter().collect();
+    entries.sort_by_key(|(idx, _)| *idx);
+
+    for (idx, tc) in entries {
+        if !tc.has_complete_metadata() {
+            return Some(IncompleteToolCallDiagnostic {
+                index: *idx,
+                missing: missing_tool_call_metadata(tc),
+                arguments_len: tc.arguments.chars().count(),
+            });
+        }
+    }
+
+    None
+}
+
+fn summarize_recent_raw_chunk(raw_response: &str, max_chars: usize) -> String {
+    if raw_response.is_empty() {
+        return "(empty)".to_string();
+    }
+
+    let char_count = raw_response.chars().count();
+    let mut tail_chars: Vec<char> = raw_response.chars().rev().take(max_chars).collect();
+    tail_chars.reverse();
+    let tail: String = tail_chars.into_iter().collect();
+    let escaped = tail.escape_debug().to_string();
+
+    if char_count > max_chars {
+        format!("...{}", escaped)
+    } else {
+        escaped
+    }
+}
+
+fn log_tool_call_collection_failure(
+    tag: &str,
+    model: &str,
+    api_url: &str,
+    flavor: ChatCompletionsFlavor,
+    map: &std::collections::HashMap<i64, PartialToolCall>,
+    raw_response: &str,
+    error: &str,
+) {
+    let recent_raw_chunk = summarize_recent_raw_chunk(raw_response, RAW_CHUNK_DEBUG_PREVIEW_CHARS);
+    let raw_response_len = raw_response.chars().count();
+
+    if let Some(issue) = first_incomplete_tool_call(map) {
+        eprintln!(
+            "[DEBUG][{}] incomplete streamed tool call: provider={} model={} api_url={} flavor={:?} tool_index={} missing={} received_arguments_len={} raw_response_len={} recent_raw_chunk={}",
+            tag,
+            tag,
+            model,
+            api_url,
+            flavor,
+            issue.index,
+            issue.missing,
+            issue.arguments_len,
+            raw_response_len,
+            recent_raw_chunk
+        );
+    } else {
+        eprintln!(
+            "[DEBUG][{}] tool call collection failed: provider={} model={} api_url={} flavor={:?} error={} raw_response_len={} recent_raw_chunk={}",
+            tag,
+            tag,
+            model,
+            api_url,
+            flavor,
+            error,
+            raw_response_len,
+            recent_raw_chunk
+        );
+    }
+}
+
+fn collect_tool_calls(
+    map: &std::collections::HashMap<i64, PartialToolCall>,
+) -> Result<Vec<ToolCallInfo>, String> {
+    let mut entries: Vec<_> = map.iter().collect();
+    entries.sort_by_key(|(idx, _)| *idx);
+    let mut tool_calls = Vec::with_capacity(entries.len());
+
+    for (idx, tc) in entries {
+        if !tc.has_complete_metadata() {
+            return Err(format!(
+                "Refusing to execute incomplete tool call at index {}: missing {}",
+                idx,
+                missing_tool_call_metadata(tc)
+            ));
+        }
+        validate_tool_call_arguments(&tc.name, &tc.arguments)?;
+        tool_calls.push(ToolCallInfo {
+            id: tc.id.clone(),
+            name: tc.name.clone(),
+            arguments: tc.arguments.clone(),
+            order: None,
+            server_tool: None,
+            server_tool_output: None,
+            outcome: None,
+            recorded_output: None,
+            nested_tool_calls: None,
+        });
+    }
+
+    Ok(tool_calls)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct UsageTotals {
+    input_tokens: u32,
+    output_tokens: u32,
+    cache_read_tokens: u32,
+    cache_write_tokens: u32,
+    cost_usd: Option<f64>,
+}
+
+fn usage_totals(usage: &StreamUsage) -> UsageTotals {
+    let prompt_details = usage.prompt_tokens_details.as_ref();
+    let cache_read_tokens = prompt_details.map(|d| d.cached_tokens).unwrap_or(0);
+    let cache_write_tokens = usage
+        .cache_write_tokens
+        .or_else(|| prompt_details.and_then(|d| d.cache_write_tokens))
+        .unwrap_or(0);
+
+    UsageTotals {
+        input_tokens: usage
+            .prompt_tokens
+            .saturating_sub(cache_read_tokens)
+            .saturating_sub(cache_write_tokens),
+        output_tokens: usage.completion_tokens,
+        cache_read_tokens,
+        cache_write_tokens,
+        cost_usd: usage.cost,
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamChunk {
+    #[serde(default)]
+    choices: Vec<StreamChoice>,
+    usage: Option<StreamUsage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamUsage {
+    #[serde(default)]
+    prompt_tokens: u32,
+    #[serde(default)]
+    completion_tokens: u32,
+    #[serde(default)]
+    prompt_tokens_details: Option<PromptTokensDetails>,
+    #[serde(default)]
+    cache_write_tokens: Option<u32>,
+    #[serde(default)]
+    cost: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PromptTokensDetails {
+    #[serde(default)]
+    cached_tokens: u32,
+    #[serde(default)]
+    cache_write_tokens: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamChoice {
+    delta: StreamDelta,
+    finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamDelta {
+    content: Option<String>,
+    reasoning_content: Option<String>,
+    reasoning_details: Option<Vec<StreamReasoningDetail>>,
+    tool_calls: Option<Vec<StreamToolCallDelta>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamReasoningDetail {
+    id: Option<String>,
+    #[serde(default)]
+    index: Option<i64>,
+    text: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamToolCallDelta {
+    /// OpenAI marks incremental tool-call fragments with `index`; some
+    /// compatible endpoints (Gemini's OpenAI layer, issue #77) omit it and
+    /// send each tool call complete instead — keep it optional.
+    #[serde(default)]
+    index: Option<i64>,
+    id: Option<String>,
+    function: Option<StreamFunctionDelta>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StreamFunctionDelta {
+    name: Option<String>,
+    arguments: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        apply_stream_chunk, build_api_messages, build_request_body, collect_tool_calls,
+        detect_flavor, drain_sse_buffer, finalize_stream_response, first_incomplete_tool_call,
+        server_json_parse_error_hint, summarize_recent_raw_chunk, ChatCompletionsFlavor,
+        ChatStreamState, CustomChatTuning, PartialToolCall, StreamChunk, ThinkTagFilter,
+        ThinkingToggle,
+    };
+    use crate::session::models::{ChatMessage, ImageData, MessageRole, ToolCallInfo};
+    use std::collections::HashMap;
+
+    #[test]
+    fn json_parse_error_hint_fires_on_client_error_with_parser_markers() {
+        // Verbatim shape of the issue #106 rejection (Spring/Jackson gateway).
+        let issue_106_body = r#"{"error":{"message":"JSON parse error: Unexpected character (',' (code 44)): was expecting a colon to separate field name and value","code":"400"}}"#;
+        let hint = server_json_parse_error_hint(
+            reqwest::StatusCode::BAD_REQUEST,
+            issue_106_body,
+            104_213,
+        )
+        .expect("Jackson-style parse error must produce a hint");
+        assert!(hint.contains("104213 bytes"));
+
+        assert!(server_json_parse_error_hint(
+            reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+            "request contained malformed JSON",
+            10,
+        )
+        .is_some());
+    }
+
+    #[test]
+    fn json_parse_error_hint_stays_quiet_otherwise() {
+        // Ordinary 4xx rejections must not accuse the network path.
+        assert!(server_json_parse_error_hint(
+            reqwest::StatusCode::BAD_REQUEST,
+            r#"{"error":{"message":"model not found"}}"#,
+            10,
+        )
+        .is_none());
+        // 5xx means the server failed, not that the request bytes were bad.
+        assert!(server_json_parse_error_hint(
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            "JSON parse error while reading upstream response",
+            10,
+        )
+        .is_none());
+    }
+    use std::sync::{Arc, Mutex};
+
+    fn ignore_text(_: String) {}
+    fn ignore_thinking(_: String) {}
+    fn ignore_tool(_: String, _: String) {}
+
+    fn user_message(content: &str, images: Option<Vec<ImageData>>) -> ChatMessage {
+        ChatMessage {
+            id: "user".to_string(),
+            role: MessageRole::User,
+            content: content.to_string(),
+            created_at: 0,
+            prompt_prefix: None,
+            prompt_suffix: None,
+            response_id: None,
+            content_order: None,
+            thinking_order: None,
+            tool_calls: None,
+            tool_call_id: None,
+            images,
+            asset_refs: None,
+            thinking_content: None,
+            thinking_duration: None,
+            thinking_signature: None,
+            knowledge_proposal: None,
+            render_parts: None,
+        }
+    }
+
+    fn assistant_message_with_tool_and_thinking() -> ChatMessage {
+        ChatMessage {
+            id: "assistant".to_string(),
+            role: MessageRole::Assistant,
+            content: "Need a tool.".to_string(),
+            created_at: 0,
+            prompt_prefix: None,
+            prompt_suffix: None,
+            response_id: None,
+            content_order: None,
+            thinking_order: None,
+            tool_calls: Some(vec![ToolCallInfo {
+                id: "call_1".to_string(),
+                name: "read_file".to_string(),
+                arguments: r#"{"path":"a.txt"}"#.to_string(),
+                order: None,
+                server_tool: None,
+                server_tool_output: None,
+                outcome: None,
+                recorded_output: None,
+                nested_tool_calls: None,
+            }]),
+            tool_call_id: None,
+            images: None,
+            asset_refs: None,
+            thinking_content: Some("I should inspect the file.".to_string()),
+            thinking_duration: Some(1),
+            thinking_signature: None,
+            knowledge_proposal: None,
+            render_parts: None,
+        }
+    }
+
+    fn tool_message(tool_call_id: &str, content: &str) -> ChatMessage {
+        ChatMessage {
+            id: "tool".to_string(),
+            role: MessageRole::Tool,
+            content: content.to_string(),
+            created_at: 0,
+            prompt_prefix: None,
+            prompt_suffix: None,
+            response_id: None,
+            content_order: None,
+            thinking_order: None,
+            tool_calls: None,
+            tool_call_id: Some(tool_call_id.to_string()),
+            images: None,
+            asset_refs: None,
+            thinking_content: None,
+            thinking_duration: None,
+            thinking_signature: None,
+            knowledge_proposal: None,
+            render_parts: None,
+        }
+    }
+
+    fn tool_message_with_images(
+        tool_call_id: &str,
+        content: &str,
+        images: Vec<ImageData>,
+    ) -> ChatMessage {
+        let mut message = tool_message(tool_call_id, content);
+        message.images = Some(images);
+        message
+    }
+
+    #[test]
+    fn deepseek_messages_use_text_content_and_replay_reasoning() {
+        let messages = build_api_messages(
+            "system",
+            &[
+                user_message(
+                    "Describe this",
+                    Some(vec![ImageData {
+                        data: "YWJj".to_string(),
+                        mime_type: "image/png".to_string(),
+                    }]),
+                ),
+                assistant_message_with_tool_and_thinking(),
+            ],
+            ChatCompletionsFlavor::DeepSeek,
+            true,
+            true,
+            None,
+        );
+
+        assert_eq!(messages[0]["content"], serde_json::json!("system"));
+        assert_eq!(messages[1]["role"], serde_json::json!("user"));
+        assert!(messages[1]["content"]
+            .as_str()
+            .unwrap()
+            .contains("Describe this"));
+        assert!(messages[1]["content"]
+            .as_str()
+            .unwrap()
+            .contains("image attachment"));
+        assert_eq!(
+            messages[2]["reasoning_content"],
+            serde_json::json!("I should inspect the file.")
+        );
+        assert_eq!(
+            messages[2]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("read_file")
+        );
+    }
+
+    #[test]
+    fn deepseek_replays_reasoning_content_without_trimming() {
+        let mut assistant = assistant_message_with_tool_and_thinking();
+        assistant.thinking_content = Some("\n  Keep exact reasoning.  \n".to_string());
+
+        let messages = build_api_messages(
+            "",
+            &[assistant],
+            ChatCompletionsFlavor::DeepSeek,
+            true,
+            true,
+            None,
+        );
+
+        assert_eq!(
+            messages[0]["reasoning_content"],
+            serde_json::json!("\n  Keep exact reasoning.  \n")
+        );
+    }
+
+    #[test]
+    fn generic_messages_replay_reasoning_content_when_enabled() {
+        let assistant = assistant_message_with_tool_and_thinking();
+
+        let enabled = build_api_messages(
+            "",
+            &[assistant.clone()],
+            ChatCompletionsFlavor::Generic,
+            false,
+            true,
+            None,
+        );
+        assert_eq!(
+            enabled[0]["reasoning_content"],
+            serde_json::json!("I should inspect the file.")
+        );
+
+        let disabled = build_api_messages(
+            "",
+            &[assistant],
+            ChatCompletionsFlavor::Generic,
+            false,
+            false,
+            None,
+        );
+        assert!(disabled[0].get("reasoning_content").is_none());
+    }
+
+    #[test]
+    fn generic_messages_replay_empty_tool_call_arguments_as_empty_object() {
+        let mut assistant = assistant_message_with_tool_and_thinking();
+        assistant.tool_calls.as_mut().unwrap()[0].arguments = String::new();
+
+        let messages = build_api_messages(
+            "",
+            &[assistant],
+            ChatCompletionsFlavor::Generic,
+            false,
+            false,
+            None,
+        );
+
+        assert_eq!(
+            messages[0]["tool_calls"][0]["function"]["arguments"],
+            serde_json::json!("{}")
+        );
+    }
+
+    #[test]
+    fn minimax_messages_replay_reasoning_details_when_enabled() {
+        let assistant = assistant_message_with_tool_and_thinking();
+
+        let messages = build_api_messages(
+            "",
+            &[assistant],
+            ChatCompletionsFlavor::MiniMax,
+            false,
+            true,
+            None,
+        );
+
+        assert!(messages[0].get("reasoning_content").is_none());
+        assert_eq!(
+            messages[0]["reasoning_details"][0]["text"],
+            serde_json::json!("I should inspect the file.")
+        );
+        assert_eq!(
+            messages[0]["reasoning_details"][0]["format"],
+            serde_json::json!("MiniMax-response-v1")
+        );
+    }
+
+    #[test]
+    fn deepseek_thinking_flattens_legacy_tool_round_without_reasoning() {
+        let mut assistant = assistant_message_with_tool_and_thinking();
+        assistant.thinking_content = None;
+        let messages = build_api_messages(
+            "",
+            &[
+                assistant,
+                tool_message("call_1", "file contents"),
+                user_message("Continue", None),
+            ],
+            ChatCompletionsFlavor::DeepSeek,
+            true,
+            true,
+            None,
+        );
+
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0]["role"], serde_json::json!("assistant"));
+        assert!(messages[0].get("tool_calls").is_none());
+        assert!(messages[0].get("reasoning_content").is_none());
+        assert!(messages[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("Tool call read_file"));
+        assert!(messages[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("file contents"));
+        assert_eq!(messages[1]["role"], serde_json::json!("user"));
+    }
+
+    #[test]
+    fn deepseek_disabled_thinking_keeps_legacy_tool_protocol() {
+        let mut assistant = assistant_message_with_tool_and_thinking();
+        assistant.thinking_content = None;
+        let messages = build_api_messages(
+            "",
+            &[assistant, tool_message("call_1", "file contents")],
+            ChatCompletionsFlavor::DeepSeek,
+            false,
+            true,
+            None,
+        );
+
+        assert_eq!(
+            messages[0]["tool_calls"][0]["function"]["name"],
+            serde_json::json!("read_file")
+        );
+        assert_eq!(messages[1]["role"], serde_json::json!("tool"));
+    }
+
+    #[test]
+    fn generic_messages_keep_image_url_blocks() {
+        let messages = build_api_messages(
+            "system",
+            &[user_message(
+                "Describe this",
+                Some(vec![ImageData {
+                    data: "YWJj".to_string(),
+                    mime_type: "image/png".to_string(),
+                }]),
+            )],
+            ChatCompletionsFlavor::Generic,
+            false,
+            false,
+            None,
+        );
+
+        let blocks = messages[1]["content"].as_array().unwrap();
+        assert_eq!(blocks[0]["type"], serde_json::json!("image_url"));
+        assert_eq!(blocks[1]["type"], serde_json::json!("text"));
+    }
+
+    #[test]
+    fn generic_messages_replay_tool_result_images_as_followup_user_content() {
+        let messages = build_api_messages(
+            "",
+            &[
+                tool_message("call_1", "text result"),
+                tool_message_with_images(
+                    "call_2",
+                    "screenshot",
+                    vec![ImageData {
+                        data: "YWJj".to_string(),
+                        mime_type: "image/png".to_string(),
+                    }],
+                ),
+            ],
+            ChatCompletionsFlavor::Generic,
+            false,
+            false,
+            None,
+        );
+
+        assert_eq!(messages[0]["role"], serde_json::json!("tool"));
+        assert_eq!(messages[1]["role"], serde_json::json!("tool"));
+        assert_eq!(messages[2]["role"], serde_json::json!("user"));
+        let blocks = messages[2]["content"].as_array().unwrap();
+        assert_eq!(blocks[0]["type"], serde_json::json!("text"));
+        assert_eq!(blocks[1]["type"], serde_json::json!("image_url"));
+        assert_eq!(
+            blocks[1]["image_url"]["url"],
+            serde_json::json!("data:image/png;base64,YWJj")
+        );
+    }
+
+    #[test]
+    fn deepseek_request_body_controls_thinking_mode() {
+        let enabled = build_request_body(
+            "deepseek-v4-pro",
+            Vec::new(),
+            &[],
+            ChatCompletionsFlavor::DeepSeek,
+            CustomChatTuning {
+                reasoning_effort: Some("low"),
+                thinking_level: Some("low"),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            enabled["thinking"],
+            serde_json::json!({ "type": "enabled" })
+        );
+        assert_eq!(enabled["reasoning_effort"], serde_json::json!("high"));
+
+        let disabled = build_request_body(
+            "deepseek-v4-pro",
+            Vec::new(),
+            &[],
+            ChatCompletionsFlavor::DeepSeek,
+            CustomChatTuning {
+                reasoning_effort: None,
+                thinking_level: Some("none"),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            disabled["thinking"],
+            serde_json::json!({ "type": "disabled" })
+        );
+        assert!(disabled.get("reasoning_effort").is_none());
+    }
+
+    #[test]
+    fn request_body_thinking_toggles_set_expected_fields() {
+        let enable_thinking = build_request_body(
+            "qwen3.7-plus",
+            Vec::new(),
+            &[],
+            ChatCompletionsFlavor::Generic,
+            CustomChatTuning {
+                thinking_toggle: Some(ThinkingToggle::EnableThinking),
+                ..Default::default()
+            },
+        );
+        assert_eq!(enable_thinking["enable_thinking"], serde_json::json!(true));
+        assert!(enable_thinking.get("thinking").is_none());
+
+        let thinking_type = build_request_body(
+            "glm-5.2",
+            Vec::new(),
+            &[],
+            ChatCompletionsFlavor::Generic,
+            CustomChatTuning {
+                thinking_toggle: Some(ThinkingToggle::ThinkingType),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            thinking_type["thinking"],
+            serde_json::json!({ "type": "enabled" })
+        );
+        assert!(thinking_type.get("enable_thinking").is_none());
+    }
+
+    #[test]
+    fn explicit_replay_field_always_sends_reasoning_content() {
+        let mut assistant = assistant_message_with_tool_and_thinking();
+        assistant.thinking_content = None;
+
+        // DeepSeek semantics: with an explicit field the value is sent even
+        // when there is no reasoning to replay.
+        let messages = build_api_messages(
+            "",
+            &[assistant.clone()],
+            ChatCompletionsFlavor::Generic,
+            false,
+            true,
+            Some(crate::commands::ReasoningReplayField::ReasoningContent),
+        );
+        assert_eq!(messages[0]["reasoning_content"], serde_json::json!(""));
+
+        let messages = build_api_messages(
+            "",
+            &[assistant.clone()],
+            ChatCompletionsFlavor::Generic,
+            false,
+            true,
+            Some(crate::commands::ReasoningReplayField::Reasoning),
+        );
+        assert_eq!(messages[0]["reasoning"], serde_json::json!(""));
+        assert!(messages[0].get("reasoning_content").is_none());
+
+        // Structured details form only attaches real content.
+        let messages = build_api_messages(
+            "",
+            &[assistant],
+            ChatCompletionsFlavor::Generic,
+            false,
+            true,
+            Some(crate::commands::ReasoningReplayField::ReasoningDetails),
+        );
+        assert!(messages[0].get("reasoning_details").is_none());
+    }
+
+    #[test]
+    fn explicit_replay_field_overrides_flavor_detection() {
+        let assistant = assistant_message_with_tool_and_thinking();
+        let messages = build_api_messages(
+            "",
+            &[assistant],
+            ChatCompletionsFlavor::MiniMax,
+            false,
+            true,
+            Some(crate::commands::ReasoningReplayField::ReasoningContent),
+        );
+        assert!(messages[0].get("reasoning_details").is_none());
+        assert_eq!(
+            messages[0]["reasoning_content"],
+            serde_json::json!("I should inspect the file.")
+        );
+    }
+
+    #[test]
+    fn detects_minimax_flavor_by_model_or_endpoint() {
+        assert_eq!(
+            detect_flavor("MiniMax-M2.7", "https://example.com/v1"),
+            ChatCompletionsFlavor::MiniMax
+        );
+        assert_eq!(
+            detect_flavor("custom-model", "https://api.minimax.io/v1"),
+            ChatCompletionsFlavor::MiniMax
+        );
+        assert_eq!(
+            detect_flavor("custom-model", "https://api.minimaxi.com/v1"),
+            ChatCompletionsFlavor::MiniMax
+        );
+    }
+
+    #[test]
+    fn minimax_request_body_enables_reasoning_split() {
+        let body = build_request_body(
+            "MiniMax-M2.7",
+            Vec::new(),
+            &[],
+            ChatCompletionsFlavor::MiniMax,
+            CustomChatTuning {
+                reasoning_effort: Some("high"),
+                thinking_level: Some("high"),
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(body["reasoning_split"], serde_json::json!(true));
+        assert_eq!(body["reasoning_effort"], serde_json::json!("high"));
+    }
+
+    #[test]
+    fn stream_reasoning_content_updates_thinking_channel() {
+        let mut state = ChatStreamState::new();
+        let thinking = Arc::new(Mutex::new(String::new()));
+        let captured = thinking.clone();
+        let on_thinking = move |delta: String| {
+            captured
+                .lock()
+                .expect("thinking mutex poisoned")
+                .push_str(&delta);
+        };
+        let chunk: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": { "reasoning_content": "Think first." },
+                "finish_reason": null
+            }]
+        }))
+        .expect("chunk should parse");
+
+        apply_stream_chunk(chunk, &mut state, &ignore_text, &on_thinking, &ignore_tool);
+
+        assert_eq!(state.thinking_text, "Think first.");
+        assert_eq!(
+            thinking.lock().expect("thinking mutex poisoned").as_str(),
+            "Think first."
+        );
+    }
+
+    #[test]
+    fn gemini_tool_call_chunk_without_index_is_collected() {
+        // Verbatim shape from issue #77: Gemini's OpenAI-compatible layer
+        // omits `index` inside tool_calls and adds extra_content metadata.
+        let mut state = ChatStreamState::new();
+        let chunk: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "extra_content": { "google": { "thought_signature": "HCvI22HAQw51" } },
+                        "function": {
+                            "arguments": "{\"part\":\"body\",\"path\":\"skill/game-system-design-expert.md\"}",
+                            "name": "knowledge_read"
+                        },
+                        "id": "jdrz4leq",
+                        "type": "function"
+                    }]
+                },
+                "index": 0
+            }],
+            "created": 1780104752_i64,
+            "id": "Lj4aau6DJbai1e8PoebVqAo",
+            "model": "gemini-3.5-flash",
+            "object": "chat.completion.chunk",
+            "usage": { "completion_tokens": 32, "prompt_tokens": 17865, "total_tokens": 18096 }
+        }))
+        .expect("Gemini chunk without tool_calls[].index must deserialize");
+
+        apply_stream_chunk(chunk, &mut state, &ignore_text, &ignore_thinking, &ignore_tool);
+
+        let tool_calls = collect_tool_calls(&state.tool_calls_map).expect("complete tool call");
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].id, "jdrz4leq");
+        assert_eq!(tool_calls[0].name, "knowledge_read");
+        assert!(tool_calls[0].arguments.contains("game-system-design-expert"));
+    }
+
+    #[test]
+    fn index_less_tool_calls_with_distinct_ids_get_separate_slots() {
+        let mut state = ChatStreamState::new();
+        let chunk: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "tool_calls": [
+                        { "id": "call_a", "function": { "name": "read", "arguments": "{}" } },
+                        { "id": "call_b", "function": { "name": "grep", "arguments": "{}" } }
+                    ]
+                },
+                "index": 0
+            }]
+        }))
+        .expect("chunk parses");
+
+        apply_stream_chunk(chunk, &mut state, &ignore_text, &ignore_thinking, &ignore_tool);
+
+        let tool_calls = collect_tool_calls(&state.tool_calls_map).expect("complete tool calls");
+        assert_eq!(tool_calls.len(), 2);
+        assert_eq!(tool_calls[0].name, "read");
+        assert_eq!(tool_calls[1].name, "grep");
+    }
+
+    #[test]
+    fn index_less_fragments_without_id_continue_the_last_slot() {
+        let mut state = ChatStreamState::new();
+        let head: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "tool_calls": [{
+                        "id": "call_a",
+                        "function": { "name": "read", "arguments": "{\"path\":" }
+                    }]
+                },
+                "index": 0
+            }]
+        }))
+        .expect("head parses");
+        let tail: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "tool_calls": [{
+                        "function": { "arguments": "\"a.md\"}" }
+                    }]
+                },
+                "index": 0
+            }]
+        }))
+        .expect("tail parses");
+
+        apply_stream_chunk(head, &mut state, &ignore_text, &ignore_thinking, &ignore_tool);
+        apply_stream_chunk(tail, &mut state, &ignore_text, &ignore_thinking, &ignore_tool);
+
+        let tool_calls = collect_tool_calls(&state.tool_calls_map).expect("complete tool call");
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].arguments, "{\"path\":\"a.md\"}");
+    }
+
+    #[test]
+    fn empty_round_with_dropped_chunks_reports_an_error() {
+        let mut state = ChatStreamState::new();
+        state.note_dropped_chunk(
+            "missing field `whatever`",
+            "data: {\"choices\":[{\"delta\":{}}]}",
+        );
+
+        let result = finalize_stream_response(
+            "Custom Chat",
+            "gemini-3.5-flash",
+            "https://example.com/v1/chat/completions",
+            ChatCompletionsFlavor::Generic,
+            false,
+            true,
+            state,
+            String::new(),
+            String::new(),
+        );
+
+        let error = result.expect_err("silent-empty round must surface the parse failure");
+        assert!(error.contains("failed to parse"));
+        assert!(error.contains("missing field `whatever`"));
+
+        // With usable output the dropped chunk stays a warning, not an error.
+        let mut state = ChatStreamState::new();
+        state.note_dropped_chunk("missing field `whatever`", "data: {}");
+        state.full_text.push_str("done");
+        let result = finalize_stream_response(
+            "Custom Chat",
+            "gemini-3.5-flash",
+            "https://example.com/v1/chat/completions",
+            ChatCompletionsFlavor::Generic,
+            false,
+            true,
+            state,
+            String::new(),
+            String::new(),
+        );
+        assert_eq!(result.expect("usable output passes through").text, "done");
+    }
+
+    #[test]
+    fn stream_reasoning_details_updates_thinking_channel_without_duplicates() {
+        let mut state = ChatStreamState::new();
+        let thinking = Arc::new(Mutex::new(String::new()));
+        let captured = thinking.clone();
+        let on_thinking = move |delta: String| {
+            captured
+                .lock()
+                .expect("thinking mutex poisoned")
+                .push_str(&delta);
+        };
+
+        let first: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "reasoning_details": [{
+                        "type": "reasoning.text",
+                        "id": "reasoning-text-1",
+                        "format": "MiniMax-response-v1",
+                        "index": 0,
+                        "text": "Think"
+                    }]
+                },
+                "finish_reason": null
+            }]
+        }))
+        .expect("first chunk should parse");
+        apply_stream_chunk(first, &mut state, &ignore_text, &on_thinking, &ignore_tool);
+
+        let second: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "reasoning_details": [{
+                        "type": "reasoning.text",
+                        "id": "reasoning-text-1",
+                        "format": "MiniMax-response-v1",
+                        "index": 0,
+                        "text": "Think more."
+                    }]
+                },
+                "finish_reason": null
+            }]
+        }))
+        .expect("second chunk should parse");
+        apply_stream_chunk(second, &mut state, &ignore_text, &on_thinking, &ignore_tool);
+
+        assert_eq!(state.thinking_text, "Think more.");
+        assert_eq!(
+            thinking.lock().expect("thinking mutex poisoned").as_str(),
+            "Think more."
+        );
+    }
+
+    fn content_chunk(text: &str) -> StreamChunk {
+        serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": { "content": text },
+                "finish_reason": null
+            }]
+        }))
+        .expect("content chunk should parse")
+    }
+
+    #[test]
+    fn inline_think_tag_content_is_rerouted_to_thinking() {
+        let mut state = ChatStreamState::new();
+        state.think_filter = ThinkTagFilter::new(true);
+        let thinking = Arc::new(Mutex::new(String::new()));
+        let text = Arc::new(Mutex::new(String::new()));
+        let captured_thinking = thinking.clone();
+        let captured_text = text.clone();
+        let on_thinking = move |delta: String| {
+            captured_thinking
+                .lock()
+                .expect("thinking mutex poisoned")
+                .push_str(&delta);
+        };
+        let on_text = move |delta: String| {
+            captured_text
+                .lock()
+                .expect("text mutex poisoned")
+                .push_str(&delta);
+        };
+
+        // Open tag split across deltas, reasoning streamed, close tag plus
+        // prose in the final delta — the wire shape vLLM/Ollama relays emit.
+        for delta in ["<thi", "nk>先分析问题", "，再给结论", "</think>\n\n结论如下"] {
+            apply_stream_chunk(content_chunk(delta), &mut state, &on_text, &on_thinking, &ignore_tool);
+        }
+        state.flush_think_filter(&on_text, &on_thinking);
+
+        assert_eq!(state.thinking_text, "先分析问题，再给结论");
+        assert_eq!(state.full_text, "结论如下");
+        assert_eq!(
+            thinking.lock().expect("thinking mutex poisoned").as_str(),
+            "先分析问题，再给结论"
+        );
+        assert_eq!(text.lock().expect("text mutex poisoned").as_str(), "结论如下");
+    }
+
+    #[test]
+    fn unclosed_think_tag_stream_lands_in_thinking_on_flush() {
+        let mut state = ChatStreamState::new();
+        state.think_filter = ThinkTagFilter::new(true);
+
+        apply_stream_chunk(
+            content_chunk("<thinking>reasoning that never closes"),
+            &mut state,
+            &ignore_text,
+            &ignore_thinking,
+            &ignore_tool,
+        );
+        state.flush_think_filter(&ignore_text, &ignore_thinking);
+
+        assert_eq!(state.thinking_text, "reasoning that never closes");
+        assert_eq!(state.full_text, "");
+    }
+
+    #[test]
+    fn ordinary_content_is_untouched_by_think_filter() {
+        let mut state = ChatStreamState::new();
+        state.think_filter = ThinkTagFilter::new(true);
+
+        for delta in ["Hello", " world, `<think>` is a literal here"] {
+            apply_stream_chunk(
+                content_chunk(delta),
+                &mut state,
+                &ignore_text,
+                &ignore_thinking,
+                &ignore_tool,
+            );
+        }
+        state.flush_think_filter(&ignore_text, &ignore_thinking);
+
+        assert_eq!(state.full_text, "Hello world, `<think>` is a literal here");
+        assert_eq!(state.thinking_text, "");
+    }
+
+    #[test]
+    fn stream_content_finishes_thinking_timing() {
+        let mut state = ChatStreamState::new();
+        let thinking: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": { "reasoning_content": "Think." },
+                "finish_reason": null
+            }]
+        }))
+        .expect("thinking chunk should parse");
+        apply_stream_chunk(
+            thinking,
+            &mut state,
+            &ignore_text,
+            &ignore_thinking,
+            &ignore_tool,
+        );
+
+        let content: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": { "content": "Answer." },
+                "finish_reason": "stop"
+            }]
+        }))
+        .expect("content chunk should parse");
+        apply_stream_chunk(
+            content,
+            &mut state,
+            &ignore_text,
+            &ignore_thinking,
+            &ignore_tool,
+        );
+
+        assert_eq!(state.full_text, "Answer.");
+        assert_eq!(state.finish_reason, "stop");
+    }
+
+    #[test]
+    fn stream_empty_tool_name_delta_preserves_existing_name() {
+        let mut state = ChatStreamState::new();
+        let started = Arc::new(Mutex::new(Vec::<(String, String)>::new()));
+        let captured = started.clone();
+        let on_tool = move |id: String, name: String| {
+            captured
+                .lock()
+                .expect("tool mutex poisoned")
+                .push((id, name));
+        };
+
+        let start: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "tool_calls": [{
+                        "index": 0,
+                        "id": "call_1",
+                        "function": { "name": "list", "arguments": "" }
+                    }]
+                },
+                "finish_reason": null
+            }]
+        }))
+        .expect("start chunk should parse");
+        apply_stream_chunk(start, &mut state, &ignore_text, &ignore_thinking, &on_tool);
+
+        let args: StreamChunk = serde_json::from_value(serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "tool_calls": [{
+                        "index": 0,
+                        "function": { "name": "", "arguments": "{\"path\":\"Assets\"}" }
+                    }]
+                },
+                "finish_reason": "tool_calls"
+            }]
+        }))
+        .expect("arguments chunk should parse");
+        apply_stream_chunk(args, &mut state, &ignore_text, &ignore_thinking, &on_tool);
+
+        let tool_calls =
+            collect_tool_calls(&state.tool_calls_map).expect("tool call should be complete");
+        assert_eq!(tool_calls.len(), 1);
+        assert_eq!(tool_calls[0].name, "list");
+        assert_eq!(
+            started.lock().expect("tool mutex poisoned").as_slice(),
+            &[("call_1".to_string(), "list".to_string())]
+        );
+    }
+
+    #[test]
+    fn stream_eof_after_finish_reason_finalizes_without_done_marker() {
+        let mut state = ChatStreamState::new();
+        let chunk = serde_json::json!({
+            "choices": [{
+                "delta": {
+                    "tool_calls": [{
+                        "index": 0,
+                        "id": "call_1",
+                        "function": {
+                            "name": "list",
+                            "arguments": "{\"path\":\"Assets\"}"
+                        }
+                    }]
+                },
+                "finish_reason": "tool_calls"
+            }]
+        });
+        let raw_response = format!("data: {}\n\n", chunk);
+        let mut buffer = raw_response.clone();
+
+        let got_done = drain_sse_buffer(
+            &mut buffer,
+            true,
+            false,
+            &mut state,
+            &ignore_text,
+            &ignore_thinking,
+            &ignore_tool,
+        )
+        .expect("stream chunk should parse");
+
+        assert!(!got_done);
+        assert!(state.saw_finish_reason);
+        let saw_finish_reason = state.saw_finish_reason;
+        let response = finalize_stream_response(
+            "Custom Chat",
+            "gpt-5.4",
+            "https://example.test/chat/completions",
+            ChatCompletionsFlavor::Generic,
+            false,
+            saw_finish_reason,
+            state,
+            String::new(),
+            raw_response,
+        )
+        .expect("finish_reason should be accepted as terminal at EOF");
+
+        assert_eq!(response.finish_reason, "tool_calls");
+        assert_eq!(response.tool_calls.len(), 1);
+        assert_eq!(response.tool_calls[0].name, "list");
+        assert_eq!(response.tool_calls[0].arguments, "{\"path\":\"Assets\"}");
+    }
+
+    #[test]
+    fn reports_incomplete_tool_call_diagnostic() {
+        let mut tool_calls = HashMap::new();
+        tool_calls.insert(
+            1,
+            PartialToolCall {
+                id: String::new(),
+                name: String::new(),
+                arguments: "{\"todos\":[]}".to_string(),
+                notified: false,
+            },
+        );
+
+        let diagnostic =
+            first_incomplete_tool_call(&tool_calls).expect("incomplete call should be reported");
+
+        assert_eq!(diagnostic.index, 1);
+        assert_eq!(diagnostic.missing, "id, name");
+        assert_eq!(diagnostic.arguments_len, "{\"todos\":[]}".chars().count());
+    }
+
+    #[test]
+    fn raw_chunk_summary_truncates_and_escapes_newlines() {
+        let summary = summarize_recent_raw_chunk("data: first\n\ndata: second\r\n", 12);
+
+        assert_eq!(summary, "...ta: second\\r\\n");
+    }
+
+    #[test]
+    fn collect_tool_calls_rejects_empty_name() {
+        let mut tool_calls = HashMap::new();
+        tool_calls.insert(
+            0,
+            PartialToolCall {
+                id: "call_1".to_string(),
+                name: String::new(),
+                arguments: "{}".to_string(),
+                notified: false,
+            },
+        );
+
+        let err = collect_tool_calls(&tool_calls).expect_err("empty name should be rejected");
+        assert!(err.contains("missing name"), "unexpected error: {}", err);
+    }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "locus-docs",
+  "private": true,
+  "description": "Documentation source and local build toolchain for Locus.",
+  "type": "module",
+  "scripts": {
+    "release:generate": "bun run scripts/generate-update-manifest.mjs",
+    "release:validate-metadata": "bun run scripts/validate-release-notes-metadata.mjs",
+    "dev": "mint dev --no-open",
+    "validate": "bun run release:validate-metadata && mint validate",
+    "broken-links": "mint broken-links",
+    "build": "bun run validate"
+  },
+  "devDependencies": {
+    "mint": "^4.2.523"
+  }
+}

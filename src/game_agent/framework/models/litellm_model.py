@@ -15,6 +15,7 @@ from game_agent.framework.models.utils.actions_toolcall import (
     AGENT_TOOLS,
     format_toolcall_observation_messages,
     parse_toolcall_actions,
+    select_agent_tools,
 )
 from game_agent.framework.models.utils.anthropic_utils import _reorder_anthropic_thinking_blocks
 from game_agent.framework.models.utils.cache_control import set_cache_control
@@ -44,6 +45,8 @@ class LitellmModelConfig(BaseModel):
     """Template used to render the observation after executing an action."""
     multimodal_regex: str = ""
     """Regex to extract multimodal content. Empty string disables multimodal processing."""
+    structured_query_tools_enabled: bool = True
+    """Expose the read-only Unity ACI query tools to the model."""
 
 
 class LitellmModel:
@@ -58,6 +61,7 @@ class LitellmModel:
 
     def __init__(self, *, config_class: Callable = LitellmModelConfig, **kwargs):
         self.config = config_class(**kwargs)
+        self.agent_tools = select_agent_tools(self.config.structured_query_tools_enabled)
         if self.config.litellm_model_registry and Path(self.config.litellm_model_registry).is_file():
             litellm.utils.register_model(json.loads(Path(self.config.litellm_model_registry).read_text()))
 
@@ -66,7 +70,7 @@ class LitellmModel:
             return litellm.completion(
                 model=self.config.model_name,
                 messages=messages,
-                tools=AGENT_TOOLS,
+                tools=self.agent_tools,
                 **(self.config.model_kwargs | kwargs),
             )
         except litellm.exceptions.AuthenticationError as e:
@@ -91,7 +95,7 @@ class LitellmModel:
             message_tokens = int(litellm.token_counter(model=self.config.model_name, messages=prepared))
         except Exception:
             message_tokens = self._conservative_token_estimate(prepared)
-        tool_tokens = self._conservative_token_estimate(AGENT_TOOLS)
+        tool_tokens = self._conservative_token_estimate(self.agent_tools)
         return max(1, message_tokens + tool_tokens)
 
     def query(self, messages: list[dict[str, str]], **kwargs) -> dict:

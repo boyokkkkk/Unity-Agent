@@ -1,0 +1,1439 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+
+const CONFIG_FILE_NAME: &str = "config.json";
+
+mod serde_atomic_bool {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &Arc<AtomicBool>, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_bool(v.load(Ordering::Relaxed))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Arc<AtomicBool>, D::Error> {
+        let b = bool::deserialize(d)?;
+        Ok(Arc::new(AtomicBool::new(b)))
+    }
+}
+
+mod serde_atomic_u32 {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &Arc<AtomicU32>, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u32(v.load(Ordering::Relaxed))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Arc<AtomicU32>, D::Error> {
+        let v = u32::deserialize(d)?;
+        Ok(Arc::new(AtomicU32::new(v)))
+    }
+}
+
+fn default_llm_retry_max_attempts() -> Arc<AtomicU32> {
+    Arc::new(AtomicU32::new(crate::llm::retry::DEFAULT_MAX_RETRIES))
+}
+
+fn default_llm_strip_inline_think_tags() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(true))
+}
+
+/// Default `task` subagent nesting depth: the top-level agent may spawn
+/// subagents, but those subagents may not spawn further subagents.
+pub const DEFAULT_SUBAGENT_MAX_DEPTH: u32 = 1;
+pub const SUBAGENT_MAX_DEPTH_LIMIT: u32 = 8;
+/// Default cap on `task` subagents running at the same time within one
+/// top-level agent tree.
+pub const DEFAULT_SUBAGENT_MAX_CONCURRENT: u32 = 3;
+pub const SUBAGENT_MAX_CONCURRENT_LIMIT: u32 = 16;
+
+fn clamp_subagent_max_depth(value: u32) -> u32 {
+    value.clamp(1, SUBAGENT_MAX_DEPTH_LIMIT)
+}
+
+fn clamp_subagent_max_concurrent(value: u32) -> u32 {
+    value.clamp(1, SUBAGENT_MAX_CONCURRENT_LIMIT)
+}
+
+fn default_subagent_max_depth() -> Arc<AtomicU32> {
+    Arc::new(AtomicU32::new(DEFAULT_SUBAGENT_MAX_DEPTH))
+}
+
+fn default_subagent_max_concurrent() -> Arc<AtomicU32> {
+    Arc::new(AtomicU32::new(DEFAULT_SUBAGENT_MAX_CONCURRENT))
+}
+
+fn default_debug_flag() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(false))
+}
+
+fn default_view_windows_above_main() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(false))
+}
+
+fn default_view_open_in_existing_window() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(true))
+}
+
+fn default_unity_background_hook_enabled() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(true))
+}
+
+fn default_unity_state_probe_enabled() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(true))
+}
+
+fn default_unity_sidecar_compiler() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(true))
+}
+
+fn default_unity_in_process_compile_fallback() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(true))
+}
+
+fn default_unity_hot_reload() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(false))
+}
+
+fn default_unity_inline_force_evaluate_enabled() -> Arc<AtomicBool> {
+    // Phase D rollout: default ON. The force-JIT stub only runs for methods whose
+    // Mono inline bits are still clear (a minority — in a running game most changed
+    // methods' callers have already JITed, so the bit is set and the stub is never
+    // built), is correctness-safe (every inline verdict converges via recompile),
+    // and only takes effect when hot reload is enabled (itself opt-in). A guard
+    // skips any type with a static initializer, so no cctor side effect is
+    // triggered. Set to false to disable.
+    Arc::new(AtomicBool::new(true))
+}
+
+fn default_unity_native_bridge_enabled() -> Arc<AtomicBool> {
+    // Default-on: the native command channel survives domain reloads and is the
+    // required Unity command transport.
+    Arc::new(AtomicBool::new(true))
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AppCloseBehavior {
+    Exit,
+    MinimizeToTray,
+}
+
+impl Default for AppCloseBehavior {
+    fn default() -> Self {
+        Self::Exit
+    }
+}
+
+mod serde_close_behavior {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(
+        v: &Arc<Mutex<AppCloseBehavior>>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        let value = *v.lock().map_err(serde::ser::Error::custom)?;
+        value.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<Arc<Mutex<AppCloseBehavior>>, D::Error> {
+        let value = AppCloseBehavior::deserialize(d)?;
+        Ok(Arc::new(Mutex::new(value)))
+    }
+}
+
+fn default_close_behavior() -> Arc<Mutex<AppCloseBehavior>> {
+    Arc::new(Mutex::new(AppCloseBehavior::Exit))
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DynamicToolLoadingMode {
+    #[serde(alias = "meta-tool", alias = "meta_tool")]
+    MetaTool,
+    Direct,
+    /// Protocol-native lazy loading: Anthropic `defer_loading` +
+    /// `tool_reference`, Codex `tool_search`. Backends without a native
+    /// renderer fall back to the MetaTool mechanism per request.
+    Native,
+}
+
+impl Default for DynamicToolLoadingMode {
+    fn default() -> Self {
+        Self::Native
+    }
+}
+
+mod serde_dynamic_tool_loading_mode {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(
+        v: &Arc<Mutex<DynamicToolLoadingMode>>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        let value = *v.lock().map_err(serde::ser::Error::custom)?;
+        value.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<Arc<Mutex<DynamicToolLoadingMode>>, D::Error> {
+        let value = DynamicToolLoadingMode::deserialize(d)?;
+        Ok(Arc::new(Mutex::new(value)))
+    }
+}
+
+fn default_dynamic_tool_loading_mode() -> Arc<Mutex<DynamicToolLoadingMode>> {
+    Arc::new(Mutex::new(DynamicToolLoadingMode::Native))
+}
+
+fn default_anthropic_native_lazy_enabled() -> Arc<AtomicBool> {
+    Arc::new(AtomicBool::new(true))
+}
+
+/// Per-tool switches for the code-analysis tool family. Each flag controls
+/// whether the tool is offered to agents at all (disabled tools are filtered
+/// out of the request tool list, see
+/// `AgentInstance::resolve_effective_tool_names`). `unity_analyzers` is not a
+/// tool: it injects Microsoft.Unity.Analyzers into the Roslyn language server
+/// so `code_diagnostics` reports Unity-specific rules (UNT*).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CodeAnalysisToolsConfig {
+    pub code_symbol_search: bool,
+    pub code_goto_definition: bool,
+    pub code_find_references: bool,
+    pub code_diagnostics: bool,
+    pub edit_write_diagnostics: bool,
+    pub code_hover: bool,
+    pub unity_code_usages: bool,
+    pub unity_analyzers: bool,
+}
+
+impl Default for CodeAnalysisToolsConfig {
+    fn default() -> Self {
+        Self {
+            code_symbol_search: true,
+            code_goto_definition: true,
+            code_find_references: true,
+            code_diagnostics: false,
+            edit_write_diagnostics: true,
+            code_hover: false,
+            unity_code_usages: true,
+            unity_analyzers: true,
+        }
+    }
+}
+
+mod serde_code_analysis_tools {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(
+        v: &Arc<Mutex<CodeAnalysisToolsConfig>>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        let value = *v.lock().map_err(serde::ser::Error::custom)?;
+        value.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<Arc<Mutex<CodeAnalysisToolsConfig>>, D::Error> {
+        let value = CodeAnalysisToolsConfig::deserialize(d)?;
+        Ok(Arc::new(Mutex::new(value)))
+    }
+}
+
+fn default_code_analysis_tools() -> Arc<Mutex<CodeAnalysisToolsConfig>> {
+    Arc::new(Mutex::new(CodeAnalysisToolsConfig::default()))
+}
+
+mod serde_string_mutex {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &Arc<Mutex<String>>, s: S) -> Result<S::Ok, S::Error> {
+        let value = v.lock().map_err(serde::ser::Error::custom)?;
+        value.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Arc<Mutex<String>>, D::Error> {
+        let value = String::deserialize(d)?;
+        Ok(Arc::new(Mutex::new(value)))
+    }
+}
+
+fn default_skill_package_namespace() -> Arc<Mutex<String>> {
+    Arc::new(Mutex::new(String::new()))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppConfig {
+    pub model: String,
+    #[serde(default)]
+    pub base_url: Option<String>,
+    #[serde(default = "default_debug_flag", with = "serde_atomic_bool")]
+    pub debug: Arc<AtomicBool>,
+    #[serde(default = "default_debug_flag", with = "serde_atomic_bool")]
+    pub file_tool_workspace_boundary: Arc<AtomicBool>,
+    #[serde(default = "default_close_behavior", with = "serde_close_behavior")]
+    pub close_behavior: Arc<Mutex<AppCloseBehavior>>,
+    #[serde(
+        default = "default_dynamic_tool_loading_mode",
+        with = "serde_dynamic_tool_loading_mode"
+    )]
+    pub dynamic_tool_loading_mode: Arc<Mutex<DynamicToolLoadingMode>>,
+    /// One-time migration marker: configs written before the Native default
+    /// get `dynamic_tool_loading_mode` rewritten to `native` exactly once
+    /// (regardless of the previously persisted value); afterwards the user's
+    /// choice sticks.
+    #[serde(default)]
+    pub dynamic_tool_loading_native_migrated: bool,
+    /// Whether the configured Anthropic endpoint supports native lazy tool
+    /// loading (`defer_loading` + `tool_reference`). Default on — the
+    /// official API supports it. Turn off for gateway/proxy `base_url`s that
+    /// reject those fields; otherwise every request pays a 400 + eager
+    /// retry round-trip (the strip-retry in `llm::anthropic` is per-request
+    /// and cannot remember the endpoint's answer).
+    #[serde(
+        default = "default_anthropic_native_lazy_enabled",
+        with = "serde_atomic_bool"
+    )]
+    pub anthropic_native_lazy_enabled: Arc<AtomicBool>,
+    #[serde(
+        default = "default_skill_package_namespace",
+        with = "serde_string_mutex"
+    )]
+    pub default_skill_package_namespace: Arc<Mutex<String>>,
+    #[serde(
+        default = "default_view_windows_above_main",
+        with = "serde_atomic_bool"
+    )]
+    pub view_windows_above_main: Arc<AtomicBool>,
+    #[serde(
+        default = "default_view_open_in_existing_window",
+        with = "serde_atomic_bool"
+    )]
+    pub view_open_in_existing_window: Arc<AtomicBool>,
+    #[serde(
+        default = "default_unity_background_hook_enabled",
+        with = "serde_atomic_bool"
+    )]
+    pub unity_background_hook_enabled: Arc<AtomicBool>,
+    /// Out-of-process native editor-state probe (stack/CPU classification) that
+    /// keeps reporting through domain reloads and editor hangs, when the named
+    /// pipe is silent. Default on; degrades to pipe+process inference when the
+    /// native tier is unavailable (no PDB / unsupported platform).
+    #[serde(
+        default = "default_unity_state_probe_enabled",
+        with = "serde_atomic_bool"
+    )]
+    pub unity_state_probe_enabled: Arc<AtomicBool>,
+    #[serde(default = "default_debug_flag", with = "serde_atomic_bool")]
+    pub csharp_lsp_enabled: Arc<AtomicBool>,
+    /// Compile unity_execute / unity_run_states / View Script snippets in
+    /// the CoreCLR compile-server sidecar instead of inside the Unity Editor
+    /// process. Default on (phase 6 rollout); any sidecar failure falls back
+    /// to the in-Unity path at runtime, and the fallback path stays for at
+    /// least one release cycle.
+    #[serde(default = "default_unity_sidecar_compiler", with = "serde_atomic_bool")]
+    pub unity_sidecar_compiler: Arc<AtomicBool>,
+    /// When the sidecar compiler is on and a compile is *unavailable* (sidecar
+    /// down / transport error), fall back to the in-Unity Roslyn compile.
+    /// Default on (keeps the graceful behavior). Turn off for pure-sidecar /
+    /// A-B: an unavailable sidecar then returns an error instead of compiling
+    /// in Unity, so no in-process Roslyn runs. No effect when the sidecar
+    /// itself is off (the in-Unity path is then the only path).
+    #[serde(
+        default = "default_unity_in_process_compile_fallback",
+        with = "serde_atomic_bool"
+    )]
+    pub unity_in_process_compile_fallback: Arc<AtomicBool>,
+    /// Hot-patch Unity C# method-body edits via the compile-server sidecar
+    /// (no Unity recompile / domain reload). Default off (phase H0 gate);
+    /// signature/field changes always go through `unity_recompile`.
+    #[serde(default = "default_unity_hot_reload", with = "serde_atomic_bool")]
+    pub unity_hot_reload: Arc<AtomicBool>,
+    /// Route the Tauri↔Unity command channel through the native broker DLL
+    /// (`locus_native`) loaded inside the Unity process, so the connection
+    /// survives domain reloads. Default on; disabling this disables the Unity
+    /// command transport for native-only builds.
+    #[serde(
+        default = "default_unity_native_bridge_enabled",
+        with = "serde_atomic_bool"
+    )]
+    pub unity_native_bridge_enabled: Arc<AtomicBool>,
+    /// Let the Unity plugin force-JIT a synthetic caller stub to evaluate a
+    /// not-yet-evaluated method's inline risk (Phase B), instead of relying only
+    /// on the static heuristic. Default on (Phase D); correctness is unaffected
+    /// either way — every inline-risk state converges via recompile — so this only
+    /// trades a rare per-apply stub JIT for tighter "is it live yet" reporting.
+    #[serde(
+        default = "default_unity_inline_force_evaluate_enabled",
+        with = "serde_atomic_bool"
+    )]
+    pub unity_inline_force_evaluate_enabled: Arc<AtomicBool>,
+    #[serde(
+        default = "default_code_analysis_tools",
+        with = "serde_code_analysis_tools"
+    )]
+    pub code_analysis_tools: Arc<Mutex<CodeAnalysisToolsConfig>>,
+    /// Automatic retries per LLM HTTP request after a retryable failure
+    /// (connect error, timeout, HTTP 5xx / 429) before any output has
+    /// streamed. `0` disables automatic retries; values are clamped to
+    /// `llm::retry::MAX_RETRIES_LIMIT`. Mirrored into `llm::retry` at
+    /// startup and on change.
+    #[serde(
+        default = "default_llm_retry_max_attempts",
+        with = "serde_atomic_u32"
+    )]
+    pub llm_retry_max_attempts: Arc<AtomicU32>,
+    /// Reroute literal `<think>`/`<thinking>` prefixes of streamed content
+    /// into the thinking channel on the OpenAI-compatible transports
+    /// (`llm::chat_completions`, `llm::openrouter`). Third-party endpoints
+    /// without a reasoning parser inline reasoning as text tags; without
+    /// rerouting it floods the transcript and the streaming markdown
+    /// renderer. Mirrored into `llm::think_tag_filter` at startup and on
+    /// change. Default on.
+    #[serde(
+        default = "default_llm_strip_inline_think_tags",
+        with = "serde_atomic_bool"
+    )]
+    pub llm_strip_inline_think_tags: Arc<AtomicBool>,
+    /// Maximum `task` subagent nesting depth. 1 (default) lets the top-level
+    /// agent spawn subagents while subagents themselves cannot; a `task` call
+    /// past the cap fails with an error tool result. Clamped to
+    /// 1..=SUBAGENT_MAX_DEPTH_LIMIT on read and write.
+    #[serde(default = "default_subagent_max_depth", with = "serde_atomic_u32")]
+    pub subagent_max_depth: Arc<AtomicU32>,
+    /// Maximum `task` subagents running at once within one top-level agent
+    /// tree (default 3). Excess calls fail with an error tool result instead
+    /// of queueing. Clamped to 1..=SUBAGENT_MAX_CONCURRENT_LIMIT on read and
+    /// write.
+    #[serde(
+        default = "default_subagent_max_concurrent",
+        with = "serde_atomic_u32"
+    )]
+    pub subagent_max_concurrent: Arc<AtomicU32>,
+    #[serde(skip)]
+    config_path: Arc<Mutex<Option<PathBuf>>>,
+}
+
+impl AppConfig {
+    pub fn load(data_dir: &Path) -> Self {
+        let primary_path = stable_config_path(data_dir);
+        Self::load_from_path(&primary_path)
+    }
+
+    fn load_from_path(primary_path: &Path) -> Self {
+        if let Some(mut config) = Self::try_load_file(primary_path) {
+            println!(
+                "[Locus] config loaded from persistent path: {:?}",
+                dunce::canonicalize(primary_path).unwrap_or(primary_path.to_path_buf())
+            );
+            config.set_config_path(primary_path.to_path_buf());
+            return config;
+        }
+
+        println!("[Locus] config not found in any path, creating defaults");
+
+        let model = std::env::var("LOCUS_MODEL")
+            .unwrap_or_else(|_| "openrouter/claude-opus-4.8".to_string());
+
+        let base_url = std::env::var("LOCUS_BASE_URL").ok();
+
+        let debug = std::env::var("LOCUS_DEBUG")
+            .map(|v| v == "1" || v == "true")
+            .unwrap_or(false);
+
+        let config = AppConfig {
+            model,
+            base_url,
+            debug: Arc::new(AtomicBool::new(debug)),
+            file_tool_workspace_boundary: default_debug_flag(),
+            close_behavior: default_close_behavior(),
+            dynamic_tool_loading_mode: default_dynamic_tool_loading_mode(),
+            dynamic_tool_loading_native_migrated: true,
+            anthropic_native_lazy_enabled: default_anthropic_native_lazy_enabled(),
+            default_skill_package_namespace: default_skill_package_namespace(),
+            view_windows_above_main: default_view_windows_above_main(),
+            view_open_in_existing_window: default_view_open_in_existing_window(),
+            unity_background_hook_enabled: default_unity_background_hook_enabled(),
+            unity_state_probe_enabled: default_unity_state_probe_enabled(),
+            csharp_lsp_enabled: default_debug_flag(),
+            unity_sidecar_compiler: default_unity_sidecar_compiler(),
+            unity_in_process_compile_fallback: default_unity_in_process_compile_fallback(),
+            unity_hot_reload: default_unity_hot_reload(),
+            unity_native_bridge_enabled: default_unity_native_bridge_enabled(),
+            unity_inline_force_evaluate_enabled: default_unity_inline_force_evaluate_enabled(),
+            code_analysis_tools: default_code_analysis_tools(),
+            llm_retry_max_attempts: default_llm_retry_max_attempts(),
+            llm_strip_inline_think_tags: default_llm_strip_inline_think_tags(),
+            subagent_max_depth: default_subagent_max_depth(),
+            subagent_max_concurrent: default_subagent_max_concurrent(),
+            config_path: Arc::new(Mutex::new(Some(primary_path.to_path_buf()))),
+        };
+
+        if let Err(err) = Self::persist_to_path(&config, primary_path) {
+            eprintln!(
+                "[Locus] failed to write default config to '{}': {}",
+                primary_path.display(),
+                err
+            );
+        } else {
+            println!(
+                "[Locus] default config written to {:?}",
+                dunce::canonicalize(primary_path).unwrap_or(primary_path.to_path_buf())
+            );
+        }
+
+        config
+    }
+
+    fn try_load_file(path: &Path) -> Option<Self> {
+        let content = fs::read_to_string(path).ok()?;
+        let (config, rewritten) = Self::parse_content(&content).ok()?;
+        if rewritten {
+            if let Err(err) = Self::persist_to_path(&config, path) {
+                eprintln!(
+                    "[Locus] failed to rewrite migrated config '{}': {}",
+                    path.display(),
+                    err
+                );
+            } else {
+                println!(
+                    "[Locus] config migrations applied and persisted: {:?}",
+                    dunce::canonicalize(path).unwrap_or(path.to_path_buf())
+                );
+            }
+        }
+        Some(config)
+    }
+
+    fn parse_content(content: &str) -> Result<(Self, bool), String> {
+        let mut value: Value =
+            serde_json::from_str(content).map_err(|e| format!("failed to parse config: {}", e))?;
+        let scrubbed_legacy_secret = Self::remove_legacy_api_key(&mut value);
+        let migrated_native_tool_loading = Self::apply_native_tool_loading_migration(&mut value);
+        let config = serde_json::from_value::<AppConfig>(value)
+            .map_err(|e| format!("failed to deserialize config: {}", e))?;
+        Ok((config, scrubbed_legacy_secret || migrated_native_tool_loading))
+    }
+
+    /// Rewrites `dynamic_tool_loading_mode` to `native` exactly once per
+    /// config file — the Native default should reach existing installs too,
+    /// whether the old value was the previous default or a manual choice.
+    /// The marker keeps later user changes authoritative.
+    fn apply_native_tool_loading_migration(value: &mut Value) -> bool {
+        let Some(obj) = value.as_object_mut() else {
+            return false;
+        };
+        if obj
+            .get("dynamic_tool_loading_native_migrated")
+            .and_then(|v| v.as_bool())
+            == Some(true)
+        {
+            return false;
+        }
+        obj.insert(
+            "dynamic_tool_loading_native_migrated".to_string(),
+            Value::Bool(true),
+        );
+        let previous = obj.insert(
+            "dynamic_tool_loading_mode".to_string(),
+            Value::String("native".to_string()),
+        );
+        println!(
+            "[Locus] dynamic tool loading migrated to native (previous: {})",
+            previous
+                .as_ref()
+                .and_then(|v| v.as_str())
+                .unwrap_or("<default>")
+        );
+        true
+    }
+
+    fn remove_legacy_api_key(value: &mut Value) -> bool {
+        let Some(obj) = value.as_object_mut() else {
+            return false;
+        };
+        let removed_snake = obj.remove("api_key").is_some();
+        let removed_camel = obj.remove("apiKey").is_some();
+        removed_snake || removed_camel
+    }
+
+    fn set_config_path(&mut self, path: PathBuf) {
+        if let Ok(mut guard) = self.config_path.lock() {
+            *guard = Some(path);
+        }
+    }
+
+    pub fn debug_enabled(&self) -> bool {
+        self.debug.load(Ordering::Relaxed)
+    }
+
+    pub fn set_debug_enabled(&self, value: bool) -> Result<(), String> {
+        self.debug.store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn file_tool_workspace_boundary_enabled(&self) -> bool {
+        self.file_tool_workspace_boundary.load(Ordering::Relaxed)
+    }
+
+    pub fn set_file_tool_workspace_boundary_enabled(&self, value: bool) -> Result<(), String> {
+        self.file_tool_workspace_boundary
+            .store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn close_behavior(&self) -> AppCloseBehavior {
+        self.close_behavior
+            .lock()
+            .map(|guard| *guard)
+            .unwrap_or_default()
+    }
+
+    pub fn set_close_behavior(&self, value: AppCloseBehavior) -> Result<(), String> {
+        *self
+            .close_behavior
+            .lock()
+            .map_err(|e| format!("close behavior lock poisoned: {}", e))? = value;
+        self.persist()
+    }
+
+    pub fn dynamic_tool_loading_mode(&self) -> DynamicToolLoadingMode {
+        self.dynamic_tool_loading_mode
+            .lock()
+            .map(|guard| *guard)
+            .unwrap_or_default()
+    }
+
+    pub fn set_dynamic_tool_loading_mode(
+        &self,
+        value: DynamicToolLoadingMode,
+    ) -> Result<(), String> {
+        *self
+            .dynamic_tool_loading_mode
+            .lock()
+            .map_err(|e| format!("dynamic tool loading mode lock poisoned: {}", e))? = value;
+        self.persist()
+    }
+
+    pub fn anthropic_native_lazy_enabled(&self) -> bool {
+        self.anthropic_native_lazy_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_anthropic_native_lazy_enabled(&self, value: bool) -> Result<(), String> {
+        self.anthropic_native_lazy_enabled
+            .store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn default_skill_package_namespace(&self) -> String {
+        self.default_skill_package_namespace
+            .lock()
+            .map(|guard| guard.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn set_default_skill_package_namespace(&self, value: String) -> Result<(), String> {
+        *self
+            .default_skill_package_namespace
+            .lock()
+            .map_err(|e| format!("default skill package namespace lock poisoned: {}", e))? = value;
+        self.persist()
+    }
+
+    pub fn view_windows_above_main_enabled(&self) -> bool {
+        self.view_windows_above_main.load(Ordering::Relaxed)
+    }
+
+    pub fn set_view_windows_above_main_enabled(&self, value: bool) -> Result<(), String> {
+        self.view_windows_above_main.store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn view_open_in_existing_window_enabled(&self) -> bool {
+        self.view_open_in_existing_window.load(Ordering::Relaxed)
+    }
+
+    pub fn set_view_open_in_existing_window_enabled(&self, value: bool) -> Result<(), String> {
+        self.view_open_in_existing_window
+            .store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn unity_background_hook_enabled(&self) -> bool {
+        self.unity_background_hook_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn unity_state_probe_enabled(&self) -> bool {
+        self.unity_state_probe_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_unity_state_probe_enabled(&self, value: bool) -> Result<(), String> {
+        self.unity_state_probe_enabled
+            .store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn csharp_lsp_enabled(&self) -> bool {
+        self.csharp_lsp_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_csharp_lsp_enabled(&self, value: bool) -> Result<(), String> {
+        self.csharp_lsp_enabled.store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn unity_sidecar_compiler_enabled(&self) -> bool {
+        self.unity_sidecar_compiler.load(Ordering::Relaxed)
+    }
+
+    pub fn set_unity_sidecar_compiler_enabled(&self, value: bool) -> Result<(), String> {
+        self.unity_sidecar_compiler.store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn unity_in_process_compile_fallback_enabled(&self) -> bool {
+        self.unity_in_process_compile_fallback
+            .load(Ordering::Relaxed)
+    }
+
+    pub fn set_unity_in_process_compile_fallback_enabled(&self, value: bool) -> Result<(), String> {
+        self.unity_in_process_compile_fallback
+            .store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn unity_hot_reload_enabled(&self) -> bool {
+        self.unity_hot_reload.load(Ordering::Relaxed)
+    }
+
+    pub fn set_unity_hot_reload_enabled(&self, value: bool) -> Result<(), String> {
+        self.unity_hot_reload.store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn unity_native_bridge_enabled(&self) -> bool {
+        self.unity_native_bridge_enabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_unity_native_bridge_enabled(&self, value: bool) -> Result<(), String> {
+        self.unity_native_bridge_enabled
+            .store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn unity_inline_force_evaluate_enabled(&self) -> bool {
+        self.unity_inline_force_evaluate_enabled
+            .load(Ordering::Relaxed)
+    }
+
+    pub fn set_unity_inline_force_evaluate_enabled(&self, value: bool) -> Result<(), String> {
+        self.unity_inline_force_evaluate_enabled
+            .store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn code_analysis_tools(&self) -> CodeAnalysisToolsConfig {
+        self.code_analysis_tools
+            .lock()
+            .map(|guard| *guard)
+            .unwrap_or_default()
+    }
+
+    pub fn set_code_analysis_tools(&self, value: CodeAnalysisToolsConfig) -> Result<(), String> {
+        *self
+            .code_analysis_tools
+            .lock()
+            .map_err(|e| format!("code analysis tools lock poisoned: {}", e))? = value;
+        self.persist()
+    }
+
+    pub fn set_unity_background_hook_enabled(&self, value: bool) -> Result<(), String> {
+        self.unity_background_hook_enabled
+            .store(value, Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn llm_retry_max_attempts(&self) -> u32 {
+        crate::llm::retry::clamp_max_retries(self.llm_retry_max_attempts.load(Ordering::Relaxed))
+    }
+
+    pub fn set_llm_retry_max_attempts(&self, value: u32) -> Result<(), String> {
+        self.llm_retry_max_attempts
+            .store(crate::llm::retry::clamp_max_retries(value), Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn llm_strip_inline_think_tags(&self) -> bool {
+        self.llm_strip_inline_think_tags.load(Ordering::Relaxed)
+    }
+
+    pub fn subagent_max_depth(&self) -> u32 {
+        clamp_subagent_max_depth(self.subagent_max_depth.load(Ordering::Relaxed))
+    }
+
+    pub fn set_subagent_max_depth(&self, value: u32) -> Result<(), String> {
+        self.subagent_max_depth
+            .store(clamp_subagent_max_depth(value), Ordering::Relaxed);
+        self.persist()
+    }
+
+    pub fn subagent_max_concurrent(&self) -> u32 {
+        clamp_subagent_max_concurrent(self.subagent_max_concurrent.load(Ordering::Relaxed))
+    }
+
+    pub fn set_subagent_max_concurrent(&self, value: u32) -> Result<(), String> {
+        self.subagent_max_concurrent
+            .store(clamp_subagent_max_concurrent(value), Ordering::Relaxed);
+        self.persist()
+    }
+
+    fn persist(&self) -> Result<(), String> {
+        let path = self
+            .config_path
+            .lock()
+            .map_err(|e| format!("config path lock poisoned: {}", e))?
+            .clone();
+        let Some(path) = path else {
+            return Err("config path is unknown; cannot persist".to_string());
+        };
+        Self::persist_to_path(self, &path)
+    }
+
+    fn persist_to_path(&self, path: &Path) -> Result<(), String> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| {
+                format!("failed to create config dir '{}': {}", parent.display(), e)
+            })?;
+        }
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| format!("failed to serialize config: {}", e))?;
+        fs::write(path, json)
+            .map_err(|e| format!("failed to write config '{}': {}", path.display(), e))?;
+        Ok(())
+    }
+}
+
+fn stable_config_path(data_dir: &Path) -> PathBuf {
+    crate::commands::persistent_config_dir()
+        .map(|dir| dir.join(CONFIG_FILE_NAME))
+        .unwrap_or_else(|err| {
+            eprintln!(
+                "[Locus] failed to resolve persistent config dir, falling back to runtime storage: {}",
+                err
+            );
+            data_dir.join(CONFIG_FILE_NAME)
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex as StdMutex;
+
+    static ENV_LOCK: StdMutex<()> = StdMutex::new(());
+
+    struct EnvGuard {
+        saved: Vec<(&'static str, Option<String>)>,
+    }
+
+    impl EnvGuard {
+        fn set(vars: &[(&'static str, Option<&str>)]) -> Self {
+            let saved = vars
+                .iter()
+                .map(|(key, value)| {
+                    let previous = std::env::var(key).ok();
+                    match value {
+                        Some(next) => std::env::set_var(key, next),
+                        None => std::env::remove_var(key),
+                    }
+                    (*key, previous)
+                })
+                .collect();
+            Self { saved }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (key, value) in self.saved.drain(..).rev() {
+                match value {
+                    Some(previous) => std::env::set_var(key, previous),
+                    None => std::env::remove_var(key),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn load_from_path_does_not_persist_openrouter_key_from_env() {
+        let _env_lock = ENV_LOCK.lock().expect("env lock");
+        let _env_guard = EnvGuard::set(&[
+            ("OPENROUTER_API_KEY", Some("or-secret-value")),
+            ("LOCUS_MODEL", Some("test-model")),
+            ("LOCUS_BASE_URL", None),
+            ("LOCUS_DEBUG", Some("0")),
+        ]);
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+
+        let config = AppConfig::load_from_path(&config_path);
+        let written = fs::read_to_string(&config_path).expect("written config");
+
+        assert_eq!(config.model, "test-model");
+        assert!(!written.contains("api_key"));
+        assert!(!written.contains("or-secret-value"));
+    }
+
+    #[test]
+    fn load_from_path_scrubs_legacy_api_key_from_file() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "api_key": "or-legacy-secret",
+  "model": "legacy-model",
+  "base_url": "https://example.com",
+  "debug": true
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+        let written = fs::read_to_string(&config_path).expect("scrubbed config");
+
+        assert_eq!(config.model, "legacy-model");
+        assert_eq!(config.base_url.as_deref(), Some("https://example.com"));
+        assert!(config.debug_enabled());
+        assert!(!config.file_tool_workspace_boundary_enabled());
+        assert!(!written.contains("api_key"));
+        assert!(!written.contains("or-legacy-secret"));
+    }
+
+    #[test]
+    fn file_tool_workspace_boundary_defaults_to_disabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(!config.file_tool_workspace_boundary_enabled());
+    }
+
+    #[test]
+    fn close_behavior_defaults_to_exit() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert_eq!(config.close_behavior(), AppCloseBehavior::Exit);
+    }
+
+    #[test]
+    fn dynamic_tool_loading_mode_defaults_to_native() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert_eq!(
+            config.dynamic_tool_loading_mode(),
+            DynamicToolLoadingMode::Native
+        );
+    }
+
+    #[test]
+    fn dynamic_tool_loading_mode_migrates_persisted_value_to_native_once() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false,
+  "dynamic_tool_loading_mode": "metaTool"
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        // Pre-migration values — even manual ones — flip to native once.
+        assert_eq!(
+            config.dynamic_tool_loading_mode(),
+            DynamicToolLoadingMode::Native
+        );
+        let written = fs::read_to_string(&config_path).expect("rewritten config");
+        assert!(written.contains("\"dynamic_tool_loading_native_migrated\": true"));
+        assert!(written.contains("\"dynamic_tool_loading_mode\": \"native\""));
+    }
+
+    #[test]
+    fn dynamic_tool_loading_mode_user_choice_sticks_after_migration() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false,
+  "dynamic_tool_loading_mode": "metaTool",
+  "dynamic_tool_loading_native_migrated": true
+}"#,
+        )
+        .expect("migrated config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert_eq!(
+            config.dynamic_tool_loading_mode(),
+            DynamicToolLoadingMode::MetaTool
+        );
+    }
+
+    #[test]
+    fn anthropic_native_lazy_enabled_defaults_to_true_and_persists_opt_out() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+        assert!(config.anthropic_native_lazy_enabled());
+
+        config
+            .set_anthropic_native_lazy_enabled(false)
+            .expect("persist opt-out");
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert!(!reloaded.anthropic_native_lazy_enabled());
+    }
+
+    #[test]
+    fn default_skill_package_namespace_defaults_to_empty() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert_eq!(config.default_skill_package_namespace(), "");
+    }
+
+    #[test]
+    fn view_windows_above_main_defaults_to_disabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(!config.view_windows_above_main_enabled());
+    }
+
+    #[test]
+    fn view_open_in_existing_window_defaults_to_enabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(config.view_open_in_existing_window_enabled());
+    }
+
+    #[test]
+    fn unity_sidecar_compiler_defaults_to_enabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(config.unity_sidecar_compiler_enabled());
+    }
+
+    #[test]
+    fn unity_hot_reload_defaults_to_disabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(!config.unity_hot_reload_enabled());
+    }
+
+    #[test]
+    fn unity_native_bridge_defaults_to_enabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        // The native command channel is the default transport; a legacy config
+        // that predates the flag opts in to the required broker path.
+        assert!(config.unity_native_bridge_enabled());
+    }
+
+    #[test]
+    fn unity_native_bridge_respects_explicit_opt_out() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "unity_native_bridge_enabled": false
+}"#,
+        )
+        .expect("opt-out config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(!config.unity_native_bridge_enabled());
+    }
+
+    #[test]
+    fn unity_inline_force_evaluate_defaults_to_enabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        // Phase D rollout: a config that predates the flag gets force-evaluation on.
+        assert!(config.unity_inline_force_evaluate_enabled());
+    }
+
+    #[test]
+    fn unity_inline_force_evaluate_respects_explicit_opt_out() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "unity_inline_force_evaluate_enabled": false
+}"#,
+        )
+        .expect("opt-out config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(!config.unity_inline_force_evaluate_enabled());
+    }
+
+    #[test]
+    fn code_analysis_diagnostics_defaults_are_split() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(!config.code_analysis_tools().code_diagnostics);
+        assert!(config.code_analysis_tools().edit_write_diagnostics);
+    }
+
+    #[test]
+    fn unity_background_hook_defaults_to_enabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert!(config.unity_background_hook_enabled());
+    }
+
+    #[test]
+    fn close_behavior_persists_minimize_to_tray() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let config = AppConfig::load_from_path(&config_path);
+
+        config
+            .set_close_behavior(AppCloseBehavior::MinimizeToTray)
+            .expect("persist close behavior");
+
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert_eq!(reloaded.close_behavior(), AppCloseBehavior::MinimizeToTray);
+    }
+
+    #[test]
+    fn dynamic_tool_loading_mode_persists_direct() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let config = AppConfig::load_from_path(&config_path);
+
+        config
+            .set_dynamic_tool_loading_mode(DynamicToolLoadingMode::Direct)
+            .expect("persist dynamic tool loading mode");
+
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert_eq!(
+            reloaded.dynamic_tool_loading_mode(),
+            DynamicToolLoadingMode::Direct
+        );
+    }
+
+    #[test]
+    fn default_skill_package_namespace_persists() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let config = AppConfig::load_from_path(&config_path);
+
+        config
+            .set_default_skill_package_namespace("studio.tools".to_string())
+            .expect("persist skill package namespace");
+
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert_eq!(reloaded.default_skill_package_namespace(), "studio.tools");
+    }
+
+    #[test]
+    fn view_windows_above_main_persists_enabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let config = AppConfig::load_from_path(&config_path);
+
+        config
+            .set_view_windows_above_main_enabled(true)
+            .expect("persist view window z-order setting");
+
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert!(reloaded.view_windows_above_main_enabled());
+    }
+
+    #[test]
+    fn view_open_in_existing_window_persists_disabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let config = AppConfig::load_from_path(&config_path);
+
+        config
+            .set_view_open_in_existing_window_enabled(false)
+            .expect("persist view tab opening setting");
+
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert!(!reloaded.view_open_in_existing_window_enabled());
+    }
+
+    #[test]
+    fn unity_background_hook_persists_disabled() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let config = AppConfig::load_from_path(&config_path);
+
+        config
+            .set_unity_background_hook_enabled(false)
+            .expect("persist unity background hook setting");
+
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert!(!reloaded.unity_background_hook_enabled());
+    }
+
+    #[test]
+    fn llm_retry_max_attempts_defaults_to_three() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        // A config that predates the field keeps the historical retry count.
+        assert_eq!(config.llm_retry_max_attempts(), 3);
+    }
+
+    #[test]
+    fn llm_retry_max_attempts_persists_zero_and_clamps_large_values() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let config = AppConfig::load_from_path(&config_path);
+
+        config
+            .set_llm_retry_max_attempts(0)
+            .expect("persist retry opt-out");
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert_eq!(reloaded.llm_retry_max_attempts(), 0);
+
+        config
+            .set_llm_retry_max_attempts(99)
+            .expect("persist clamped retry count");
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert_eq!(
+            reloaded.llm_retry_max_attempts(),
+            crate::llm::retry::MAX_RETRIES_LIMIT
+        );
+    }
+
+    #[test]
+    fn subagent_limits_default_for_legacy_config() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        fs::write(
+            &config_path,
+            r#"{
+  "model": "legacy-model",
+  "debug": false
+}"#,
+        )
+        .expect("legacy config");
+
+        let config = AppConfig::load_from_path(&config_path);
+
+        assert_eq!(config.subagent_max_depth(), DEFAULT_SUBAGENT_MAX_DEPTH);
+        assert_eq!(
+            config.subagent_max_concurrent(),
+            DEFAULT_SUBAGENT_MAX_CONCURRENT
+        );
+    }
+
+    #[test]
+    fn subagent_limits_persist_and_clamp() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("config.json");
+        let config = AppConfig::load_from_path(&config_path);
+
+        config
+            .set_subagent_max_depth(3)
+            .expect("persist subagent depth");
+        config
+            .set_subagent_max_concurrent(5)
+            .expect("persist subagent concurrency");
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert_eq!(reloaded.subagent_max_depth(), 3);
+        assert_eq!(reloaded.subagent_max_concurrent(), 5);
+
+        // 0 and oversized values clamp into range instead of persisting raw.
+        config
+            .set_subagent_max_depth(0)
+            .expect("persist clamped depth");
+        config
+            .set_subagent_max_concurrent(999)
+            .expect("persist clamped concurrency");
+        let reloaded = AppConfig::load_from_path(&config_path);
+        assert_eq!(reloaded.subagent_max_depth(), 1);
+        assert_eq!(
+            reloaded.subagent_max_concurrent(),
+            SUBAGENT_MAX_CONCURRENT_LIMIT
+        );
+    }
+}

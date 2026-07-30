@@ -9,8 +9,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 from jinja2 import StrictUndefined, Template
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from game_agent.aci import QUERY_TOOL_NAMES, StructuredQueryExecutor
+from game_agent.context import ContextAssembler, ContextConfig
 from game_agent.framework import Environment, Model, __version__
 from game_agent.framework.exceptions import (
     ConsecutiveToolFailuresExceeded,
@@ -49,6 +51,7 @@ class AgentConfig(BaseModel):
     max_no_progress_rounds: int = 2
     max_consecutive_tool_failures: int = 3
     output_path: Path | None = None
+    context: ContextConfig = Field(default_factory=ContextConfig)
 
 
 class DefaultAgent:
@@ -61,6 +64,7 @@ class DefaultAgent:
         event_sink: Callable[..., object] | None = None,
         event_context_sink: Callable[..., object] | None = None,
         skill_runtime: object | None = None,
+        context_assembler: ContextAssembler | None = None,
         **kwargs,
     ):
         """Create an Agent; event hooks are optional and preserve upstream behavior."""
@@ -71,6 +75,20 @@ class DefaultAgent:
         self.event_sink = event_sink
         self.event_context_sink = event_context_sink
         self.skill_runtime = skill_runtime
+        environment_config = getattr(env, "config", None)
+        project_root = Path(getattr(environment_config, "cwd", "") or Path.cwd())
+        artifact_dir = str(getattr(environment_config, "artifact_dir", "") or "")
+        self.context_assembler = context_assembler or ContextAssembler(
+            self.config.context,
+            project_root=project_root,
+            artifact_root=Path(artifact_dir) if artifact_dir else None,
+            event_sink=event_sink,
+        )
+        self.query_executor = StructuredQueryExecutor(
+            self.context_assembler,
+            project_root=project_root,
+            artifact_root=Path(artifact_dir) if artifact_dir else None,
+        )
         self.applied_skills: list[dict[str, str | int]] = []
         self.extra_template_vars = {}
         self.logger = logging.getLogger("agent")
@@ -119,6 +137,7 @@ class DefaultAgent:
                 'prompt_tokens': self.prompt_tokens,
                 'completion_tokens': self.completion_tokens,
                 'total_tokens': self.total_tokens,
+                'context_metrics': self.context_assembler.metrics(),
             },
             self.extra_template_vars,
             kwargs,
@@ -199,6 +218,7 @@ class DefaultAgent:
     def run(self, task: str = "", **kwargs) -> dict:
         """Run one legacy task and retain its terminal exit message."""
         self._reset_task()
+        self.context_assembler.reset(task)
         self.turn = 1
         self._begin_turn()
         self.extra_template_vars |= {"task": task, **kwargs}
@@ -220,6 +240,7 @@ class DefaultAgent:
         self._begin_turn()
         self.extra_template_vars |= {"task": task, **kwargs}
         if not self.messages:
+            self.context_assembler.reset(task)
             instance_content = self._with_skill_context(
                 task,
                 self._render_template(self.config.instance_template),
@@ -229,6 +250,7 @@ class DefaultAgent:
                 self.model.format_message(role="user", content=instance_content),
             )
         else:
+            self.context_assembler.begin_turn(task)
             self.add_messages(
                 self.model.format_message(role="user", content=self._with_skill_context(task, task))
             )
@@ -359,14 +381,45 @@ class DefaultAgent:
                 }
             )
 
-        output_token_budget = self._preflight_token_budget()
+        raw_input_tokens = self._estimate_input_tokens(self.messages)
+        model_messages = self.context_assembler.assemble(
+            self.messages,
+            raw_input_tokens=raw_input_tokens,
+            max_input_tokens=self.config.max_input_tokens,
+            budget={
+                "max_input_tokens": self.config.max_input_tokens,
+                "max_output_tokens": self.config.max_output_tokens,
+                "max_total_tokens": self.config.max_total_tokens,
+                "total_tokens_used": self.total_tokens,
+                "remaining_total_tokens": (
+                    max(0, self.config.max_total_tokens - self.total_tokens)
+                    if self.config.max_total_tokens > 0 else None
+                ),
+                "model_calls_used": self.n_calls,
+                "model_calls_limit": self.config.step_limit,
+                "elapsed_seconds": int(time.time() - self._turn_start_time),
+                "wall_time_limit_seconds": self.config.wall_time_limit_seconds,
+            },
+        )
+        assembled_input_tokens = self._estimate_input_tokens(model_messages)
+        self.context_assembler.record_context_size(
+            raw_tokens=raw_input_tokens,
+            assembled_tokens=assembled_input_tokens,
+        )
+        output_token_budget = self._preflight_token_budget(model_messages)
         self.n_calls += 1
         started = time.perf_counter()
         model_name = getattr(getattr(self.model, "config", None), "model_name", type(self.model).__name__)
-        self._emit("model_start", component="model", model=model_name, message_count=len(self.messages))
+        self._emit(
+            "model_start",
+            component="model",
+            model=model_name,
+            message_count=len(model_messages),
+            raw_message_count=len(self.messages),
+        )
         try:
             query_kwargs = {'max_tokens': output_token_budget} if output_token_budget > 0 else {}
-            message = self.model.query(self.messages, **query_kwargs)
+            message = self.model.query(model_messages, **query_kwargs)
         except BaseException as error:
             self._emit(
                 "model_error",
@@ -453,8 +506,8 @@ class DefaultAgent:
         self.completion_tokens += completion_tokens
         self.total_tokens += total_tokens
 
-    def _preflight_token_budget(self) -> int:
-        estimated_input = self._estimate_input_tokens(self.messages)
+    def _preflight_token_budget(self, messages: list[dict] | None = None) -> int:
+        estimated_input = self._estimate_input_tokens(messages if messages is not None else self.messages)
         self.last_input_tokens = estimated_input
         context_percent = (
             estimated_input / self.config.max_input_tokens * 100
@@ -552,7 +605,7 @@ class DefaultAgent:
         repeated_count = self.consecutive_repeated_actions + 1 if action_hash == self._last_action_hash else 1
         if 0 < self.config.max_repeated_actions < repeated_count:
             explanation = (
-                f"Repeated PowerShell action blocked before execution after "
+                f"Repeated action blocked before execution after "
                 f"{self.consecutive_repeated_actions} identical attempts."
             )
             outputs = [
@@ -572,7 +625,7 @@ class DefaultAgent:
                 explanation,
             )
 
-        outputs = [self.env.execute(action) for action in actions]
+        outputs = [self._execute_action(action) for action in actions]
         result_hash = self._result_hash(outputs)
         warnings = []
 
@@ -631,9 +684,19 @@ class DefaultAgent:
 
     @staticmethod
     def _action_hash(actions: list[dict]) -> str:
-        normalized = [" ".join(action.get("command", "").strip().split()) for action in actions]
-        payload = json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))
+        normalized = [
+            {key: value for key, value in action.items() if key != "tool_call_id"}
+            for action in actions
+        ]
+        payload = json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _execute_action(self, action: dict) -> dict:
+        if action.get("tool") not in QUERY_TOOL_NAMES:
+            return self.env.execute(action)
+        output = self.query_executor.execute(action)
+        finalizer = getattr(self.env, "finalize_output", None)
+        return finalizer(output) if callable(finalizer) else output
 
     @staticmethod
     def _result_hash(outputs: list[dict]) -> str:
@@ -662,6 +725,7 @@ class DefaultAgent:
         warnings: list[str] | None = None,
     ) -> list[dict]:
         observations = self.model.format_observation_messages(message, outputs, self.get_template_vars())
+        self.context_assembler.record_tool_transition(actions, outputs, observations)
         if warnings:
             observations.append(
                 self.model.format_message(
@@ -746,6 +810,7 @@ class DefaultAgent:
             "messages": self.messages,
             "turn_results": self.turn_results,
             "applied_skills": self.applied_skills,
+            "context": self.context_assembler.serialize(),
             "trajectory_format": UPSTREAM_TRAJECTORY_FORMAT,
         }
         agent_data['info']['model_stats'].update(self.token_usage())

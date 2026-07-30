@@ -1,0 +1,22 @@
+{
+  "description": "Search the Locus plugin registries by natural-language query, plugin id, name, summary, author, or tag. By default it searches every registry the user has registered in the Locus plugin hub. Use this when the /plugin request asks to find, discover, compare, or install a plugin but the exact registry id is not already confirmed.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search text from the user's natural-language /plugin request, such as a capability, plugin name, tag, author, or exact plugin id."
+      },
+      "registryBaseUrl": {
+        "type": ["string", "null"],
+        "description": "Optional registry base URL override that narrows the search to one registry. Omit to search all registries configured in Locus; the official Locus registry is used when none are configured."
+      },
+      "limit": {
+        "type": ["number", "null"],
+        "description": "Maximum result count, clamped to 1-50. Default is 20."
+      }
+    },
+    "required": ["query"]
+  }
+}

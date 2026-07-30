@@ -135,9 +135,11 @@ class ConsoleTaskTest(unittest.TestCase):
         second_turn_history = model.histories[2]
         self.assertEqual(
             [message["role"] for message in second_turn_history],
-            ["system", "user", "assistant", "tool", "assistant", "tool", "assistant", "user"],
+            ["system", "user"],
         )
-        self.assertIn("answer-1", second_turn_history[-2]["content"])
+        self.assertIn("virtual-project-context", second_turn_history[-1]["content"])
+        self.assertIn("answer-1", second_turn_history[-1]["content"])
+        self.assertGreater(len(task.agent.messages), len(second_turn_history))
         self.assertIn("[Agent]", stream.getvalue())
         self.assertIn("[Model]", stream.getvalue())
         self.assertIn("[Env]", stream.getvalue())
@@ -161,6 +163,8 @@ class ConsoleTaskTest(unittest.TestCase):
         self.assertLess(names.index("model_end"), names.index("tool_start"))
         self.assertLess(names.index("tool_start"), names.index("tool_end"))
         self.assertIn("agent_observation_added", names)
+        self.assertIn("context_assembled", names)
+        self.assertIn("context_tool_results_externalized", names)
         self.assertTrue(all(event["returncode"] == 0 for event in events if event["event"] == "tool_end"))
         self.assertEqual({event["task_id"] for event in events}, {"console-task"})
         self.assertTrue(
@@ -196,7 +200,8 @@ class ConsoleTaskTest(unittest.TestCase):
         task.close()
 
         first_user_message = next(message for message in model.histories[0] if message["role"] == "user")
-        self.assertIn('<verified-skill name="unity-source-navigation">', first_user_message["content"])
+        self.assertIn("verified-skill", first_user_message["content"])
+        self.assertIn("unity-source-navigation", first_user_message["content"])
         events = [
             json.loads(line)
             for line in (task.artifact_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()

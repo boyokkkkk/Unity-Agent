@@ -12,7 +12,7 @@ def register_builtin_agents() -> None:
 
 
 def get_agent(model: Model, env: Environment, config: dict, *, default_type: str = "default") -> Agent:
-    runtime_keys = {"event_sink", "event_context_sink", "skill_runtime"}
+    runtime_keys = {"event_sink", "event_context_sink", "skill_runtime", "context_assembler"}
     runtime_values = {key: value for key, value in config.items() if key in runtime_keys}
     config = copy.deepcopy({key: value for key, value in config.items() if key not in runtime_keys})
     config.update(runtime_values)
