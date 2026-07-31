@@ -193,8 +193,30 @@ class StructuredToolProtocolTest(unittest.TestCase):
             self.assertTrue(end["evidence_ids"])
             self.assertEqual(0, end["returncode"])
             self.assertEqual("", end["blocked_reason"])
+            preflight = [
+                event for event in events if event["event"] == "model_preflight"
+            ]
+            self.assertTrue(preflight)
+            self.assertTrue(all(
+                event["tool_profile"] == "localization"
+                for event in preflight
+            ))
+            self.assertTrue(all(
+                event["tool_schema_tokens"] > 0
+                for event in preflight
+            ))
+            self.assertTrue(all(
+                event["exposed_tool_count"] == len(QUERY_TOOL_NAMES.intersection({
+                    "code_symbol_search",
+                    "unity_asset_search",
+                    "code_find_references",
+                    "code_file_read",
+                    "artifact_read",
+                }))
+                for event in preflight
+            ))
 
-    def test_repeated_aci_action_emits_blocked_third_tool_pair(self):
+    def test_repeated_aci_action_emits_structured_replan_instead_of_hard_stop(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
             project = Path(directory)
             artifacts = project / "artifacts"
@@ -215,19 +237,66 @@ class StructuredToolProtocolTest(unittest.TestCase):
             result = agent.run("Read the target")
 
             ends = [event for event in events if event["event"] == "tool_end"]
-            self.assertEqual("RepeatedActionExceeded", result["exit_status"])
-            self.assertEqual([0, 0, -2], [event["returncode"] for event in ends])
+            self.assertNotEqual("RepeatedActionExceeded", result["exit_status"])
+            self.assertEqual([0, -2, -2, -2], [event["returncode"] for event in ends])
             self.assertFalse(ends[0]["blocked"])
-            self.assertEqual("repeated_action", ends[2]["blocked_reason"])
-            self.assertEqual(3, len({
+            self.assertTrue(all(
+                event["blocked_reason"] == "completed_action_disabled"
+                for event in ends[1:]
+            ))
+            self.assertTrue(all(
+                event["admissible_action_signatures"]
+                for event in ends[1:]
+            ))
+            self.assertEqual(4, len({
                 event["tool_call_id"] for event in ends
             }))
+
+    def test_agent_can_accept_admissible_alternative_after_structured_replan(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            artifacts = project / "artifacts"
+            store = ProjectContextStore.from_graph(aci_graph(project), project_root=project)
+            context = ContextAssembler(
+                ContextConfig(auto_locate=False), project_root=project,
+                artifact_root=artifacts, project_store=store,
+            )
+            events = []
+            agent = DefaultAgent(
+                _ReplanRecoveryModel(),
+                LocalEnvironment(cwd=str(project), artifact_dir=str(artifacts)),
+                system_template="system", instance_template="{{task}}",
+                context_assembler=context, step_limit=5,
+                event_sink=lambda name, **data: events.append({"event": name, **data}),
+            )
+
+            result = agent.run("Read then follow references")
+
+            self.assertEqual("Submitted", result["exit_status"])
+            ends = [event for event in events if event["event"] == "tool_end"]
+            self.assertEqual([0, -2, 0], [event["returncode"] for event in ends])
+            self.assertTrue(ends[1]["admissible_action_signatures"])
+            third_start = [
+                event for event in events
+                if event["event"] == "tool_start" and event["tool"] == "code_find_references"
+            ][0]
+            self.assertIn(
+                third_start["action_signature"],
+                third_start["admissible_action_signatures"],
+            )
 
 
 class _QueryThenSubmitModel:
     def __init__(self):
         self.config = SimpleNamespace(model_name="query-test")
         self.calls = 0
+        self.available_tool_names = ()
+
+    def set_available_tool_names(self, tool_names):
+        self.available_tool_names = tuple(tool_names)
+
+    def estimate_tool_schema_tokens(self):
+        return len(self.available_tool_names) * 10
 
     def estimate_input_tokens(self, messages):
         return len(json.dumps(messages, default=str))
@@ -264,6 +333,37 @@ class _RepeatReadModel(_QueryThenSubmitModel):
             "arguments": {"path": "Assets/Scripts/KitchenManager.cs"},
             "tool_call_id": f"read-{self.calls}",
         }]
+        return {
+            "role": "assistant",
+            "content": "",
+            "extra": {
+                "actions": actions,
+                "cost": 0.0,
+                "prompt_tokens": 1,
+                "completion_tokens": 1,
+                "total_tokens": self.calls * 2,
+            },
+        }
+
+
+class _ReplanRecoveryModel(_QueryThenSubmitModel):
+    def query(self, messages, **kwargs):
+        del messages, kwargs
+        self.calls += 1
+        if self.calls <= 2:
+            actions = [{
+                "tool": "code_file_read",
+                "arguments": {"path": "Assets/Scripts/KitchenManager.cs"},
+                "tool_call_id": f"read-{self.calls}",
+            }]
+        elif self.calls == 3:
+            actions = [{
+                "tool": "code_find_references",
+                "arguments": {"node_id": "file", "direction": "both"},
+                "tool_call_id": "references",
+            }]
+        else:
+            actions = [{"tool": "submit", "answer": "recovered", "tool_call_id": "submit"}]
         return {
             "role": "assistant",
             "content": "",

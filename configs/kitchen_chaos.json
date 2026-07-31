@@ -54,6 +54,9 @@
     "graph_path": "artifacts/project-graph/kitchen-chaos-full/project-graph.json",
     "state_path": "project-context-state.json",
     "auto_locate": true,
+    "retrieval_strategy": "role_mmr",
+    "max_test_candidates": 1,
+    "retrieval_mmr_lambda": 0.82,
     "max_working_set_entries": 4,
     "max_candidate_details": 1,
     "max_recent_tool_results": 1,
@@ -69,6 +72,7 @@
   "aci": {
     "enabled": true,
     "typed_mutations_enabled": true,
+    "dynamic_tool_exposure_enabled": true,
     "editor_path": "",
     "timeout_seconds": 1200,
     "require_location_evidence": true,

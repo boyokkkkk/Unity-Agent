@@ -383,6 +383,15 @@ class StageAnalyzer:
 
         usage = [event for event in records if event.get("event") == "model_usage"]
         preflight = [event for event in records if event.get("event") == "model_preflight"]
+        tool_profile_calls: dict[str, int] = {}
+        tool_profile_schema_tokens: dict[str, int] = {}
+        for event in preflight:
+            profile = str(event.get("tool_profile", "") or "unknown")
+            tool_profile_calls[profile] = tool_profile_calls.get(profile, 0) + 1
+            tool_profile_schema_tokens[profile] = (
+                tool_profile_schema_tokens.get(profile, 0)
+                + int(event.get("tool_schema_tokens", 0) or 0)
+            )
         prompt_tokens = sum(int(event.get("prompt_tokens", 0) or 0) for event in usage)
         completion_tokens = sum(int(event.get("completion_tokens", 0) or 0) for event in usage)
         total_tokens = max((int(event.get("total_tokens", 0) or 0) for event in usage), default=0)
@@ -504,7 +513,10 @@ class StageAnalyzer:
             ),
             default=0,
         )
-        schema_tokens = sum(int(event.get("tool_schema_tokens", 0) or 0) for event in records)
+        schema_tokens = sum(
+            int(event.get("tool_schema_tokens", 0) or 0)
+            for event in preflight
+        )
 
         turn_end = next((event for event in records if event.get("event") == "turn_end"), {})
         limit_event = next((event for event in records if event.get("event") == "agent_limit_reached"), {})
@@ -596,8 +608,10 @@ class StageAnalyzer:
                     "escape_hatch_ratio": _ratio(len(escape_hatches), len(mutation_events)),
                     "tool_schema_measurements": sum(
                         int(event.get("tool_schema_tokens", 0) or 0) > 0
-                        for event in records
+                        for event in preflight
                     ),
+                    "tool_profile_calls": tool_profile_calls,
+                    "tool_schema_tokens_by_profile": tool_profile_schema_tokens,
                 },
             },
         }

@@ -44,6 +44,31 @@ class RegistryAndModelTest(unittest.TestCase):
             self.assertEqual(model.estimate_input_tokens(messages), 100000)
         self.assertEqual(counter.call_args.kwargs["tools"], model.agent_tools)
 
+    def test_dynamic_tool_selection_reduces_chat_and_response_schema_tokens(self):
+        chat = LitellmModel(model_name="test/model", cost_tracking="ignore_errors")
+        response = LitellmResponseModel(
+            model_name="test/model",
+            cost_tracking="ignore_errors",
+        )
+        full_chat = chat.estimate_tool_schema_tokens()
+        full_response = response.estimate_tool_schema_tokens()
+
+        names = ("code_symbol_search", "code_file_read", "artifact_read")
+        chat.set_available_tool_names(names)
+        response.set_available_tool_names(names)
+
+        chat_names = {
+            tool["function"]["name"] for tool in chat.agent_tools
+        }
+        response_names = {tool["name"] for tool in response.response_tools}
+        self.assertEqual(
+            {"powershell", "submit", *names},
+            chat_names,
+        )
+        self.assertEqual(chat_names, response_names)
+        self.assertLess(chat.estimate_tool_schema_tokens(), full_chat)
+        self.assertLess(response.estimate_tool_schema_tokens(), full_response)
+
     def test_controlled_registry_rejects_unknown_dynamic_paths_and_duplicates(self):
         registry = ComponentRegistry()
         factory = lambda: "ok"

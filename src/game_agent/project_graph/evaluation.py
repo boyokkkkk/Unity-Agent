@@ -21,6 +21,13 @@ class GoldDependencyPath(BaseModel):
     edge_kinds: list[str] = Field(default_factory=list)
 
 
+class InjectedDefect(BaseModel):
+    kind: str
+    target_path: str
+    root_cause_file: str
+    description: str = ""
+
+
 class LocalizationTask(BaseModel):
     id: str
     query: str
@@ -28,6 +35,7 @@ class LocalizationTask(BaseModel):
     gold_game_objects: list[str] = Field(default_factory=list)
     gold_assets: list[str] = Field(default_factory=list)
     gold_dependency_paths: list[GoldDependencyPath] = Field(default_factory=list)
+    injected_defect: InjectedDefect | None = None
     tags: list[str] = Field(default_factory=list)
 
     @field_validator("id")
@@ -105,10 +113,63 @@ class LocalizationEvaluator:
             "results": rows,
         }
 
+    def run_diversity(
+        self,
+        *,
+        bootstrap_resamples: int = 10_000,
+        bootstrap_seed: int = 42,
+    ) -> dict[str, Any]:
+        strategies = {
+            "D0": "relevance",
+            "D1": "path_collapse",
+            "D2": "path_quota",
+            "D3": "role_mmr",
+        }
+        rows: list[dict[str, Any]] = []
+        max_k = max(self.task_set.ks)
+        for task in self.task_set.tasks:
+            for label, strategy in strategies.items():
+                result = self.retriever.retrieve(
+                    task.query,
+                    "A2",
+                    limit=max(20, max_k),
+                    strategy=strategy,
+                    max_test_candidates=1,
+                    mmr_lambda=0.82,
+                )
+                rows.append(self._score(task, result, label=label))
+        return {
+            "schema_version": LOCALIZATION_RESULT_SCHEMA,
+            "study": "graph_retrieval_diversity",
+            "project_path": self.task_set.project_path,
+            "task_count": len(self.task_set.tasks),
+            "injected_defect_count": sum(
+                task.injected_defect is not None for task in self.task_set.tasks
+            ),
+            "ks": self.task_set.ks,
+            "variants": strategies,
+            "aggregate": {
+                label: aggregate_variant(
+                    [row for row in rows if row["variant"] == label],
+                    self.task_set.ks,
+                )
+                for label in strategies
+            },
+            "inference": infer_localization_statistics(
+                rows,
+                resamples=bootstrap_resamples,
+                seed=bootstrap_seed,
+                comparison_pairs=[("D3", "D0"), ("D3", "D1"), ("D3", "D2")],
+            ),
+            "results": rows,
+        }
+
     def _score(
         self,
         task: LocalizationTask,
         result: LocalizationResult,
+        *,
+        label: str | None = None,
     ) -> dict[str, Any]:
         file_rank = [_norm(item["path"]) for item in result.files]
         object_rank = [
@@ -116,6 +177,16 @@ class LocalizationEvaluator:
             for item in result.game_objects
         ]
         asset_rank = [_norm(item["path"]) for item in result.assets]
+        candidate_paths = [
+            _norm(str(item.get("path", "")))
+            for item in result.ranked_nodes
+            if item.get("path")
+        ]
+        root_cause = (
+            task.injected_defect.root_cause_file
+            if task.injected_defect is not None
+            else task.gold_files[0] if task.gold_files else ""
+        )
         metrics: dict[str, float] = {}
         for k in self.task_set.ks:
             metrics[f"file_recall@{k}"] = recall_at_k(file_rank, task.gold_files, k)
@@ -126,13 +197,41 @@ class LocalizationEvaluator:
             metrics[f"asset_recall@{k}"] = recall_at_k(
                 asset_rank, task.gold_assets, k
             )
+            top_candidates = candidate_paths[:k]
+            metrics[f"candidate_distinct_path_ratio@{k}"] = (
+                len(set(top_candidates)) / len(top_candidates)
+                if top_candidates else 0.0
+            )
+            metrics[f"candidate_test_ratio@{k}"] = (
+                sum("/tests/" in f"/{path}/" or path.endswith("tests.cs") for path in top_candidates)
+                / len(top_candidates)
+                if top_candidates else 0.0
+            )
+            metrics[f"root_cause_recall@{k}"] = (
+                float(any(_matches(path, root_cause, contains=False) for path in top_candidates))
+                if root_cause else 1.0
+            )
+        root_rank = next(
+            (
+                index
+                for index, path in enumerate(candidate_paths, start=1)
+                if root_cause and _matches(path, root_cause, contains=False)
+            ),
+            None,
+        )
+        metrics["root_cause_mrr"] = 1.0 / root_rank if root_rank else 0.0
         metrics["dependency_path_recall"] = dependency_path_recall(
             result.dependency_paths,
             task.gold_dependency_paths,
         )
         return {
             "task_id": task.id,
-            "variant": result.variant,
+            "variant": label or result.variant,
+            "strategy": result.strategy,
+            "injected_defect": (
+                task.injected_defect.model_dump()
+                if task.injected_defect is not None else None
+            ),
             "metrics": metrics,
             "ranking": result.to_dict(),
         }
@@ -216,7 +315,11 @@ def aggregate_variant(
         *(f"file_precision@{k}" for k in ks),
         *(f"gameobject_recall@{k}" for k in ks),
         *(f"asset_recall@{k}" for k in ks),
+        *(f"candidate_distinct_path_ratio@{k}" for k in ks),
+        *(f"candidate_test_ratio@{k}" for k in ks),
+        *(f"root_cause_recall@{k}" for k in ks),
         "dependency_path_recall",
+        "root_cause_mrr",
     ]
     return {
         "tasks": len(rows),

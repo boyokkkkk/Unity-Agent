@@ -117,7 +117,14 @@ class SyntheticTrajectoryTest(unittest.TestCase):
         records = [
             event(1, 0, "turn_start", request="repair"),
             event(2, 5, "model_usage", prompt_tokens=100, completion_tokens=20, total_tokens=120),
-            event(3, 5, "model_preflight", context_usage_percent=25),
+            event(
+                3,
+                5,
+                "model_preflight",
+                context_usage_percent=25,
+                tool_profile="localization",
+                tool_schema_tokens=320,
+            ),
             tool_start(4, 10, read_root),
             tool_end(5, 20, read_root, output="manager", digest="manager"),
             tool_start(6, 30, write_root),
@@ -139,6 +146,13 @@ class SyntheticTrajectoryTest(unittest.TestCase):
         self.assertTrue(metrics["outcome"]["agent_submitted"])
         self.assertEqual(metrics["context"]["total_tokens"], 120)
         self.assertEqual(metrics["context"]["peak_context_usage_percent"], 25)
+        tools = metrics["research"]["tools_and_cost"]
+        self.assertEqual(320.0, tools["tool_schema_tokens_per_call"])
+        self.assertEqual({"localization": 1}, tools["tool_profile_calls"])
+        self.assertEqual(
+            {"localization": 320},
+            tools["tool_schema_tokens_by_profile"],
+        )
 
     def test_irrelevant_searches_quantify_poor_navigation(self):
         records = [

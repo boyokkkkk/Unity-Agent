@@ -145,6 +145,7 @@ def infer_localization_statistics(
     confidence: float = 0.95,
     resamples: int = 10_000,
     seed: int = 42,
+    comparison_pairs: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     metrics = sorted({
         key for row in rows for key in row.get("metrics", {})
@@ -170,7 +171,8 @@ def infer_localization_statistics(
         for variant, tasks in by_variant.items()
     }
     comparisons: dict[str, Any] = {}
-    for left_variant, right_variant in (("A2", "A0"), ("A2", "A1")):
+    pairs = comparison_pairs or [("A2", "A0"), ("A2", "A1")]
+    for left_variant, right_variant in pairs:
         common = sorted(set(by_variant.get(left_variant, {})) & set(by_variant.get(right_variant, {})))
         metric_tests: dict[str, Any] = {}
         permutation_p: dict[str, float] = {}

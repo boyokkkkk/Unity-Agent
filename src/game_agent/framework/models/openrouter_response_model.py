@@ -30,6 +30,13 @@ class OpenRouterResponseModel(OpenRouterModel):
         self.response_tools = select_response_tools(self.config.structured_query_tools_enabled)
         self._api_url = "https://openrouter.ai/api/v1/responses"
 
+    def set_available_tool_names(self, tool_names: tuple[str, ...]) -> None:
+        super().set_available_tool_names(tool_names)
+        self.response_tools = select_response_tools(
+            self.config.structured_query_tools_enabled,
+            tool_names,
+        )
+
     def _prepare_messages_for_api(self, messages: list[dict]) -> list[dict]:
         prepared = []
         for message in messages:
@@ -51,6 +58,9 @@ class OpenRouterResponseModel(OpenRouterModel):
     def estimate_input_tokens(self, messages: list[dict]) -> int:
         prepared = self._prepare_messages_for_api(messages)
         return self._estimate(prepared) + self._estimate(self.response_tools)
+
+    def estimate_tool_schema_tokens(self) -> int:
+        return self._estimate(self.response_tools)
 
     def query(self, messages: list[dict], **kwargs) -> dict:
         prepared = self._prepare_messages_for_api(messages)

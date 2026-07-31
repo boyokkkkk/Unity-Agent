@@ -123,6 +123,8 @@ class DefaultAgent:
         self.turn_results: list[dict] = []
         self.last_result: dict = {}
         self._last_interrupt: InterruptAgentFlow | None = None
+        self._tool_exposure: dict = {}
+        self._last_tool_schema_tokens = 0
 
     def _emit(self, event: str, *, component: str, **data) -> None:
         if self.event_sink:
@@ -393,7 +395,11 @@ class DefaultAgent:
                 }
             )
 
+        self._configure_tool_exposure()
         raw_input_tokens = self._estimate_input_tokens(self.messages)
+        self.context_assembler.set_control_state(
+            self.aci_controller.action_compiler.state()
+        )
         model_messages = self.context_assembler.assemble(
             self.messages,
             raw_input_tokens=raw_input_tokens,
@@ -453,6 +459,8 @@ class DefaultAgent:
             request_total_tokens=message.get('extra', {}).get('total_tokens', 0),
             total_tokens=self.total_tokens,
             max_total_tokens=self.config.max_total_tokens,
+            tool_profile=self._tool_exposure.get("profile", ""),
+            exposed_tool_count=len(self._tool_exposure.get("tool_names", [])),
         )
         self.add_messages(message)
         actions = message.get("extra", {}).get("actions", [])
@@ -511,6 +519,14 @@ class DefaultAgent:
             return 0
         encoded = json.dumps(tools, ensure_ascii=False, default=str).encode("utf-8")
         return max(1, (len(encoded) + 2) // 3)
+
+    def _configure_tool_exposure(self) -> None:
+        exposure = self.aci_controller.tool_exposure()
+        setter = getattr(self.model, "set_available_tool_names", None)
+        applied = callable(setter)
+        if applied:
+            setter(exposure.tool_names)
+        self._tool_exposure = exposure.to_dict() | {"applied": applied}
 
     def _record_usage(self, message: dict, *, fallback_prompt_tokens: int) -> None:
         extra = message.setdefault('extra', {})
@@ -591,6 +607,7 @@ class DefaultAgent:
                 )
             output_budget = min(output_budget, remaining) if output_budget > 0 else remaining
 
+        self._last_tool_schema_tokens = self._estimate_tool_schema_tokens()
         self._emit(
             'model_preflight',
             component='model',
@@ -600,7 +617,16 @@ class DefaultAgent:
             max_total_tokens=self.config.max_total_tokens,
             context_usage_percent=context_percent,
             output_token_budget=output_budget,
-            tool_schema_tokens=self._estimate_tool_schema_tokens(),
+            tool_schema_tokens=self._last_tool_schema_tokens,
+            tool_profile=self._tool_exposure.get("profile", ""),
+            exposed_tool_names=list(self._tool_exposure.get("tool_names", [])),
+            exposed_tool_count=len(self._tool_exposure.get("tool_names", [])),
+            validation_tools_locked=bool(
+                self._tool_exposure.get("validation_locked", False)
+            ),
+            dynamic_tool_exposure_applied=bool(
+                self._tool_exposure.get("applied", False)
+            ),
         )
         return output_budget
 
@@ -630,6 +656,33 @@ class DefaultAgent:
         action_hash = self._action_hash(actions)
         repeated_count = self.consecutive_repeated_actions + 1 if action_hash == self._last_action_hash else 1
         if 0 < self.config.max_repeated_actions < repeated_count:
+            if all(action.get("tool") in ACI_TOOL_NAMES for action in actions):
+                outputs = [
+                    self.aci_controller.replan_repeated(action)
+                    for action in actions
+                ]
+                for action, output in zip(actions, outputs):
+                    self._emit_aci_tool_events(action, output)
+                added = self._append_action_observations(
+                    message,
+                    actions,
+                    outputs,
+                    warnings=[
+                        "Repeated ACI action was masked. Choose one of the structured admissible alternatives."
+                    ],
+                )
+                self._last_action_hash = None
+                self.consecutive_repeated_actions = 0
+                self._last_result_hash = self._result_hash(outputs)
+                self._emit(
+                    "agent_progress_warning",
+                    component="agent",
+                    warnings=["structured_replan_required"],
+                    repeated_actions=repeated_count,
+                    no_progress_rounds=self.no_progress_rounds,
+                    consecutive_tool_failures=self.consecutive_tool_failures,
+                )
+                return added
             explanation = (
                 f"Repeated action blocked before execution after "
                 f"{self.consecutive_repeated_actions} identical attempts."
@@ -831,7 +884,10 @@ class DefaultAgent:
                 else "query"
             ),
             "arguments_hash": arguments_hash,
-            "action_signature": f"{tool}:{arguments_hash}",
+            "action_signature": str(
+                extra.get("action_signature")
+                or self.aci_controller.action_compiler.action_signature(action)
+            ),
             "node_ids": list(dict.fromkeys(node_ids)),
             "changed_paths": list(dict.fromkeys(changed_paths)),
             "accessed_files": list(dict.fromkeys(accessed_files)),
@@ -842,6 +898,10 @@ class DefaultAgent:
             "stale_evidence_node_ids": sorted(set(referenced_node_ids).intersection(dirty_nodes)),
             "evidence_expected": bool(str(extra.get("evidence_claim", "")).strip()),
             "execution_protocol": extra.get("execution_protocol"),
+            "admissible_action_signatures": self._string_values(
+                extra.get("admissible_action_signatures", [])
+                or self.aci_controller.action_compiler.last_admissible_signatures
+            ),
             "escape_hatch": bool(extra.get("escape_hatch", False)),
         }
 

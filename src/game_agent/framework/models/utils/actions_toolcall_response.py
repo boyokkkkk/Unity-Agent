@@ -7,7 +7,11 @@ from jinja2 import StrictUndefined, Template
 
 from game_agent.framework.exceptions import FormatError
 from game_agent.aci.schemas import ACI_TOOL_NAMES
-from game_agent.framework.models.utils.actions_toolcall import AGENT_TOOLS, validate_tool_arguments
+from game_agent.framework.models.utils.actions_toolcall import (
+    AGENT_TOOLS,
+    select_agent_tools,
+    validate_tool_arguments,
+)
 
 
 RESPONSE_TOOLS = [
@@ -16,10 +20,11 @@ RESPONSE_TOOLS = [
 ]
 
 
-def select_response_tools(structured_queries_enabled: bool = True) -> list[dict]:
-    source = AGENT_TOOLS if structured_queries_enabled else [
-        tool for tool in AGENT_TOOLS if tool["function"]["name"] in {"powershell", "submit"}
-    ]
+def select_response_tools(
+    structured_queries_enabled: bool = True,
+    tool_names: set[str] | frozenset[str] | tuple[str, ...] | None = None,
+) -> list[dict]:
+    source = select_agent_tools(structured_queries_enabled, tool_names)
     return [{"type": "function", **tool["function"]} for tool in source]
 
 

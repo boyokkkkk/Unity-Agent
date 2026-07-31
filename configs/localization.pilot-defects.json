@@ -1,0 +1,100 @@
+{
+  "schema_version": "game-agent-localization-tasks-v1",
+  "project_path": "E:/Unity_project/Kitchen_Chaos/Kitchen_Chaos",
+  "ks": [1, 4, 10],
+  "tasks": [
+    {
+      "id": "defect-state-event-missing",
+      "query": "player interaction does not start countdown tutorial stays visible game state event missing",
+      "gold_files": [
+        "Assets/Scripts/KitchenGameManager.cs",
+        "Assets/Scripts/UI/TutorialUI.cs",
+        "Assets/Scripts/UI/GameStartCountdownUI.cs"
+      ],
+      "injected_defect": {
+        "kind": "script_event_missing",
+        "target_path": "Assets/Scripts/KitchenGameManager.cs",
+        "root_cause_file": "Assets/Scripts/KitchenGameManager.cs",
+        "description": "Remove the interaction subscription that transitions WaitingToStart to CountdownToStart."
+      },
+      "tags": ["injected", "script", "state-machine", "event"]
+    },
+    {
+      "id": "defect-stove-progress-reference",
+      "query": "stove frying progress bar never updates serialized progress source reference wrong prefab",
+      "gold_files": [
+        "Assets/Scripts/UI/ProgressBarUI.cs",
+        "Assets/Scripts/Counters/StoveCounter.cs",
+        "Assets/Scripts/IHasProgress.cs"
+      ],
+      "injected_defect": {
+        "kind": "serialized_property_wrong",
+        "target_path": "Assets/Prefabs/Counters/StoveCounter.prefab",
+        "root_cause_file": "Assets/Scripts/UI/ProgressBarUI.cs",
+        "description": "Redirect the serialized progress source away from the StoveCounter component."
+      },
+      "tags": ["injected", "prefab", "serialized-property", "progress"]
+    },
+    {
+      "id": "defect-stove-visual-component",
+      "query": "stove visual does not change frying burned state component missing prefab",
+      "gold_files": [
+        "Assets/Scripts/Counters/StoveCounterVisual.cs",
+        "Assets/Scripts/Counters/StoveCounter.cs"
+      ],
+      "injected_defect": {
+        "kind": "component_missing",
+        "target_path": "Assets/Prefabs/Counters/StoveCounter.prefab",
+        "root_cause_file": "Assets/Scripts/Counters/StoveCounterVisual.cs",
+        "description": "Remove the StoveCounterVisual component from the visual GameObject."
+      },
+      "tags": ["injected", "prefab", "component", "visual"]
+    },
+    {
+      "id": "defect-options-volume-listener",
+      "query": "options sound effects button does nothing volume click UnityEvent listener missing",
+      "gold_files": [
+        "Assets/Scripts/UI/OptionUI.cs",
+        "Assets/Scripts/SoundManager.cs"
+      ],
+      "injected_defect": {
+        "kind": "unity_event_listener_missing",
+        "target_path": "Assets/Scenes/GameScene.unity",
+        "root_cause_file": "Assets/Scripts/UI/OptionUI.cs",
+        "description": "Remove the sound-effects button persistent listener."
+      },
+      "tags": ["injected", "scene", "unity-event", "audio"]
+    },
+    {
+      "id": "defect-plates-visual-script",
+      "query": "plates counter spawns plates but stacked plate visuals do not appear missing script component",
+      "gold_files": [
+        "Assets/Scripts/Counters/PlatesCounterVisual.cs",
+        "Assets/Scripts/Counters/PlatesCounter.cs"
+      ],
+      "injected_defect": {
+        "kind": "component_missing",
+        "target_path": "Assets/Prefabs/Counters/PlatesCounter.prefab",
+        "root_cause_file": "Assets/Scripts/Counters/PlatesCounterVisual.cs",
+        "description": "Remove the PlatesCounterVisual component from the prefab."
+      },
+      "tags": ["injected", "prefab", "component", "spawn"]
+    },
+    {
+      "id": "defect-delivery-result-event",
+      "query": "delivery result success failure popup never appears recipe delivered event subscription missing",
+      "gold_files": [
+        "Assets/Scripts/UI/DeliveryResultUI.cs",
+        "Assets/Scripts/DeliveryManager.cs",
+        "Assets/Scripts/Counters/DeliveryCounter.cs"
+      ],
+      "injected_defect": {
+        "kind": "script_event_missing",
+        "target_path": "Assets/Scripts/UI/DeliveryResultUI.cs",
+        "root_cause_file": "Assets/Scripts/UI/DeliveryResultUI.cs",
+        "description": "Remove the delivery success and failure event subscriptions."
+      },
+      "tags": ["injected", "script", "event", "ui"]
+    }
+  ]
+}

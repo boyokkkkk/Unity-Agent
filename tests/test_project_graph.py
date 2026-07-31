@@ -186,6 +186,28 @@ class RoslynParserTest(unittest.TestCase):
 
 
 class LocalizationAblationTest(unittest.TestCase):
+    def test_role_aware_diversity_collapses_paths_and_enforces_test_quota(self):
+        rows = [
+            {"id": "test-file", "path": "Assets/Tests/PlayMode/KitchenManagerTests.cs", "kind": "CSHARP_FILE", "score": 1.0},
+            {"id": "test-type", "path": "Assets/Tests/PlayMode/KitchenManagerTests.cs", "kind": "CLASS", "score": 0.99},
+            {"id": "other-test", "path": "Assets/Tests/EditMode/OtherTests.cs", "kind": "METHOD", "score": 0.98},
+            {"id": "manager", "path": "Assets/Scripts/KitchenGameManager.cs", "kind": "CSHARP_FILE", "score": 0.90},
+            {"id": "tutorial", "path": "Assets/Scripts/UI/TutorialUI.cs", "kind": "CSHARP_FILE", "score": 0.80},
+            {"id": "input", "path": "Assets/Scripts/GameInput.cs", "kind": "CSHARP_FILE", "score": 0.70},
+        ]
+
+        collapsed = LocalizationRetriever._diversify_rows(
+            rows, limit=4, strategy="path_collapse", max_test_candidates=1, mmr_lambda=0.72
+        )
+        diversified = LocalizationRetriever._diversify_rows(
+            rows, limit=4, strategy="role_mmr", max_test_candidates=1, mmr_lambda=0.72
+        )
+
+        self.assertEqual(4, len({item["path"] for item in collapsed}))
+        self.assertLessEqual(sum(item["role"] == "test" for item in diversified), 1)
+        self.assertTrue(any(item["id"] == "manager" for item in diversified))
+        self.assertGreaterEqual(len({item["subsystem"] for item in diversified}), 3)
+
     def test_a0_a1_a2_use_progressively_richer_context(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
             project = Path(directory)
@@ -234,6 +256,41 @@ class LocalizationAblationTest(unittest.TestCase):
             self.assertGreater(result["aggregate"]["A2"]["gameobject_recall@5"], 0.0)
             self.assertIn("confidence_intervals", result["inference"])
             self.assertIn("A2_vs_A0", result["inference"]["paired_tests"])
+
+    def test_diversity_evaluator_reports_injected_defects_and_localization_metrics(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            graph = synthetic_graph(project)
+            tasks = LocalizationTaskSet.model_validate(
+                {
+                    "schema_version": LOCALIZATION_TASK_SCHEMA,
+                    "project_path": str(project),
+                    "ks": [1, 4],
+                    "tasks": [
+                        {
+                            "id": "injected-state-event",
+                            "query": "KitchenManager StartCountdown countdown",
+                            "gold_files": ["Assets/Scripts/KitchenManager.cs"],
+                            "injected_defect": {
+                                "kind": "script_event_missing",
+                                "target_path": "Assets/Scripts/KitchenManager.cs",
+                                "root_cause_file": "Assets/Scripts/KitchenManager.cs",
+                            },
+                        }
+                    ],
+                }
+            )
+
+            report = LocalizationEvaluator(graph, tasks).run_diversity(
+                bootstrap_resamples=20,
+                bootstrap_seed=7,
+            )
+
+            self.assertEqual(1, report["injected_defect_count"])
+            self.assertEqual({"D0", "D1", "D2", "D3"}, set(report["aggregate"]))
+            self.assertIn("root_cause_recall@4", report["aggregate"]["D3"])
+            self.assertIn("candidate_distinct_path_ratio@4", report["aggregate"]["D3"])
+            self.assertIn("D3_vs_D0", report["inference"]["paired_tests"])
 
 
 class LocalizationStatisticsTest(unittest.TestCase):

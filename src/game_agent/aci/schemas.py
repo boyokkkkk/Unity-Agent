@@ -368,3 +368,36 @@ MUTATION_TOOL_NAMES = frozenset(tool["function"]["name"] for tool in TYPED_MUTAT
 CONTROL_TOOL_NAMES = frozenset(tool["function"]["name"] for tool in CONTROL_TOOLS)
 ACI_TOOLS = [*STRUCTURED_QUERY_TOOLS, *TYPED_MUTATION_TOOLS, *CONTROL_TOOLS]
 ACI_TOOL_NAMES = QUERY_TOOL_NAMES | MUTATION_TOOL_NAMES | CONTROL_TOOL_NAMES
+
+LOCALIZATION_TOOL_NAMES = frozenset(
+    {
+        "code_symbol_search",
+        "unity_asset_search",
+        "code_find_references",
+        "code_file_read",
+        "artifact_read",
+    }
+)
+IMPLEMENTATION_READ_TOOL_NAMES = frozenset(
+    {
+        "unity_object_read",
+        "unity_asset_read",
+        "code_file_read",
+        "code_find_references",
+        "code_diagnostics",
+        "artifact_read",
+    }
+)
+ASSET_MUTATION_TOOL_NAMES = frozenset(
+    MUTATION_TOOL_NAMES - {"unity_script_patch", "unity_execute_csharp"}
+)
+SCRIPT_MUTATION_TOOL_NAMES = frozenset({"unity_script_patch"})
+VALIDATION_TOOL_NAMES = frozenset(
+    {
+        "code_diagnostics",
+        "unity_recompile",
+        "unity_hot_reload",
+        "unity_validate",
+        "artifact_read",
+    }
+)

@@ -9,6 +9,8 @@ from typing import Any
 
 from game_agent.context import ContextAssembler, EvidenceStatus
 
+from .control import EvidenceActionCompiler
+from .exposure import ToolExposure, select_tool_exposure
 from .mutation import AciConfig, UnityMutationExecutor
 from .query import StructuredQueryExecutor
 from .schemas import CONTROL_TOOL_NAMES, MUTATION_TOOL_NAMES, QUERY_TOOL_NAMES
@@ -64,6 +66,10 @@ class UnityAciController:
             artifact_root=artifact_root,
             config=self.config,
         )
+        self.action_compiler = EvidenceActionCompiler(
+            context,
+            project_root=project_root,
+        )
         self.pending: PendingChange | None = None
         self.completed: list[dict[str, Any]] = []
         self.blocked_actions = 0
@@ -72,18 +78,28 @@ class UnityAciController:
         self.pending = None
         self.completed = []
         self.blocked_actions = 0
+        self.action_compiler.reset()
 
     def execute(self, action: dict[str, Any]) -> dict[str, Any]:
         tool = str(action.get("tool", ""))
+        decision = self.action_compiler.before_action(action)
+        if not decision.allowed:
+            self.blocked_actions += 1
+            return self.action_compiler.replan_output(
+                action,
+                reason=decision.reason,
+            )
         if tool in QUERY_TOOL_NAMES:
             output = self.query_executor.execute(action)
             self._consume_query(tool, output)
+            self.action_compiler.observe(action, output)
             return output
         if tool in MUTATION_TOOL_NAMES:
             blocked = self._guard_mutation(tool, action.get("arguments", {}))
             if blocked:
                 return blocked
             output = self.mutation_executor.execute(action)
+            self.action_compiler.observe(action, output)
             if self._succeeded(output):
                 extra = output.get("extra", {})
                 self.pending = PendingChange(
@@ -102,9 +118,17 @@ class UnityAciController:
                 return blocked
             output = self.mutation_executor.execute(action)
             self._consume_control(tool, output)
+            self.action_compiler.observe(action, output)
             output.setdefault("extra", {})["execution_protocol"] = self.protocol_state()
             return output
         return self._blocked(tool, "unknown_aci_tool", f"Unknown ACI tool: {tool}")
+
+    def replan_repeated(self, action: dict[str, Any]) -> dict[str, Any]:
+        self.blocked_actions += 1
+        return self.action_compiler.replan_output(
+            action,
+            reason="The action repeated after prior evidence or a prior replan; choose an admissible alternative.",
+        )
 
     def guard_submission(self) -> dict[str, Any] | None:
         if self.pending is None:
@@ -115,11 +139,28 @@ class UnityAciController:
             f"Cannot submit while checkpoint {self.pending.checkpoint_id} awaits {self.pending.stage}.",
         )
 
+    def tool_exposure(self) -> ToolExposure:
+        pending_stage = self.pending.stage if self.pending is not None else ""
+        return select_tool_exposure(
+            phase=self.context.phase,
+            unresolved_slot_ids=(
+                str(slot.get("id", ""))
+                for slot in self.action_compiler.open_slots()
+            ),
+            working_paths=(
+                entry.path for entry in self.context.working_set.entries.values()
+            ),
+            pending_stage=pending_stage,
+            enabled=self.config.dynamic_tool_exposure_enabled,
+        )
+
     def protocol_state(self) -> dict[str, Any]:
         return {
             "pending": asdict(self.pending) | {"stage": self.pending.stage} if self.pending else None,
             "completed_transactions": len(self.completed),
             "blocked_actions": self.blocked_actions,
+            "tool_exposure": self.tool_exposure().to_dict(),
+            **self.action_compiler.state(),
             **self.mutation_executor.metrics(),
         }
 

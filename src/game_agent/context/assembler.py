@@ -6,7 +6,7 @@ import time
 import uuid
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -46,6 +46,11 @@ class ContextConfig(BaseModel):
     graph_path: str = ""
     state_path: str = ""
     auto_locate: bool = True
+    retrieval_strategy: Literal[
+        "relevance", "path_collapse", "path_quota", "role_mmr"
+    ] = "role_mmr"
+    max_test_candidates: int = Field(default=1, ge=0)
+    retrieval_mmr_lambda: float = Field(default=0.82, ge=0.0, le=1.0)
     max_working_set_entries: int = Field(default=24, ge=1)
     max_candidate_details: int = Field(default=5, ge=0)
     max_recent_tool_results: int = Field(default=1, ge=0)
@@ -95,6 +100,7 @@ class ContextAssembler:
         self.structured_query_count = 0
         self.structured_query_nodes_mapped = 0
         self.structured_query_evidence_count = 0
+        self.control_state: dict[str, Any] = {}
 
     @property
     def working_set(self) -> TaskWorkingSet:
@@ -130,6 +136,7 @@ class ContextAssembler:
         self.structured_query_count = 0
         self.structured_query_nodes_mapped = 0
         self.structured_query_evidence_count = 0
+        self.control_state = {}
         if hasattr(self, "_standalone_working_set"):
             del self._standalone_working_set
         if self.project_store is not None:
@@ -140,6 +147,9 @@ class ContextAssembler:
                         self.task_id,
                         task,
                         limit=self.config.max_working_set_entries,
+                        strategy=self.config.retrieval_strategy,
+                        max_test_candidates=self.config.max_test_candidates,
+                        mmr_lambda=self.config.retrieval_mmr_lambda,
                     )
                 except (OSError, ValueError):
                     entries = []
@@ -218,6 +228,9 @@ class ContextAssembler:
 
     def record_unresolved_question(self, question: str) -> None:
         self.memory.add_unique("unresolved_questions", question)
+
+    def set_control_state(self, state: dict[str, Any]) -> None:
+        self.control_state = dict(state)
 
     def assemble(
         self,
@@ -441,6 +454,7 @@ class ContextAssembler:
             "structured_query_calls": self.structured_query_count,
             "structured_query_nodes_mapped": self.structured_query_nodes_mapped,
             "structured_query_evidence": self.structured_query_evidence_count,
+            "control_state": self.control_state,
         }
 
     def _open_store(self) -> ProjectContextStore | None:
@@ -602,7 +616,7 @@ class ContextAssembler:
                 "relevance": round(entry.relevance, 6),
                 "evidence_ids": entry.evidence_ids,
             }
-            for entry in sorted(self.working_set.entries.values(), key=lambda value: -value.relevance)
+            for entry in self.working_set.entries.values()
         ]
         recent_tools = [item.to_dict() for item in self.recent_tools[-self.config.max_recent_tool_results :]]
         payload = {
@@ -616,6 +630,7 @@ class ContextAssembler:
             "observed_evidence": active,
             "graph_suggestions": suggested,
             "working_set": working_refs,
+            "evidence_conditioned_control": self.control_state,
             "candidate_details": details,
             "recent_messages": recent_messages,
             "recent_tool_results": recent_tools,

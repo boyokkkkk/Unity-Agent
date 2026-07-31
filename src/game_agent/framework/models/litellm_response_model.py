@@ -38,6 +38,13 @@ class LitellmResponseModel(LitellmModel):
         super().__init__(config_class=config_class, **kwargs)
         self.response_tools = select_response_tools(self.config.structured_query_tools_enabled)
 
+    def set_available_tool_names(self, tool_names: tuple[str, ...]) -> None:
+        super().set_available_tool_names(tool_names)
+        self.response_tools = select_response_tools(
+            self.config.structured_query_tools_enabled,
+            tool_names,
+        )
+
     def _prepare_messages_for_api(self, messages: list[dict]) -> list[dict]:
         prepared = []
         for message in messages:
@@ -64,6 +71,9 @@ class LitellmResponseModel(LitellmModel):
     def estimate_input_tokens(self, messages: list[dict[str, str]]) -> int:
         prepared = self._prepare_messages_for_api(messages)
         return self._conservative_token_estimate(prepared) + self._conservative_token_estimate(self.response_tools)
+
+    def estimate_tool_schema_tokens(self) -> int:
+        return self._conservative_token_estimate(self.response_tools)
 
     def _calculate_usage(self, response: Any, messages: list[dict]) -> dict[str, int]:
         usage = getattr(response, "usage", None)

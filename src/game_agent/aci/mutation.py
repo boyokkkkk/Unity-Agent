@@ -22,6 +22,7 @@ class AciConfig(BaseModel):
 
     enabled: bool = True
     typed_mutations_enabled: bool = True
+    dynamic_tool_exposure_enabled: bool = True
     editor_path: str = ""
     timeout_seconds: int = Field(default=1200, ge=1)
     require_location_evidence: bool = True

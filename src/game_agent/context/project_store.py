@@ -113,20 +113,44 @@ class ProjectContextStore:
             working_set._bound_entries()
         return working_set
 
-    def locate(self, task_id: str, query: str, *, limit: int = 12) -> list[WorkingSetEntry]:
-        result = self._retriever.retrieve(query, "A2", limit=limit)
+    def locate(
+        self,
+        task_id: str,
+        query: str,
+        *,
+        limit: int = 12,
+        strategy: str = "role_mmr",
+        max_test_candidates: int = 1,
+        mmr_lambda: float = 0.82,
+    ) -> list[WorkingSetEntry]:
+        result = self._retriever.retrieve(
+            query,
+            "A2",
+            limit=limit,
+            strategy=strategy,
+            max_test_candidates=max_test_candidates,
+            mmr_lambda=mmr_lambda,
+        )
         scores: dict[str, float] = {}
+        ordered_ids: list[str] = []
+
+        def add(node_id: str, score: float) -> None:
+            if node_id not in scores:
+                ordered_ids.append(node_id)
+            scores[node_id] = max(scores.get(node_id, 0.0), score)
+
         for item in result.ranked_nodes:
-            scores[str(item["id"])] = max(scores.get(str(item["id"]), 0.0), float(item.get("score", 0.0)))
+            add(str(item["id"]), float(item.get("score", 0.0)))
         for collection in (result.game_objects, result.assets):
             for item in collection:
-                scores[str(item["id"])] = max(scores.get(str(item["id"]), 0.0), float(item.get("score", 0.0)))
+                add(str(item["id"]), float(item.get("score", 0.0)))
         for item in result.files:
             for node_id in self._path_index.get(_normalize_path(str(item.get("path", ""))), []):
-                scores[node_id] = max(scores.get(node_id, 0.0), float(item.get("score", 0.0)))
+                add(node_id, float(item.get("score", 0.0)))
         working_set = self.working_set(task_id)
         entries = []
-        for node_id, score in sorted(scores.items(), key=lambda pair: (-pair[1], pair[0]))[:limit]:
+        for node_id in ordered_ids[:limit]:
+            score = scores[node_id]
             node = self.graph.nodes[node_id]
             entry = working_set.add(self._entry(node, relevance=score))
             entries.append(entry)

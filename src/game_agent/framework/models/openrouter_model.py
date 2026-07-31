@@ -67,6 +67,12 @@ class OpenRouterModel:
         self._api_url = "https://openrouter.ai/api/v1/chat/completions"
         self._api_key = os.getenv("OPENROUTER_API_KEY", "")
 
+    def set_available_tool_names(self, tool_names: tuple[str, ...]) -> None:
+        self.agent_tools = select_agent_tools(
+            self.config.structured_query_tools_enabled,
+            tool_names,
+        )
+
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"}
 
@@ -109,6 +115,9 @@ class OpenRouterModel:
 
     def estimate_input_tokens(self, messages: list[dict]) -> int:
         return self._estimate(self._prepare_messages_for_api(messages)) + self._estimate(self.agent_tools)
+
+    def estimate_tool_schema_tokens(self) -> int:
+        return self._estimate(self.agent_tools)
 
     def _calculate_cost(self, response: dict) -> dict[str, float]:
         cost = float(response.get("usage", {}).get("cost") or 0.0)

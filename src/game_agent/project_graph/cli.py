@@ -30,12 +30,22 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--output", type=Path, required=True)
     evaluate.add_argument("--bootstrap-resamples", type=int, default=10_000)
     evaluate.add_argument("--bootstrap-seed", type=int, default=42)
+    evaluate.add_argument(
+        "--diversity-study",
+        action="store_true",
+        help="Compare relevance, path collapse, test quota, and role-aware MMR on A2",
+    )
 
     query = commands.add_parser("query", help="Query A0/A1/A2 localization context")
     query.add_argument("--graph", type=Path, required=True)
     query.add_argument("--project", type=Path, required=True)
     query.add_argument("--query", required=True)
     query.add_argument("--variant", choices=["A0", "A1", "A2"], default="A2")
+    query.add_argument(
+        "--strategy",
+        choices=["relevance", "path_collapse", "path_quota", "role_mmr"],
+        default="role_mmr",
+    )
     query.add_argument("--limit", type=int, default=10)
     query.add_argument("--output", type=Path)
 
@@ -67,7 +77,8 @@ def main() -> None:
         return
     if args.command == "evaluate":
         evaluator = LocalizationEvaluator.from_paths(args.graph, args.tasks)
-        result = evaluator.run(
+        runner = evaluator.run_diversity if args.diversity_study else evaluator.run
+        result = runner(
             bootstrap_resamples=args.bootstrap_resamples,
             bootstrap_seed=args.bootstrap_seed,
         )
@@ -109,11 +120,13 @@ def main() -> None:
         args.query,
         args.variant,
         limit=args.limit,
+        strategy=args.strategy,
     ).to_dict()
     payload = {
         "schema_version": "game-agent-project-graph-query-v1",
         "query": args.query,
         "variant": args.variant,
+        "strategy": args.strategy,
         "limit": args.limit,
         "result": result,
     }

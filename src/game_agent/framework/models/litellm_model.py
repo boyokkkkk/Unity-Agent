@@ -66,6 +66,12 @@ class LitellmModel:
         if self.config.litellm_model_registry and Path(self.config.litellm_model_registry).is_file():
             litellm.utils.register_model(json.loads(Path(self.config.litellm_model_registry).read_text()))
 
+    def set_available_tool_names(self, tool_names: tuple[str, ...]) -> None:
+        self.agent_tools = select_agent_tools(
+            self.config.structured_query_tools_enabled,
+            tool_names,
+        )
+
     def _query(self, messages: list[dict[str, str]], **kwargs):
         try:
             return litellm.completion(

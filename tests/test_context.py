@@ -157,6 +157,37 @@ class ProjectContextStoreTest(unittest.TestCase):
 
 
 class ContextAssemblerTest(unittest.TestCase):
+    def test_virtual_context_surfaces_evidence_conditioned_control_state(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            context = ContextAssembler(
+                ContextConfig(auto_locate=False),
+                project_root=Path(directory),
+            )
+            context.reset("repair", task_id="control-state")
+            context.set_control_state({
+                "completed_actions": [],
+                "disabled_actions": ["code_file_read:done"],
+                "unresolved_slots": [{"id": "implementation_source", "status": "open"}],
+                "admissible_action_signatures": ["code_symbol_search:next"],
+            })
+
+            assembled = context.assemble([
+                {"role": "system", "content": "system"},
+                {"role": "user", "content": "repair"},
+            ])
+
+            rendered = assembled[-1]["content"]
+            payload = json.loads(rendered[rendered.index("{") : rendered.rindex("}") + 1])
+            control = payload["evidence_conditioned_control"]
+            self.assertEqual(
+                "implementation_source",
+                control["unresolved_slots"][0]["id"],
+            )
+            self.assertEqual(
+                ["code_symbol_search:next"],
+                control["admissible_action_signatures"],
+            )
+
     def test_assembler_uses_structured_memory_and_externalized_tool_results(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
             project = Path(directory)

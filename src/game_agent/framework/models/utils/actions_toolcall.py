@@ -50,8 +50,20 @@ AGENT_TOOLS = [POWERSHELL_TOOL, *ACI_TOOLS, SUBMIT_TOOL]
 TOOL_SCHEMAS = {tool["function"]["name"]: tool["function"]["parameters"] for tool in AGENT_TOOLS}
 
 
-def select_agent_tools(structured_queries_enabled: bool = True) -> list[dict]:
-    return AGENT_TOOLS if structured_queries_enabled else CORE_AGENT_TOOLS
+def select_agent_tools(
+    structured_queries_enabled: bool = True,
+    tool_names: set[str] | frozenset[str] | tuple[str, ...] | None = None,
+) -> list[dict]:
+    if not structured_queries_enabled:
+        return CORE_AGENT_TOOLS
+    if tool_names is None:
+        return AGENT_TOOLS
+    selected = set(tool_names)
+    return [
+        POWERSHELL_TOOL,
+        *(tool for tool in ACI_TOOLS if tool["function"]["name"] in selected),
+        SUBMIT_TOOL,
+    ]
 
 
 def validate_tool_arguments(tool_name: str, args: object) -> str:

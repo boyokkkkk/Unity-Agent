@@ -88,6 +88,7 @@ class TextIndex:
 @dataclass(slots=True)
 class LocalizationResult:
     variant: str
+    strategy: str
     files: list[dict[str, Any]]
     game_objects: list[dict[str, Any]]
     assets: list[dict[str, Any]]
@@ -97,6 +98,7 @@ class LocalizationResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "variant": self.variant,
+            "strategy": self.strategy,
             "files": self.files,
             "game_objects": self.game_objects,
             "assets": self.assets,
@@ -114,6 +116,10 @@ class LocalizationRetriever:
         self.node_index = TextIndex(
             {node.id: _node_text(node) for node in graph.nodes.values()}
         )
+        self.one_hop: dict[str, set[str]] = defaultdict(set)
+        for edge in graph.edges:
+            self.one_hop[edge.source].add(edge.target)
+            self.one_hop[edge.target].add(edge.source)
 
     def retrieve(
         self,
@@ -121,13 +127,33 @@ class LocalizationRetriever:
         variant: str,
         *,
         limit: int = 20,
+        strategy: str = "relevance",
+        max_test_candidates: int = 1,
+        mmr_lambda: float = 0.82,
     ) -> LocalizationResult:
         variant = variant.upper()
+        if strategy not in {"relevance", "path_collapse", "path_quota", "role_mmr"}:
+            raise ValueError(
+                "strategy must be relevance, path_collapse, path_quota, or role_mmr"
+            )
         if variant == "A0":
-            return self._a0(query, limit)
+            return self._a0(
+                query,
+                limit,
+                strategy=strategy,
+                max_test_candidates=max_test_candidates,
+                mmr_lambda=mmr_lambda,
+            )
         if variant not in {"A1", "A2"}:
             raise ValueError("variant must be A0, A1, or A2")
-        return self._graph_variant(query, variant, limit)
+        return self._graph_variant(
+            query,
+            variant,
+            limit,
+            strategy=strategy,
+            max_test_candidates=max_test_candidates,
+            mmr_lambda=mmr_lambda,
+        )
 
     def _load_file_documents(self) -> dict[str, str]:
         documents: dict[str, str] = {}
@@ -137,11 +163,27 @@ class LocalizationRetriever:
             documents[node.path] = f"{node.path}\n{text}"
         return documents
 
-    def _a0(self, query: str, limit: int) -> LocalizationResult:
+    def _a0(
+        self,
+        query: str,
+        limit: int,
+        *,
+        strategy: str,
+        max_test_candidates: int,
+        mmr_lambda: float,
+    ) -> LocalizationResult:
         file_scores = self.file_index.score(query)
         files = _rank_items(file_scores, limit, key_name="path")
+        files = self._diversify_rows(
+            files,
+            limit=limit,
+            strategy="path_quota" if strategy == "role_mmr" else strategy,
+            max_test_candidates=max_test_candidates,
+            mmr_lambda=mmr_lambda,
+        )
         return LocalizationResult(
             variant="A0",
+            strategy=strategy,
             files=files,
             game_objects=[],
             assets=[],
@@ -149,7 +191,16 @@ class LocalizationRetriever:
             dependency_paths=[],
         )
 
-    def _graph_variant(self, query: str, variant: str, limit: int) -> LocalizationResult:
+    def _graph_variant(
+        self,
+        query: str,
+        variant: str,
+        limit: int,
+        *,
+        strategy: str,
+        max_test_candidates: int,
+        mmr_lambda: float,
+    ) -> LocalizationResult:
         allowed_nodes = CODE_KINDS if variant == "A1" else set(NodeKind)
         allowed_edges = {EdgeKind.CALLS} if variant == "A1" else set(EdgeKind)
         network = nx.DiGraph()
@@ -200,6 +251,15 @@ class LocalizationRetriever:
             combined,
             key=lambda node_id: (-combined[node_id], node_id),
         )
+        diversified_ids = self._diversify_node_ids(
+            ranked_node_ids,
+            combined,
+            lexical_scores=lexical,
+            limit=limit,
+            strategy=strategy,
+            max_test_candidates=max_test_candidates,
+            mmr_lambda=mmr_lambda,
+        )
         ranked_nodes = [
             {
                 "id": node_id,
@@ -207,14 +267,23 @@ class LocalizationRetriever:
                 "name": self.graph.nodes[node_id].name,
                 "path": self.graph.nodes[node_id].path,
                 "score": combined[node_id],
+                "role": _path_role(self.graph.nodes[node_id].path),
+                "subsystem": _path_subsystem(self.graph.nodes[node_id].path),
             }
-            for node_id in ranked_node_ids[:limit]
+            for node_id in diversified_ids
         ]
         files = self._aggregate_files(
             ranked_node_ids,
             combined,
             file_scores,
-            limit,
+            max(limit * 4, limit),
+        )
+        files = self._diversify_rows(
+            files,
+            limit=limit,
+            strategy="path_quota" if strategy == "role_mmr" else strategy,
+            max_test_candidates=max_test_candidates,
+            mmr_lambda=mmr_lambda,
         )
         game_objects = [
             _node_result(self.graph.nodes[node_id], combined[node_id])
@@ -232,12 +301,132 @@ class LocalizationRetriever:
         paths = self._top_dependency_paths(network, ranked_node_ids, personalization, limit=limit)
         return LocalizationResult(
             variant=variant,
+            strategy=strategy,
             files=files,
             game_objects=game_objects,
             assets=assets,
             ranked_nodes=ranked_nodes,
             dependency_paths=paths,
         )
+
+    def _diversify_node_ids(
+        self,
+        ranked: list[str],
+        scores: dict[str, float],
+        *,
+        lexical_scores: dict[str, float],
+        limit: int,
+        strategy: str,
+        max_test_candidates: int,
+        mmr_lambda: float,
+    ) -> list[str]:
+        if strategy == "relevance":
+            return ranked[:limit]
+        candidates = ranked[: max(limit * 8, 40)]
+        rows = [
+            {
+                "id": node_id,
+                "path": self.graph.nodes[node_id].path,
+                "kind": self.graph.nodes[node_id].kind.value,
+                "score": scores[node_id],
+                "lexical_score": lexical_scores.get(node_id, 0.0),
+                "neighbors": sorted(self.one_hop.get(node_id, set())),
+            }
+            for node_id in candidates
+        ]
+        return [
+            str(row["id"])
+            for row in self._diversify_rows(
+                rows,
+                limit=limit,
+                strategy=strategy,
+                max_test_candidates=max_test_candidates,
+                mmr_lambda=mmr_lambda,
+            )
+        ]
+
+    @staticmethod
+    def _diversify_rows(
+        rows: list[dict[str, Any]],
+        *,
+        limit: int,
+        strategy: str,
+        max_test_candidates: int,
+        mmr_lambda: float,
+    ) -> list[dict[str, Any]]:
+        enriched = [
+            {
+                **row,
+                "role": _path_role(str(row.get("path", ""))),
+                "subsystem": _path_subsystem(str(row.get("path", ""))),
+            }
+            for row in rows
+        ]
+        if strategy == "relevance":
+            return enriched[:limit]
+        collapsed: list[dict[str, Any]] = []
+        seen_paths: set[str] = set()
+        for row in enriched:
+            path_key = _normalized_candidate_path(row)
+            if path_key in seen_paths:
+                continue
+            seen_paths.add(path_key)
+            collapsed.append(row)
+        if strategy == "path_collapse":
+            return collapsed[:limit]
+        if strategy == "path_quota":
+            return _apply_test_quota(collapsed, limit, max_test_candidates)
+
+        pool = list(collapsed)
+        selected: list[dict[str, Any]] = []
+        maximum = max((float(row.get("score", 0.0)) for row in pool), default=1.0)
+        lexical_maximum = max(
+            (float(row.get("lexical_score", 0.0)) for row in pool),
+            default=1.0,
+        )
+        required_implementation = min(
+            4,
+            limit,
+            sum(row["role"] == "implementation" for row in pool),
+        )
+        while pool and len(selected) < limit:
+            eligible = [
+                row for row in pool
+                if row["role"] != "test"
+                or sum(item["role"] == "test" for item in selected) < max_test_candidates
+            ]
+            selected_implementation = sum(
+                item["role"] == "implementation" for item in selected
+            )
+            if selected_implementation < required_implementation:
+                implementation = [
+                    row for row in eligible if row["role"] == "implementation"
+                ]
+                if implementation:
+                    eligible = implementation
+            if not eligible:
+                break
+            best = max(
+                eligible,
+                key=lambda row: (
+                    mmr_lambda * float(row.get("score", 0.0)) / max(maximum, 1e-12)
+                    - (1.0 - mmr_lambda) * max(
+                        (_candidate_similarity(row, chosen) for chosen in selected),
+                        default=0.0,
+                    )
+                    + 0.15 * float(row.get("lexical_score", 0.0))
+                    / max(lexical_maximum, 1e-12)
+                    + 0.05 * float(any(
+                        str(chosen.get("id", "")) in set(row.get("neighbors", []))
+                        for chosen in selected
+                    )),
+                    float(row.get("score", 0.0)),
+                    str(row.get("id", row.get("path", ""))),
+                ),
+            )
+            selected.append(best)
+            pool.remove(best)
+        return selected
 
     def _add_code_component_bridges(self, network: nx.DiGraph) -> None:
         for node in self.graph.nodes.values():
@@ -447,3 +636,63 @@ def _node_result(node: Node, score: float) -> dict[str, Any]:
         "kind": node.kind.value,
         "score": score,
     }
+
+
+def _path_role(path: str) -> str:
+    normalized = path.replace("\\", "/").casefold()
+    if "/tests/" in f"/{normalized}/" or normalized.endswith("tests.cs"):
+        return "test"
+    if normalized.endswith(".cs"):
+        return "implementation"
+    if normalized:
+        return "asset"
+    return "unknown"
+
+
+def _path_subsystem(path: str) -> str:
+    parts = [part for part in path.replace("\\", "/").split("/") if part]
+    lowered = [part.casefold() for part in parts]
+    if "tests" in lowered:
+        index = lowered.index("tests")
+        return "/".join(parts[index : index + 2]).casefold()
+    if "scripts" in lowered:
+        index = lowered.index("scripts")
+        following = parts[index + 1 : index + 2]
+        return (following[0] if following else "scripts-root").casefold()
+    return (parts[1] if len(parts) > 1 else parts[0] if parts else "unknown").casefold()
+
+
+def _normalized_candidate_path(row: dict[str, Any]) -> str:
+    path = str(row.get("path", "")).replace("\\", "/").casefold()
+    return path or f"node:{row.get('id', row.get('name', ''))}"
+
+
+def _candidate_similarity(left: dict[str, Any], right: dict[str, Any]) -> float:
+    if _normalized_candidate_path(left) == _normalized_candidate_path(right):
+        return 1.0
+    similarity = 0.0
+    if left.get("role") == right.get("role"):
+        similarity += 0.35
+    if left.get("subsystem") == right.get("subsystem"):
+        similarity += 0.4
+    if left.get("kind") and left.get("kind") == right.get("kind"):
+        similarity += 0.15
+    return min(1.0, similarity)
+
+
+def _apply_test_quota(
+    rows: list[dict[str, Any]],
+    limit: int,
+    max_test_candidates: int,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    tests = 0
+    for row in rows:
+        if row["role"] == "test":
+            if tests >= max_test_candidates:
+                continue
+            tests += 1
+        selected.append(row)
+        if len(selected) >= limit:
+            break
+    return selected
