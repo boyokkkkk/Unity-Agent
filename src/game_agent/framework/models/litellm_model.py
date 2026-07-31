@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import os
 import time
 from collections.abc import Callable
@@ -91,12 +92,45 @@ class LitellmModel:
     def estimate_input_tokens(self, messages: list[dict[str, str]]) -> int:
         '''Estimate request tokens, including the tool schema sent with every request.'''
         prepared = self._prepare_messages_for_api(messages)
+        payload = {"messages": prepared, "tools": self.agent_tools}
+        utf8_upper_bound = math.ceil(
+            len(json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")) / 3
+        )
         try:
-            message_tokens = int(litellm.token_counter(model=self.config.model_name, messages=prepared))
+            tokenizer_estimate = int(
+                litellm.token_counter(
+                    model=self.config.model_name,
+                    messages=prepared,
+                    tools=self.agent_tools,
+                )
+            )
+            return max(1, tokenizer_estimate, utf8_upper_bound)
         except Exception:
-            message_tokens = self._conservative_token_estimate(prepared)
-        tool_tokens = self._conservative_token_estimate(self.agent_tools)
-        return max(1, message_tokens + tool_tokens)
+            return max(
+                1,
+                utf8_upper_bound,
+                int(
+                    self._conservative_token_estimate(prepared)
+                    + self._conservative_token_estimate(self.agent_tools)
+                ),
+            )
+
+    def estimate_tool_schema_tokens(self) -> int:
+        """Estimate the independently measurable schema overhead per model call."""
+        utf8_upper_bound = math.ceil(
+            len(json.dumps(self.agent_tools, ensure_ascii=False, default=str).encode("utf-8")) / 3
+        )
+        try:
+            tokenizer_estimate = int(
+                litellm.token_counter(
+                    model=self.config.model_name,
+                    messages=[],
+                    tools=self.agent_tools,
+                )
+            )
+            return max(1, tokenizer_estimate, utf8_upper_bound)
+        except Exception:
+            return max(1, utf8_upper_bound)
 
     def query(self, messages: list[dict[str, str]], **kwargs) -> dict:
         for attempt in retry(logger=logger, abort_exceptions=self.abort_exceptions):

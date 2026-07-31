@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from game_agent.context import EvidenceLedger
 
-STAGE_METRICS_SCHEMA_VERSION = "game-agent-stage-metrics-v1"
+
+STAGE_METRICS_SCHEMA_VERSION = "game-agent-stage-metrics-v2"
 CONVERSATION_SCHEMA_VERSION = "game-agent-conversation-v1"
 
 _QUOTED_FILE = re.compile(
@@ -94,6 +98,131 @@ def _matches(path: str, expected: str) -> bool:
     return normalized == target or normalized.endswith("/" + target) or normalized.endswith(target)
 
 
+def _is_aci_tool(tool: str) -> bool:
+    return (
+        tool.startswith("unity_")
+        or tool.startswith("code_")
+        or tool == "artifact_read"
+    )
+
+
+def _values(value: object) -> list[str]:
+    values = value if isinstance(value, list) else [value]
+    return [str(item) for item in values if item not in (None, "")]
+
+
+def _nested_paths(value: object) -> list[str]:
+    paths: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in {"path", "asset_path", "source_path", "artifact_ref"}:
+                paths.extend(_values(item))
+            elif key in {"node", "asset", "object", "results"}:
+                paths.extend(_nested_paths(item))
+    elif isinstance(value, list):
+        for item in value:
+            paths.extend(_nested_paths(item))
+    return [normalize_project_path(path) for path in paths]
+
+
+def replay_aci_tool_events(
+    trajectory: dict[str, Any],
+    *,
+    seq_start: int = 0,
+) -> list[dict[str, Any]]:
+    """Rebuild missing ACI tool pairs from a legacy trajectory's messages."""
+    messages = list(trajectory.get("messages", []))
+    replayed: list[dict[str, Any]] = []
+    sequence = seq_start
+    available_evidence_ids: list[str] = []
+    available_evidence_node_ids: list[str] = []
+    for index, message in enumerate(messages):
+        actions = message.get("extra", {}).get("actions", [])
+        if not isinstance(actions, list):
+            continue
+        observations: list[dict[str, Any]] = []
+        for candidate in messages[index + 1 :]:
+            if candidate.get("extra", {}).get("actions"):
+                break
+            if candidate.get("role") in {"tool", "user"}:
+                observations.append(candidate)
+            if len(observations) >= len(actions):
+                break
+        for offset, action in enumerate(actions):
+            tool = str(action.get("tool", ""))
+            if not _is_aci_tool(tool):
+                continue
+            arguments = action.get("arguments", {})
+            if not isinstance(arguments, dict):
+                arguments = {}
+            encoded = json.dumps(arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            arguments_hash = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+            signature = f"{tool}:{arguments_hash}"
+            observation = observations[offset] if offset < len(observations) else {}
+            extra = dict(observation.get("extra", {}))
+            claim = str(extra.get("evidence_claim", "")).strip()
+            sources = _values(extra.get("evidence_sources", []))
+            evidence_ids = (
+                [EvidenceLedger.id_for(claim, sources or [f"aci:{tool}"])]
+                if claim else []
+            )
+            paths = [
+                *_values(arguments.get("path", "")),
+                *_values(arguments.get("asset_path", "")),
+                *_values(arguments.get("target_paths", [])),
+                *_nested_paths(extra.get("structured", {})),
+                *_values(extra.get("changed_paths", [])),
+            ]
+            common = {
+                "aci": True,
+                "telemetry_source": "trajectory_replay",
+                "tool": tool,
+                "tool_call_id": str(action.get("tool_call_id", "") or ""),
+                "tool_class": (
+                    "mutation" if extra.get("aci_mutation")
+                    else "validation" if extra.get("aci_control")
+                    else "query"
+                ),
+                "arguments_hash": arguments_hash,
+                "action_signature": signature,
+                "node_ids": _values(extra.get("node_ids", [])),
+                "changed_paths": _values(extra.get("changed_paths", [])),
+                "accessed_files": list(dict.fromkeys(normalize_project_path(path) for path in paths)),
+                "evidence_ids": evidence_ids,
+                "available_evidence_ids": list(available_evidence_ids),
+                "available_evidence_node_ids": list(available_evidence_node_ids),
+                "referenced_node_ids": [
+                    *_values(arguments.get("evidence_node_ids", [])),
+                    *_values(arguments.get("node_id", "")),
+                ],
+                "stale_evidence_node_ids": [],
+                "evidence_expected": bool(claim),
+                "replayed": True,
+            }
+            sequence += 1
+            replayed.append({"seq": sequence, "event": "tool_start", **common})
+            sequence += 1
+            replayed.append(
+                {
+                    "seq": sequence,
+                    "event": "tool_end",
+                    **common,
+                    "returncode": int(extra.get("returncode", -1)),
+                    "blocked": bool(extra.get("blocked", False)),
+                    "blocked_reason": str(extra.get("guard", "") or ""),
+                    "output_chars": int(extra.get("output_chars", 0) or 0),
+                    "output_sha256": str(extra.get("output_sha256", "") or ""),
+                }
+            )
+            available_evidence_ids = list(dict.fromkeys([*available_evidence_ids, *evidence_ids]))
+            available_evidence_node_ids = list(
+                dict.fromkeys(
+                    [*available_evidence_node_ids, *_values(extra.get("node_ids", []))]
+                )
+            )
+    return replayed
+
+
 class StageAnalyzer:
     """Reconstruct deterministic experiment stages from append-only events."""
 
@@ -107,7 +236,33 @@ class StageAnalyzer:
         *,
         trajectory: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        records = sorted((dict(event) for event in events), key=lambda item: int(item.get("seq", 0)))
+        records = [dict(event) for event in events]
+        if trajectory and not any(event.get("telemetry_source") == "aci" for event in records):
+            replayed = replay_aci_tool_events(
+                trajectory,
+                seq_start=max((int(event.get("seq", 0)) for event in records), default=0),
+            )
+            model_end_times = [
+                _event_ms(event)
+                for event in records
+                if event.get("event") == "model_end"
+            ]
+            next_model_times = [
+                _event_ms(event)
+                for event in records
+                if event.get("event") == "model_start"
+            ][1:]
+            for call_index in range(0, len(replayed), 2):
+                model_index = call_index // 2
+                if model_index < len(model_end_times):
+                    replayed[call_index]["elapsed_ms"] = model_end_times[model_index]
+                    replayed[call_index + 1]["elapsed_ms"] = (
+                        next_model_times[model_index]
+                        if model_index < len(next_model_times)
+                        else model_end_times[model_index]
+                    )
+            records.extend(replayed)
+        records.sort(key=lambda item: int(item.get("seq", 0)))
         origin_ns = min((int(item["monotonic_ns"]) for item in records if "monotonic_ns" in item), default=0)
         timed = [(event, _event_ms(event, origin_ns)) for event in records]
 
@@ -241,6 +396,7 @@ class StageAnalyzer:
             " ".join(str(event.get("command", "")).split()).casefold()
             for event in records
             if event.get("event") == "tool_start"
+            and str(event.get("command", "")).strip()
         ]
         repeated_commands = len(commands) - len(set(commands))
         writes_after_validation = sum(
@@ -252,6 +408,103 @@ class StageAnalyzer:
             and event.get("returncode", 0) == 0
             and (event.get("command_category") or classify_command(str(event.get("command", "")))) == "write"
         )
+
+        aci_starts = [
+            event for event in records
+            if event.get("event") == "tool_start" and bool(event.get("aci"))
+        ]
+        aci_ends = [
+            event for event in records
+            if event.get("event") == "tool_end" and bool(event.get("aci"))
+        ]
+        retrieval_paths = [
+            normalize_project_path(str(path))
+            for event in aci_ends
+            if event.get("tool_class") == "query" and int(event.get("returncode", -1)) == 0
+            for path in event.get("accessed_files", [])
+            if str(path)
+        ]
+        retrieval_at_k = retrieval_paths[:4]
+        distinct_at_k = {path.casefold() for path in retrieval_at_k}
+        test_paths_at_k = [
+            path for path in retrieval_at_k
+            if "/tests/" in f"/{path.casefold()}/" or path.casefold().endswith("tests.cs")
+        ]
+        causal_observed = sum(int(event.get("causal_edges_observed", 0) or 0) for event in aci_ends)
+        causal_total = sum(int(event.get("causal_edges_total", 0) or 0) for event in aci_ends)
+
+        evidence_expected = [event for event in aci_ends if event.get("evidence_expected")]
+        written_evidence = {
+            str(evidence_id)
+            for event in evidence_expected
+            for evidence_id in event.get("evidence_ids", [])
+            if evidence_id
+        }
+        evidence_transitions = 0
+        evidence_presented = 0
+        for end_event in aci_ends:
+            produced = set(_values(end_event.get("evidence_ids", [])))
+            if not produced:
+                continue
+            later = next(
+                (
+                    event for event in records
+                    if int(event.get("seq", 0)) > int(end_event.get("seq", 0))
+                    and event.get("event") == "tool_start"
+                    and event.get("aci")
+                ),
+                None,
+            )
+            if later is None:
+                continue
+            evidence_transitions += len(produced)
+            evidence_presented += len(produced.intersection(_values(later.get("available_evidence_ids", []))))
+
+        utilization_denominator = 0
+        utilized = 0
+        stale_references = 0
+        referenced_evidence_nodes = 0
+        for event in aci_starts:
+            available_nodes = set(_values(event.get("available_evidence_node_ids", [])))
+            referenced_nodes = set(_values(event.get("referenced_node_ids", [])))
+            if available_nodes and referenced_nodes:
+                utilization_denominator += 1
+                utilized += int(bool(available_nodes.intersection(referenced_nodes)))
+            referenced_evidence_nodes += len(referenced_nodes)
+            stale_references += len(_values(event.get("stale_evidence_node_ids", [])))
+
+        signatures = [str(event.get("action_signature", "")) for event in aci_ends]
+        duplicate_actions = len(signatures) - len(set(signatures))
+        blocked_events = [event for event in aci_ends if event.get("blocked")]
+        recovered = 0
+        for blocked_event in blocked_events:
+            blocked_signature = str(blocked_event.get("action_signature", ""))
+            if any(
+                int(candidate.get("seq", 0)) > int(blocked_event.get("seq", 0))
+                and int(candidate.get("returncode", -1)) == 0
+                and str(candidate.get("action_signature", "")) != blocked_signature
+                for candidate in aci_ends
+            ):
+                recovered += 1
+        admissible_events = [
+            event for event in aci_starts if event.get("admissible_action_signatures")
+        ]
+        accepted_admissible = sum(
+            str(event.get("action_signature", "")) in set(_values(event.get("admissible_action_signatures", [])))
+            for event in admissible_events
+        )
+        mutation_events = [event for event in aci_ends if event.get("tool_class") == "mutation"]
+        typed_mutations = [event for event in mutation_events if not event.get("escape_hatch")]
+        escape_hatches = [event for event in mutation_events if event.get("escape_hatch")]
+        completed_transactions = max(
+            (
+                int((event.get("execution_protocol") or {}).get("completed_transactions", 0) or 0)
+                for event in aci_ends
+                if isinstance(event.get("execution_protocol"), dict)
+            ),
+            default=0,
+        )
+        schema_tokens = sum(int(event.get("tool_schema_tokens", 0) or 0) for event in records)
 
         turn_end = next((event for event in records if event.get("event") == "turn_end"), {})
         limit_event = next((event for event in records if event.get("event") == "agent_limit_reached"), {})
@@ -293,6 +546,59 @@ class StageAnalyzer:
                 "tool_calls": len(tool_ends),
                 "failed_tool_calls": sum(int(event.get("returncode", 0) or 0) != 0 for event in tool_ends),
                 "repeated_commands": repeated_commands,
+            },
+            "research": {
+                "retrieval": {
+                    "k": 4,
+                    "candidate_paths_at_k": len(retrieval_at_k),
+                    "distinct_paths_at_k": len(distinct_at_k),
+                    "distinct_path_ratio_at_k": _ratio(len(distinct_at_k), len(retrieval_at_k)),
+                    "test_node_ratio_at_k": _ratio(len(test_paths_at_k), len(retrieval_at_k)),
+                    "root_cause_mrr": _ratio(1, root_rank or 0),
+                    "causal_edge_coverage": _ratio(causal_observed, causal_total),
+                    "causal_edges_total": causal_total,
+                },
+                "memory": {
+                    "evidence_write_recall": _ratio(
+                        sum(bool(event.get("evidence_ids")) for event in evidence_expected),
+                        len(evidence_expected),
+                    ),
+                    "evidence_read_recall": _ratio(evidence_presented, evidence_transitions),
+                    "evidence_utilization": _ratio(utilized, utilization_denominator),
+                    "stale_evidence_rate": _ratio(stale_references, referenced_evidence_nodes),
+                    "unique_evidence": len(written_evidence),
+                    "expected_evidence_writes": len(evidence_expected),
+                    "evidence_read_transitions": evidence_transitions,
+                    "evidence_utilization_opportunities": utilization_denominator,
+                    "referenced_evidence_nodes": referenced_evidence_nodes,
+                },
+                "control": {
+                    "duplicate_action_ratio": _ratio(duplicate_actions, len(aci_ends)),
+                    "blocked_action_recovery_rate": _ratio(recovered, len(blocked_events)),
+                    "admissible_action_acceptance": _ratio(
+                        accepted_admissible, len(admissible_events)
+                    ),
+                    "phase_regression_count": writes_after_validation,
+                    "protocol_gate_completion": _ratio(
+                        completed_transactions, len(mutation_events)
+                    ),
+                    "blocked_actions": len(blocked_events),
+                    "admissible_action_opportunities": len(admissible_events),
+                    "mutation_calls": len(mutation_events),
+                },
+                "tools_and_cost": {
+                    "aci_tool_calls": len(aci_ends),
+                    "tool_schema_tokens_per_call": _ratio(schema_tokens, len(usage)),
+                    "unique_evidence_per_1k_tokens": _ratio(
+                        len(written_evidence) * 1000, total_tokens
+                    ),
+                    "typed_mutation_ratio": _ratio(len(typed_mutations), len(mutation_events)),
+                    "escape_hatch_ratio": _ratio(len(escape_hatches), len(mutation_events)),
+                    "tool_schema_measurements": sum(
+                        int(event.get("tool_schema_tokens", 0) or 0) > 0
+                        for event in records
+                    ),
+                },
             },
         }
 

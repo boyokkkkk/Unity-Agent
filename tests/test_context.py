@@ -61,6 +61,17 @@ def context_graph(project: Path) -> ProjectGraph:
 
 
 class ProjectContextStoreTest(unittest.TestCase):
+    def test_existing_working_set_keeps_the_strictest_capacity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            store = ProjectContextStore.from_graph(context_graph(project), project_root=project)
+            working_set = store.working_set("task", max_entries=2)
+            for node in list(store.graph.nodes.values())[:3]:
+                store.map_node_ids("task", [node.id])
+
+            self.assertEqual(working_set.max_entries, 2)
+            self.assertLessEqual(len(working_set.entries), 2)
+
     def test_immutable_project_knowledge_is_reused_across_tasks_and_stores(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
             project = Path(directory)

@@ -36,5 +36,6 @@ where = ["src"]
 [tool.setuptools.package-data]
 game_agent = [
     "builtin_skills/**/SKILL.md",
+    "aci/editor/*.cs",
     "project_graph/editor/*.cs",
 ]

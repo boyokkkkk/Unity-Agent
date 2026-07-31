@@ -7,7 +7,7 @@ from jinja2 import StrictUndefined, Template
 
 from game_agent.framework.exceptions import FormatError
 from game_agent.framework.models.utils.openai_multimodal import expand_multimodal_content
-from game_agent.aci.schemas import QUERY_TOOL_NAMES, STRUCTURED_QUERY_TOOLS
+from game_agent.aci.schemas import ACI_TOOL_NAMES, ACI_TOOLS
 
 POWERSHELL_TOOL = {
     "type": "function",
@@ -46,7 +46,7 @@ SUBMIT_TOOL = {
 }
 
 CORE_AGENT_TOOLS = [POWERSHELL_TOOL, SUBMIT_TOOL]
-AGENT_TOOLS = [POWERSHELL_TOOL, *STRUCTURED_QUERY_TOOLS, SUBMIT_TOOL]
+AGENT_TOOLS = [POWERSHELL_TOOL, *ACI_TOOLS, SUBMIT_TOOL]
 TOOL_SCHEMAS = {tool["function"]["name"]: tool["function"]["parameters"] for tool in AGENT_TOOLS}
 
 
@@ -132,7 +132,7 @@ def parse_toolcall_actions(
             )
         elif tool_name == "submit":
             actions.append({"tool": "submit", "answer": args["answer"], "tool_call_id": tool_call.id})
-        elif tool_name in QUERY_TOOL_NAMES:
+        elif tool_name in ACI_TOOL_NAMES:
             actions.append({"tool": tool_name, "arguments": args, "tool_call_id": tool_call.id})
     if any(action["tool"] == "submit" for action in actions) and len(actions) != 1:
         raise FormatError(

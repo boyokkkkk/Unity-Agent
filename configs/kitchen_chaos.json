@@ -51,18 +51,29 @@
   },
   "context": {
     "enabled": true,
-    "graph_path": "",
+    "graph_path": "artifacts/project-graph/kitchen-chaos-full/project-graph.json",
     "state_path": "project-context-state.json",
     "auto_locate": true,
-    "max_working_set_entries": 24,
-    "max_candidate_details": 5,
+    "max_working_set_entries": 4,
+    "max_candidate_details": 1,
     "max_recent_tool_results": 1,
-    "max_recent_messages": 4,
-    "compression_trigger_ratio": 0.65,
-    "working_set_detail_keep": 5,
-    "max_evidence_items": 20,
-    "max_memory_items_per_field": 20,
-    "max_durable_instruction_chars": 10000
+    "max_recent_messages": 1,
+    "detail_char_limit": 800,
+    "tool_summary_char_limit": 600,
+    "compression_trigger_ratio": 0.55,
+    "working_set_detail_keep": 2,
+    "max_evidence_items": 4,
+    "max_memory_items_per_field": 12,
+    "max_durable_instruction_chars": 4000
+  },
+  "aci": {
+    "enabled": true,
+    "typed_mutations_enabled": true,
+    "editor_path": "",
+    "timeout_seconds": 1200,
+    "require_location_evidence": true,
+    "require_target_read": true,
+    "required_validation_modes": ["editmode", "playmode"]
   },
   "workspace": {
     "isolation": "auto",

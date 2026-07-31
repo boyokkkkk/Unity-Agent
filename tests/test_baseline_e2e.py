@@ -220,6 +220,65 @@ def fake_successful_agent(task: str, config_path: Path, *, run_id: str) -> dict:
 
 
 class BaselineFixtureTest(unittest.TestCase):
+    def test_baseline_variant_clears_configured_graph_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = create_project(root)
+            config = create_config(root, project)
+            payload = json.loads(config.read_text(encoding="utf-8"))
+            payload["context"] = {"enabled": True, "graph_path": "missing/project-graph.json"}
+            config.write_text(json.dumps(payload), encoding="utf-8")
+            artifact_dir = root / "artifacts" / "baseline"
+            artifact_dir.mkdir(parents=True)
+            editor = root / "Unity.exe"
+            editor.write_text("fixture", encoding="utf-8")
+
+            prepared, _ = StateEventBaselineRunner(
+                BaselineCase(
+                    source_project=project,
+                    config_path=config,
+                    artifact_dir=artifact_dir,
+                    editor_path=editor,
+                )
+            )._prepare_config(project, "baseline")
+
+            self.assertFalse(prepared["context"]["enabled"])
+            self.assertEqual(prepared["context"]["graph_path"], "")
+
+    def test_innovation_variant_preserves_graph_context_and_aci(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = create_project(root)
+            config = create_config(root, project)
+            graph = root / "project-graph.json"
+            graph.write_text("{}", encoding="utf-8")
+            payload = json.loads(config.read_text(encoding="utf-8"))
+            payload["context"] = {"enabled": True, "graph_path": str(graph)}
+            payload["aci"] = {"enabled": True, "typed_mutations_enabled": True}
+            payload["model"]["structured_query_tools_enabled"] = True
+            config.write_text(json.dumps(payload), encoding="utf-8")
+            artifact_dir = root / "artifacts" / "innovation"
+            artifact_dir.mkdir(parents=True)
+            editor = root / "Unity.exe"
+            editor.write_text("fixture", encoding="utf-8")
+
+            prepared, _ = StateEventBaselineRunner(
+                BaselineCase(
+                    source_project=project,
+                    config_path=config,
+                    artifact_dir=artifact_dir,
+                    editor_path=editor,
+                    variant="innovation",
+                )
+            )._prepare_config(project, "innovation")
+
+            self.assertTrue(prepared["skills"]["enabled"])
+            self.assertTrue(prepared["context"]["enabled"])
+            self.assertEqual(Path(prepared["context"]["graph_path"]), graph.resolve())
+            self.assertTrue(prepared["model"]["structured_query_tools_enabled"])
+            self.assertTrue(prepared["aci"]["typed_mutations_enabled"])
+            self.assertEqual(Path(prepared["aci"]["editor_path"]), editor.resolve())
+
     def test_defect_and_hidden_oracle_are_reversible(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

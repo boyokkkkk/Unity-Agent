@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -138,6 +139,21 @@ class StructuredQueryExecutor:
         if not nodes:
             return self._empty("unity_object_read", "No matching GameObject or Component.")
         target = nodes[0]
+        source = (self.project_root / target.path).resolve()
+        if source != self.project_root and self.project_root not in source.parents:
+            return self._error("unity_object_read", "project_scope", "indexed object path escapes the Unity project")
+        if not source.is_file():
+            return self._error(
+                "unity_object_read",
+                "asset_missing",
+                f"Indexed Unity object asset does not exist: {target.path}",
+            )
+        if target.id in self.store.dirty_nodes:
+            return self._error(
+                "unity_object_read",
+                "stale_graph_node",
+                f"Indexed Unity object is stale and must be rebuilt before mutation: {target.id}",
+            )
         ids = [target.id]
         components: list[dict[str, Any]] = []
         if bool(args.get("include_components", True)):
@@ -197,6 +213,90 @@ class StructuredQueryExecutor:
         return self._ok("code_find_references", {
             "status": "ok", "direction": direction, "seeds": [_summary(node) for node in seeds], "total": len(rows), "results": rows,
         }, ids=ids, sources=_graph_sources(ids), status="observed", claim=f"Observed {len(rows)} indexed reference edge(s) for {seeds[0].name}.")
+
+    def _unity_asset_read(self, args: dict[str, Any]) -> dict[str, Any]:
+        unavailable = self._need_graph("unity_asset_read")
+        if unavailable:
+            return unavailable
+        nodes = self._resolve(
+            node_id=str(args.get("node_id", "")),
+            path=str(args.get("asset_path", "")),
+            kinds=ASSET_KINDS,
+        )
+        if not nodes:
+            return self._empty("unity_asset_read", "No matching indexed Unity asset.")
+        node = nodes[0]
+        target = (self.project_root / node.path).resolve()
+        if target != self.project_root and self.project_root not in target.parents:
+            return self._error("unity_asset_read", "project_scope", "indexed asset path escapes the Unity project")
+        if not target.is_file():
+            return self._error(
+                "unity_asset_read",
+                "asset_missing",
+                f"Indexed Unity asset does not exist: {node.path}",
+            )
+        if node.id in self.store.dirty_nodes:
+            return self._error(
+                "unity_asset_read",
+                "stale_graph_node",
+                f"Indexed Unity asset is stale and must be rebuilt before mutation: {node.id}",
+            )
+        detail = self._materialize(node.id) or _summary(node)
+        return self._ok(
+            "unity_asset_read",
+            {"status": "ok", "asset": detail},
+            ids=[node.id],
+            sources=[f"graph:{node.id}", node.path],
+            status="source_verified",
+            claim=f"Read indexed Unity asset {node.name} ({node.path}).",
+        )
+
+    def _code_file_read(self, args: dict[str, Any]) -> dict[str, Any]:
+        unavailable = self._need_graph("code_file_read")
+        if unavailable:
+            return unavailable
+        nodes = self._resolve(
+            node_id=str(args.get("node_id", "")),
+            path=str(args.get("path", "")),
+            kinds=CODE_KINDS,
+        )
+        if not nodes:
+            return self._empty("code_file_read", "No matching indexed C# file or symbol.")
+        node = nodes[0]
+        relative = node.path
+        target = (self.project_root / relative).resolve()
+        if target != self.project_root and self.project_root not in target.parents:
+            return self._error("code_file_read", "project_scope", "path escapes the Unity project")
+        if not target.is_file():
+            return self._error("code_file_read", "source_missing", f"Source does not exist: {relative}")
+        raw = target.read_bytes()
+        lines = raw.decode("utf-8", errors="replace").splitlines()
+        start = max(1, int(args.get("start_line", 1)))
+        end = min(len(lines), int(args.get("end_line", start + 199)))
+        if end < start:
+            raise ValueError("end_line must be >= start_line")
+        maximum = max(256, min(50000, int(args.get("max_chars", 12000))))
+        content = "\n".join(lines[start - 1:end])
+        self._map([node.id])
+        payload = {
+            "status": "ok",
+            "node": _summary(node),
+            "path": relative,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "start_line": start,
+            "end_line": end,
+            "total_lines": len(lines),
+            "truncated": len(content) > maximum,
+            "content": content[:maximum],
+        }
+        return self._ok(
+            "code_file_read",
+            payload,
+            ids=[node.id],
+            sources=[f"source:{relative}:{start}-{end}"],
+            status="source_verified",
+            claim=f"Read source file {relative} at SHA-256 {payload['sha256']}.",
+        )
 
     def _code_diagnostics(self, args: dict[str, Any]) -> dict[str, Any]:
         unavailable = self._need_graph("code_diagnostics")

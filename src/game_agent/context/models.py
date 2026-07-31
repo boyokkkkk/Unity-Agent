@@ -39,7 +39,8 @@ class EvidenceLedger:
         self.items: dict[str, Evidence] = {}
 
     @staticmethod
-    def _id(claim: str, sources: Iterable[str]) -> str:
+    def id_for(claim: str, sources: Iterable[str]) -> str:
+        """Return the stable identifier used when the evidence is recorded."""
         payload = claim.strip() + "\x1f" + "\x1f".join(sorted(set(sources)))
         return "evidence:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
@@ -53,7 +54,7 @@ class EvidenceLedger:
         confidence: float = 0.0,
     ) -> Evidence:
         normalized_sources = sorted(set(str(value) for value in sources if value))
-        evidence_id = self._id(claim, normalized_sources)
+        evidence_id = self.id_for(claim, normalized_sources)
         existing = self.items.get(evidence_id)
         if existing is not None:
             if _status_rank(status) > _status_rank(existing.status):

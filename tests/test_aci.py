@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import tempfile
 import unittest
@@ -23,6 +24,12 @@ def aci_graph(project: Path) -> ProjectGraph:
         "class KitchenManager { void StartCountdown() { ShowCountdown(); } void ShowCountdown() {} }",
         encoding="utf-8",
     )
+    scene = project / "Assets" / "Scenes" / "Game.unity"
+    scene.parent.mkdir(parents=True)
+    scene.write_text("%YAML 1.1\n", encoding="utf-8")
+    prefab = project / "Assets" / "Prefabs" / "CountdownPanel.prefab"
+    prefab.parent.mkdir(parents=True)
+    prefab.write_text("%YAML 1.1\n", encoding="utf-8")
     graph = ProjectGraph(project_path=str(project), metadata={"project_revision": "aci-1"})
     nodes = [
         Node("file", NodeKind.CSHARP_FILE, "KitchenManager.cs", "Assets/Scripts/KitchenManager.cs"),
@@ -108,6 +115,20 @@ class StructuredQueryExecutorTest(unittest.TestCase):
         self.assertEqual("error", escaped["status"])
         self.assertNotEqual(0, output["returncode"])
 
+    def test_precise_asset_and_code_reads_create_patch_preconditions(self):
+        asset, _ = self.call("unity_asset_read", node_id="scene")
+        source, _ = self.call("code_file_read", node_id="file", start_line=1, end_line=1)
+
+        raw = (self.project / "Assets" / "Scripts" / "KitchenManager.cs").read_bytes()
+        self.assertEqual("scene", asset["asset"]["id"])
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), source["sha256"])
+        verified_ids = {
+            node_id
+            for evidence in self.context.evidence.verified()
+            for node_id in evidence.node_ids
+        }
+        self.assertTrue({"scene", "file"} <= verified_ids)
+
     def test_queries_without_graph_report_unavailable_without_false_evidence(self):
         context = ContextAssembler(ContextConfig(auto_locate=False), project_root=self.project)
         context.reset("query", task_id="no-graph")
@@ -146,11 +167,13 @@ class StructuredToolProtocolTest(unittest.TestCase):
                 artifact_root=artifacts, project_store=store,
             )
             model = _QueryThenSubmitModel()
+            events = []
             agent = DefaultAgent(
                 model,
                 LocalEnvironment(cwd=str(project), artifact_dir=str(artifacts)),
                 system_template="system", instance_template="{{task}}",
                 context_assembler=context, step_limit=4,
+                event_sink=lambda name, **data: events.append({"event": name, **data}),
             )
 
             result = agent.run("Find ShowCountdown")
@@ -160,6 +183,45 @@ class StructuredToolProtocolTest(unittest.TestCase):
             self.assertEqual(1, context.metrics()["structured_query_calls"])
             self.assertEqual(1, context.metrics()["structured_query_evidence"])
             self.assertTrue(context.memory.artifact_references)
+            tool_events = [event for event in events if event["event"] in {"tool_start", "tool_end"}]
+            self.assertEqual(["tool_start", "tool_end"], [event["event"] for event in tool_events])
+            end = tool_events[-1]
+            self.assertEqual("code_symbol_search", end["tool"])
+            self.assertEqual(64, len(end["arguments_hash"]))
+            self.assertTrue(end["action_signature"].startswith("code_symbol_search:"))
+            self.assertEqual(["show"], end["node_ids"])
+            self.assertTrue(end["evidence_ids"])
+            self.assertEqual(0, end["returncode"])
+            self.assertEqual("", end["blocked_reason"])
+
+    def test_repeated_aci_action_emits_blocked_third_tool_pair(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            artifacts = project / "artifacts"
+            store = ProjectContextStore.from_graph(aci_graph(project), project_root=project)
+            context = ContextAssembler(
+                ContextConfig(auto_locate=False), project_root=project,
+                artifact_root=artifacts, project_store=store,
+            )
+            events = []
+            agent = DefaultAgent(
+                _RepeatReadModel(),
+                LocalEnvironment(cwd=str(project), artifact_dir=str(artifacts)),
+                system_template="system", instance_template="{{task}}",
+                context_assembler=context, step_limit=4, max_repeated_actions=2,
+                event_sink=lambda name, **data: events.append({"event": name, **data}),
+            )
+
+            result = agent.run("Read the target")
+
+            ends = [event for event in events if event["event"] == "tool_end"]
+            self.assertEqual("RepeatedActionExceeded", result["exit_status"])
+            self.assertEqual([0, 0, -2], [event["returncode"] for event in ends])
+            self.assertFalse(ends[0]["blocked"])
+            self.assertEqual("repeated_action", ends[2]["blocked_reason"])
+            self.assertEqual(3, len({
+                event["tool_call_id"] for event in ends
+            }))
 
 
 class _QueryThenSubmitModel:
@@ -191,6 +253,28 @@ class _QueryThenSubmitModel:
 
     def serialize(self):
         return {"info": {}}
+
+
+class _RepeatReadModel(_QueryThenSubmitModel):
+    def query(self, messages, **kwargs):
+        del messages, kwargs
+        self.calls += 1
+        actions = [{
+            "tool": "code_file_read",
+            "arguments": {"path": "Assets/Scripts/KitchenManager.cs"},
+            "tool_call_id": f"read-{self.calls}",
+        }]
+        return {
+            "role": "assistant",
+            "content": "",
+            "extra": {
+                "actions": actions,
+                "cost": 0.0,
+                "prompt_tokens": 1,
+                "completion_tokens": 1,
+                "total_tokens": self.calls * 2,
+            },
+        }
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from game_agent.baseline import (
     enrich_tool_event,
     extract_command_paths,
     project_conversation,
+    replay_aci_tool_events,
 )
 from game_agent.logging import ExperimentLogger
 
@@ -232,6 +233,68 @@ class SyntheticTrajectoryTest(unittest.TestCase):
         self.assertEqual(metrics["context"]["raw_output_chars"], 8)
         self.assertEqual(metrics["context"]["repeated_observation_ratio"], 0.5)
         self.assertEqual(metrics["behavior"]["repeated_commands"], 0)
+
+    def test_legacy_aci_trajectory_replay_counts_two_reads_and_blocked_third(self):
+        path = "Assets/Tests/PlayMode/KitchenGameManagerPlayModeTests.cs"
+        action = lambda call_id: {
+            "tool": "code_file_read",
+            "arguments": {"path": path},
+            "tool_call_id": call_id,
+        }
+        success_extra = {
+            "returncode": 0,
+            "aci": True,
+            "query_tool": "code_file_read",
+            "structured": {"status": "ok", "path": path},
+            "node_ids": ["test-file"],
+            "evidence_sources": [f"source:{path}:1-53"],
+            "evidence_claim": f"Read source file {path} at SHA-256 db482e.",
+            "output_chars": 100,
+            "output_sha256": "db482e",
+        }
+        trajectory = {
+            "info": {"model_stats": {"total_tokens": 3000}},
+            "messages": [
+                {"role": "assistant", "extra": {"actions": [action("read-1")]}},
+                {"role": "tool", "content": "first", "extra": success_extra},
+                {"role": "assistant", "extra": {"actions": [action("read-2")]}},
+                {"role": "tool", "content": "second", "extra": success_extra},
+                {"role": "assistant", "extra": {"actions": [action("read-3")]}},
+                {
+                    "role": "tool",
+                    "content": "blocked",
+                    "extra": {
+                        "returncode": -2,
+                        "blocked": True,
+                        "guard": "repeated_action",
+                    },
+                },
+            ],
+        }
+
+        replayed = replay_aci_tool_events(trajectory)
+        metrics = self.analyzer.analyze(
+            [
+                event(1, 0, "turn_start", request="repair"),
+                event(2, 10, "turn_end", exit_status="RepeatedActionExceeded"),
+            ],
+            trajectory=trajectory,
+        )
+
+        self.assertEqual(6, len(replayed))
+        self.assertEqual([0, 0, -2], [
+            item["returncode"] for item in replayed if item["event"] == "tool_end"
+        ])
+        self.assertEqual(3, metrics["research"]["tools_and_cost"]["aci_tool_calls"])
+        self.assertEqual(0, metrics["behavior"]["repeated_commands"])
+        self.assertEqual(1, metrics["research"]["control"]["blocked_actions"])
+        self.assertAlmostEqual(
+            2 / 3, metrics["research"]["control"]["duplicate_action_ratio"]
+        )
+        self.assertEqual(1.0, metrics["research"]["memory"]["evidence_write_recall"])
+        self.assertEqual(1.0, metrics["research"]["memory"]["evidence_read_recall"])
+        self.assertEqual(1, metrics["research"]["retrieval"]["distinct_paths_at_k"])
+        self.assertEqual(1.0, metrics["research"]["retrieval"]["test_node_ratio_at_k"])
 
 
 if __name__ == "__main__":

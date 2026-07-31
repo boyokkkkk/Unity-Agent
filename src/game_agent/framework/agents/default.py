@@ -11,8 +11,14 @@ from pathlib import Path
 from jinja2 import StrictUndefined, Template
 from pydantic import BaseModel, Field
 
-from game_agent.aci import QUERY_TOOL_NAMES, StructuredQueryExecutor
-from game_agent.context import ContextAssembler, ContextConfig
+from game_agent.aci import (
+    ACI_TOOL_NAMES,
+    CONTROL_TOOL_NAMES,
+    MUTATION_TOOL_NAMES,
+    AciConfig,
+    UnityAciController,
+)
+from game_agent.context import ContextAssembler, ContextConfig, EvidenceLedger
 from game_agent.framework import Environment, Model, __version__
 from game_agent.framework.exceptions import (
     ConsecutiveToolFailuresExceeded,
@@ -52,6 +58,7 @@ class AgentConfig(BaseModel):
     max_consecutive_tool_failures: int = 3
     output_path: Path | None = None
     context: ContextConfig = Field(default_factory=ContextConfig)
+    aci: AciConfig = Field(default_factory=AciConfig)
 
 
 class DefaultAgent:
@@ -65,6 +72,7 @@ class DefaultAgent:
         event_context_sink: Callable[..., object] | None = None,
         skill_runtime: object | None = None,
         context_assembler: ContextAssembler | None = None,
+        aci_controller: UnityAciController | None = None,
         **kwargs,
     ):
         """Create an Agent; event hooks are optional and preserve upstream behavior."""
@@ -84,10 +92,11 @@ class DefaultAgent:
             artifact_root=Path(artifact_dir) if artifact_dir else None,
             event_sink=event_sink,
         )
-        self.query_executor = StructuredQueryExecutor(
+        self.aci_controller = aci_controller or UnityAciController(
             self.context_assembler,
             project_root=project_root,
             artifact_root=Path(artifact_dir) if artifact_dir else None,
+            config=self.config.aci,
         )
         self.applied_skills: list[dict[str, str | int]] = []
         self.extra_template_vars = {}
@@ -138,6 +147,7 @@ class DefaultAgent:
                 'completion_tokens': self.completion_tokens,
                 'total_tokens': self.total_tokens,
                 'context_metrics': self.context_assembler.metrics(),
+                'aci_metrics': self.aci_controller.metrics(),
             },
             self.extra_template_vars,
             kwargs,
@@ -219,6 +229,7 @@ class DefaultAgent:
         """Run one legacy task and retain its terminal exit message."""
         self._reset_task()
         self.context_assembler.reset(task)
+        self.aci_controller.reset()
         self.turn = 1
         self._begin_turn()
         self.extra_template_vars |= {"task": task, **kwargs}
@@ -241,6 +252,7 @@ class DefaultAgent:
         self.extra_template_vars |= {"task": task, **kwargs}
         if not self.messages:
             self.context_assembler.reset(task)
+            self.aci_controller.reset()
             instance_content = self._with_skill_context(
                 task,
                 self._render_template(self.config.instance_template),
@@ -490,6 +502,16 @@ class DefaultAgent:
         prepared = [{k: v for k, v in message.items() if k != 'extra'} for message in messages]
         return self._fallback_token_estimate(prepared)
 
+    def _estimate_tool_schema_tokens(self) -> int:
+        estimator = getattr(self.model, "estimate_tool_schema_tokens", None)
+        if callable(estimator):
+            return max(0, int(estimator()))
+        tools = getattr(self.model, "agent_tools", None)
+        if not tools:
+            return 0
+        encoded = json.dumps(tools, ensure_ascii=False, default=str).encode("utf-8")
+        return max(1, (len(encoded) + 2) // 3)
+
     def _record_usage(self, message: dict, *, fallback_prompt_tokens: int) -> None:
         extra = message.setdefault('extra', {})
         prompt_tokens = int(extra.get('prompt_tokens') or fallback_prompt_tokens or 0)
@@ -578,6 +600,7 @@ class DefaultAgent:
             max_total_tokens=self.config.max_total_tokens,
             context_usage_percent=context_percent,
             output_token_budget=output_budget,
+            tool_schema_tokens=self._estimate_tool_schema_tokens(),
         )
         return output_budget
 
@@ -589,6 +612,9 @@ class DefaultAgent:
         self.n_tool_calls += len(actions)
 
         if len(actions) == 1 and actions[0].get("tool") == "submit":
+            blocked = self.aci_controller.guard_submission()
+            if blocked is not None:
+                return self._append_action_observations(message, actions, [blocked])
             answer = actions[0]["answer"].strip()
             outputs = [{"output": "Task submitted.", "returncode": 0, "exception_info": ""}]
             self._append_action_observations(message, actions, outputs)
@@ -617,6 +643,8 @@ class DefaultAgent:
                 }
                 for _ in actions
             ]
+            for action, output in zip(actions, outputs):
+                self._emit_aci_tool_events(action, output)
             self._append_action_observations(message, actions, outputs)
             self._raise_progress_limit(
                 RepeatedActionExceeded,
@@ -692,11 +720,165 @@ class DefaultAgent:
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def _execute_action(self, action: dict) -> dict:
-        if action.get("tool") not in QUERY_TOOL_NAMES:
+        if action.get("tool") not in ACI_TOOL_NAMES:
             return self.env.execute(action)
-        output = self.query_executor.execute(action)
-        finalizer = getattr(self.env, "finalize_output", None)
-        return finalizer(output) if callable(finalizer) else output
+        started = time.perf_counter()
+        fields = self._aci_telemetry_fields(action)
+        self._emit("tool_start", component="environment", **fields)
+        try:
+            output = self.aci_controller.execute(action)
+            finalizer = getattr(self.env, "finalize_output", None)
+            output = finalizer(output) if callable(finalizer) else output
+        except Exception as exc:
+            self._emit(
+                "tool_end",
+                component="environment",
+                **fields,
+                returncode=-1,
+                blocked=False,
+                blocked_reason="",
+                exception_info=str(exc),
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
+            raise
+        self._emit_aci_tool_end(action, output, started=started, start_fields=fields)
+        return output
+
+    def _emit_aci_tool_events(self, action: dict, output: dict) -> None:
+        """Emit a complete pair for an ACI action blocked before controller dispatch."""
+        fields = self._aci_telemetry_fields(action)
+        self._emit("tool_start", component="environment", **fields)
+        self._emit_aci_tool_end(action, output, started=time.perf_counter(), start_fields=fields)
+
+    def _emit_aci_tool_end(
+        self,
+        action: dict,
+        output: dict,
+        *,
+        started: float,
+        start_fields: dict,
+    ) -> None:
+        extra = dict(output.get("extra", {}))
+        claim = str(extra.get("evidence_claim", "")).strip()
+        sources = [str(value) for value in extra.get("evidence_sources", []) if value]
+        evidence_ids = [str(value) for value in extra.get("evidence_ids", []) if value]
+        if claim:
+            evidence_ids.append(EvidenceLedger.id_for(claim, sources or [f"aci:{action.get('tool', '')}"]))
+        text = str(output.get("output", "") or "")
+        blocked_reason = str(extra.get("guard", "") or "")
+        if extra.get("blocked") and not blocked_reason:
+            blocked_reason = str(output.get("exception_info", "") or "blocked")
+        end_fields = start_fields | self._aci_telemetry_fields(action, output) | {
+            "evidence_ids": list(dict.fromkeys(evidence_ids)),
+            "returncode": int(output.get("returncode", -1) or 0),
+            "blocked": bool(extra.get("blocked", False)),
+            "blocked_reason": blocked_reason,
+            "exception_info": str(output.get("exception_info", "") or ""),
+            "output_chars": int(extra.get("output_chars", len(text)) or 0),
+            "observation_chars": len(text),
+            "observation_lines": len(text.splitlines()),
+            "output_sha256": str(
+                extra.get("output_sha256")
+                or hashlib.sha256(text.encode("utf-8")).hexdigest()
+            ),
+            "duration_ms": int((time.perf_counter() - started) * 1000),
+        }
+        self._emit("tool_end", component="environment", **end_fields)
+
+    def _aci_telemetry_fields(
+        self,
+        action: dict,
+        output: dict | None = None,
+    ) -> dict:
+        tool = str(action.get("tool", ""))
+        arguments = action.get("arguments", {})
+        if not isinstance(arguments, dict):
+            arguments = {}
+        encoded = json.dumps(arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        arguments_hash = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+        extra = dict((output or {}).get("extra", {}))
+        structured = extra.get("structured", {})
+        node_ids = [
+            *self._string_values(arguments.get("evidence_node_ids", [])),
+            *self._string_values(arguments.get("node_id", "")),
+            *self._string_values(extra.get("node_ids", [])),
+        ]
+        changed_paths = self._string_values(extra.get("changed_paths", []))
+        accessed_files = [
+            *self._argument_paths(arguments),
+            *changed_paths,
+            *self._structured_paths(structured),
+        ]
+        available = self.context_assembler.evidence.active()
+        available_node_ids = [node_id for item in available for node_id in item.node_ids]
+        referenced_node_ids = [
+            *self._string_values(arguments.get("evidence_node_ids", [])),
+            *self._string_values(arguments.get("node_id", "")),
+        ]
+        dirty_nodes = (
+            set(self.context_assembler.project_store.dirty_nodes)
+            if self.context_assembler.project_store is not None
+            else set()
+        )
+        return {
+            "aci": True,
+            "telemetry_source": "aci",
+            "tool": tool,
+            "tool_call_id": str(action.get("tool_call_id", "") or ""),
+            "tool_class": (
+                "mutation" if tool in MUTATION_TOOL_NAMES
+                else "validation" if tool in CONTROL_TOOL_NAMES
+                else "query"
+            ),
+            "arguments_hash": arguments_hash,
+            "action_signature": f"{tool}:{arguments_hash}",
+            "node_ids": list(dict.fromkeys(node_ids)),
+            "changed_paths": list(dict.fromkeys(changed_paths)),
+            "accessed_files": list(dict.fromkeys(accessed_files)),
+            "evidence_ids": [],
+            "available_evidence_ids": [item.id for item in available],
+            "available_evidence_node_ids": list(dict.fromkeys(available_node_ids)),
+            "referenced_node_ids": list(dict.fromkeys(referenced_node_ids)),
+            "stale_evidence_node_ids": sorted(set(referenced_node_ids).intersection(dirty_nodes)),
+            "evidence_expected": bool(str(extra.get("evidence_claim", "")).strip()),
+            "execution_protocol": extra.get("execution_protocol"),
+            "escape_hatch": bool(extra.get("escape_hatch", False)),
+        }
+
+    @staticmethod
+    def _string_values(value: object) -> list[str]:
+        values = value if isinstance(value, list) else [value]
+        return [str(item) for item in values if item not in (None, "")]
+
+    @classmethod
+    def _argument_paths(cls, arguments: dict) -> list[str]:
+        keys = (
+            "path",
+            "asset_path",
+            "source_asset_path",
+            "prefab_path",
+            "artifact_ref",
+            "target_paths",
+        )
+        return [
+            value.replace("\\", "/")
+            for key in keys
+            for value in cls._string_values(arguments.get(key, []))
+        ]
+
+    @classmethod
+    def _structured_paths(cls, value: object) -> list[str]:
+        paths: list[str] = []
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in {"path", "asset_path", "source_path", "artifact_ref"}:
+                    paths.extend(cls._string_values(item))
+                elif key in {"node", "asset", "object", "results"}:
+                    paths.extend(cls._structured_paths(item))
+        elif isinstance(value, list):
+            for item in value:
+                paths.extend(cls._structured_paths(item))
+        return [path.replace("\\", "/") for path in paths]
 
     @staticmethod
     def _result_hash(outputs: list[dict]) -> str:
@@ -811,6 +993,7 @@ class DefaultAgent:
             "turn_results": self.turn_results,
             "applied_skills": self.applied_skills,
             "context": self.context_assembler.serialize(),
+            "aci": self.aci_controller.protocol_state(),
             "trajectory_format": UPSTREAM_TRAJECTORY_FORMAT,
         }
         agent_data['info']['model_stats'].update(self.token_usage())

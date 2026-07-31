@@ -208,6 +208,10 @@ def run(task: str, config_path: Path, *, run_id: str | None = None) -> dict:
     if configured_graph and not Path(configured_graph).is_absolute():
         context_config["graph_path"] = str((config_path.resolve().parent.parent / configured_graph).resolve())
     agent_config["context"] = context_config
+    aci_config = dict(config.get("aci", {}))
+    if not aci_config.get("editor_path"):
+        aci_config["editor_path"] = str(config.get("validation", {}).get("editor_path", ""))
+    agent_config["aci"] = aci_config
     agent_config.update(
         max_input_tokens=experiment["max_input_tokens"],
         max_output_tokens=experiment["max_output_tokens"],

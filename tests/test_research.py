@@ -9,6 +9,7 @@ from unittest.mock import patch
 from game_agent.benchmark.runner import BenchmarkRunner, aggregate_results
 from game_agent.benchmark.schemas import BenchmarkManifest, RESULT_SCHEMA_VERSION
 from game_agent.framework.models import get_model
+from game_agent.framework.models.litellm_model import LitellmModel
 from game_agent.framework.models.litellm_response_model import LitellmResponseModel
 from game_agent.framework.models.openrouter_model import OpenRouterModel
 from game_agent.framework.models.openrouter_response_model import OpenRouterResponseModel
@@ -33,6 +34,16 @@ class FakeResponse:
 
 
 class RegistryAndModelTest(unittest.TestCase):
+    def test_litellm_chat_token_estimate_counts_tools_with_tokenizer(self):
+        model = LitellmModel(model_name="openai/qwen-plus", cost_tracking="ignore_errors")
+        messages = [{"role": "user", "content": "inspect"}]
+        with patch(
+            "game_agent.framework.models.litellm_model.litellm.token_counter",
+            return_value=100000,
+        ) as counter:
+            self.assertEqual(model.estimate_input_tokens(messages), 100000)
+        self.assertEqual(counter.call_args.kwargs["tools"], model.agent_tools)
+
     def test_controlled_registry_rejects_unknown_dynamic_paths_and_duplicates(self):
         registry = ComponentRegistry()
         factory = lambda: "ok"
@@ -72,7 +83,12 @@ class RegistryAndModelTest(unittest.TestCase):
             observation_template="{{ output.output }}",
         )
 
-        self.assertEqual([tool["name"] for tool in RESPONSE_TOOLS], ["powershell", "submit"])
+        response_tool_names = [tool["name"] for tool in RESPONSE_TOOLS]
+        self.assertEqual("powershell", response_tool_names[0])
+        self.assertEqual("submit", response_tool_names[-1])
+        self.assertIn("unity_object_read", response_tool_names)
+        self.assertIn("unity_script_patch", response_tool_names)
+        self.assertIn("unity_validate", response_tool_names)
         self.assertEqual(powershell[0]["tool"], "powershell")
         self.assertEqual(submit[0]["tool"], "submit")
         self.assertEqual(observations[0]["type"], "function_call_output")

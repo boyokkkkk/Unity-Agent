@@ -15,6 +15,7 @@ def main() -> None:
     parser.add_argument("--editor", required=True)
     parser.add_argument("--output-root", default="artifacts/baselines/state-event-v1")
     parser.add_argument("--run-id", default="")
+    parser.add_argument("--variant", choices=("baseline", "innovation"), default="baseline")
     parser.add_argument("--keep-workspace", action="store_true")
     args = parser.parse_args()
 
@@ -26,6 +27,7 @@ def main() -> None:
             config_path=Path(args.config),
             artifact_dir=artifact_dir,
             editor_path=Path(args.editor),
+            variant=args.variant,
             keep_workspace=args.keep_workspace,
         )
     ).run()

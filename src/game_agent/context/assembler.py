@@ -288,9 +288,14 @@ class ContextAssembler:
             command = str(action.get("command", "")) or tool_name
             content = _message_text(observation) or str(output.get("output", ""))
             extra = dict(output.get("extra", {})) | dict(observation.get("extra", {}))
-            category = "query" if extra.get("aci") else _command_category(command)
+            category = (
+                "mutation" if extra.get("aci_mutation")
+                else "validation" if extra.get("aci_control")
+                else "query" if extra.get("aci")
+                else _command_category(command)
+            )
             success = int(output.get("returncode", -1)) == 0
-            if action.get("tool") == "submit":
+            if action.get("tool") == "submit" and success:
                 self._set_phase("submission", "Submit the bounded result with evidence and limitations.")
             artifact_ref = str(extra.get("artifact_path", ""))
             if artifact_ref:
@@ -311,9 +316,40 @@ class ContextAssembler:
             self.recent_tools.append(tool_observation)
             if extra.get("aci"):
                 self._record_structured_query(tool_name, extra)
+                if category == "query":
+                    self._set_phase(
+                        "evidence_verification",
+                        "Verify structured project-graph candidates and retain their evidence.",
+                    )
+                structured = extra.get("structured", {})
+                diagnostic_errors = any(
+                    str(item.get("severity", "")).casefold() == "error"
+                    for item in structured.get("diagnostics", [])
+                    if isinstance(item, dict)
+                ) if isinstance(structured, dict) else False
+                if (
+                    tool_name == "code_diagnostics"
+                    and success
+                    and isinstance(structured, dict)
+                    and structured.get("status") != "unavailable"
+                    and not diagnostic_errors
+                ):
+                    if "static_diagnostics" in self.memory.pending_validations:
+                        self.memory.pending_validations.remove("static_diagnostics")
+            if category == "mutation" and success:
+                changed_paths = [
+                    str(value) for value in extra.get("changed_paths", []) if value
+                ]
+                for path in changed_paths:
+                    self.memory.add_unique("changed_files", path)
+                if self.project_store is not None:
+                    self.project_store.invalidate_paths(changed_paths, reason="typed_aci_mutation")
+                self.memory.add_unique("pending_validations", "static_diagnostics")
+                if tool_name in {"unity_script_patch", "unity_execute_csharp"}:
+                    self.memory.add_unique("pending_validations", "compile")
                 self._set_phase(
-                    "evidence_verification",
-                    "Verify structured project-graph candidates and retain their evidence.",
+                    "implementation",
+                    "Verify the checkpointed typed Unity mutation through the controller protocol.",
                 )
             paths = _extract_paths(command + "\n" + content)
             if category in {"read", "search"}:
@@ -330,7 +366,9 @@ class ContextAssembler:
                 self.memory.add_unique("pending_validations", "compile")
                 self._set_phase("implementation", "Apply the planned minimal change and track its impact.")
             elif category == "validation":
-                self._record_validation(command, success, tool_observation)
+                modes = [str(value) for value in extra.get("validation_modes", []) if value]
+                for mode in modes or [command]:
+                    self._record_validation(mode, success, tool_observation)
             if not success:
                 self.memory.last_failure = {
                     "category": category,

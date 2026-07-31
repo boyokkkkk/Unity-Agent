@@ -107,7 +107,11 @@ class ProjectContextStore:
     def working_set(self, task_id: str, *, max_entries: int = 24) -> TaskWorkingSet:
         if task_id not in self.working_sets:
             self.working_sets[task_id] = TaskWorkingSet(task_id, max_entries=max_entries)
-        return self.working_sets[task_id]
+        working_set = self.working_sets[task_id]
+        if max_entries < working_set.max_entries:
+            working_set.max_entries = max_entries
+            working_set._bound_entries()
+        return working_set
 
     def locate(self, task_id: str, query: str, *, limit: int = 12) -> list[WorkingSetEntry]:
         result = self._retriever.retrieve(query, "A2", limit=limit)

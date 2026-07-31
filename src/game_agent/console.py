@@ -261,6 +261,17 @@ class ConsoleTask:
         )
         self.environment = KitchenEnvironment(**environment_config)
         agent_config = dict(self.config["agent"])
+        context_config = dict(self.config.get("context", {}))
+        configured_graph = str(context_config.get("graph_path", "")).strip()
+        if configured_graph and not Path(configured_graph).is_absolute():
+            context_config["graph_path"] = str(
+                (resolved_config_path.parent.parent / configured_graph).resolve()
+            )
+        aci_config = dict(self.config.get("aci", {}))
+        if not aci_config.get("editor_path"):
+            aci_config["editor_path"] = str(
+                self.config.get("validation", {}).get("editor_path", "")
+            )
         agent_config.update(
             output_path=self.artifact_dir / "trajectory.json",
             event_sink=self.logger.emit,
@@ -268,6 +279,8 @@ class ConsoleTask:
             max_input_tokens=experiment["max_input_tokens"],
             max_output_tokens=experiment["max_output_tokens"],
             max_total_tokens=experiment["max_total_tokens"],
+            context=context_config,
+            aci=aci_config,
             skill_runtime=build_skill_runtime(
                 self.config,
                 self.logger,

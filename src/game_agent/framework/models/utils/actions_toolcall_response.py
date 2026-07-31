@@ -6,7 +6,7 @@ import time
 from jinja2 import StrictUndefined, Template
 
 from game_agent.framework.exceptions import FormatError
-from game_agent.aci.schemas import QUERY_TOOL_NAMES
+from game_agent.aci.schemas import ACI_TOOL_NAMES
 from game_agent.framework.models.utils.actions_toolcall import AGENT_TOOLS, validate_tool_arguments
 
 
@@ -82,7 +82,7 @@ def parse_response_actions(
             actions.append({"tool": "powershell", "command": arguments["command"], "tool_call_id": call_id})
         elif name == "submit":
             actions.append({"tool": "submit", "answer": arguments["answer"], "tool_call_id": call_id})
-        elif name in QUERY_TOOL_NAMES:
+        elif name in ACI_TOOL_NAMES:
             actions.append({"tool": name, "arguments": arguments, "tool_call_id": call_id})
     if any(action["tool"] == "submit" for action in actions) and len(actions) != 1:
         text = Template(format_error_template, undefined=StrictUndefined).render(

@@ -315,6 +315,7 @@ class BaselineCase:
     artifact_dir: Path
     editor_path: Path
     task: str = DEFAULT_TASK
+    variant: str = "baseline"
     isolation: str = "copy"
     keep_workspace: bool = False
 
@@ -333,17 +334,40 @@ class StateEventBaselineRunner:
 
     def _prepare_config(self, project: Path, run_id: str) -> tuple[dict[str, Any], Path]:
         config = json.loads(json.dumps(load_config(self.case.config_path)))
-        config["experiment"]["config_id"] = "state-event-v1-no-skill"
+        if self.case.variant not in {"baseline", "innovation"}:
+            raise ValueError(f"Unsupported experiment variant: {self.case.variant}")
+        innovation_enabled = self.case.variant == "innovation"
+        config["experiment"]["config_id"] = (
+            "state-event-v1-innovation" if innovation_enabled else "state-event-v1-no-skill"
+        )
         config["experiment"]["target_project"] = str(project)
         config["environment"]["cwd"] = str(project)
         config.setdefault("skills", {})
-        config["skills"].update(enabled=False, paths=[])
+        config["skills"].update(enabled=innovation_enabled, paths=[])
         config.setdefault("context", {})
-        config["context"]["enabled"] = False
+        config["context"]["enabled"] = innovation_enabled
+        configured_graph = str(config["context"].get("graph_path", "")).strip()
+        if innovation_enabled:
+            if not configured_graph:
+                raise ValueError("Innovation variant requires context.graph_path")
+            graph_path = Path(configured_graph)
+            if not graph_path.is_absolute():
+                graph_path = self.case.config_path.resolve().parent.parent / graph_path
+            graph_path = graph_path.resolve()
+            if not graph_path.is_file():
+                raise FileNotFoundError(f"Configured project graph does not exist: {graph_path}")
+            config["context"]["graph_path"] = str(graph_path)
+        else:
+            config["context"]["graph_path"] = ""
+        config.setdefault("aci", {})
+        config["aci"]["enabled"] = innovation_enabled
+        config["aci"]["typed_mutations_enabled"] = innovation_enabled
+        config["aci"]["editor_path"] = str(self.case.editor_path.resolve())
         config.setdefault("model", {})
-        config["model"]["structured_query_tools_enabled"] = False
+        config["model"]["structured_query_tools_enabled"] = innovation_enabled
         config.setdefault("validation", {})
         config["validation"]["enabled"] = False
+        config["validation"]["editor_path"] = str(self.case.editor_path.resolve())
         config["logging"]["events_path"] = str(self.case.artifact_dir / "events.jsonl")
         config["logging"]["trajectory_path"] = str(self.case.artifact_dir / "trajectory.json")
         destination = self.case.artifact_dir / "config.json"
@@ -353,13 +377,16 @@ class StateEventBaselineRunner:
             {
                 "schema_version": BASELINE_SCHEMA_VERSION,
                 "run_id": run_id,
+                "variant": self.case.variant,
                 "task": self.case.task,
                 "source_project": str(self.case.source_project.resolve()),
                 "project_path": str(project),
                 "isolation": self.case.isolation,
-                "skills_enabled": False,
-                "context_virtualization_enabled": False,
-                "structured_query_tools_enabled": False,
+                "skills_enabled": innovation_enabled,
+                "context_virtualization_enabled": innovation_enabled,
+                "structured_query_tools_enabled": innovation_enabled,
+                "typed_mutation_tools_enabled": innovation_enabled,
+                "graph_path": config["context"].get("graph_path", ""),
                 "editor_path": str(self.case.editor_path.resolve()),
             },
         )
@@ -523,8 +550,21 @@ class StateEventBaselineRunner:
             no_skill_evidence = config.get("skills", {}).get("enabled") is False and not any(
                 item.get("event") in {"skill_matched", "skill_apply_start", "skill_apply_end"} for item in events
             )
-            if not no_skill_evidence:
-                infrastructure_errors.append("no_skill_condition_violated")
+            innovation_config_evidence = all(
+                (
+                    config.get("skills", {}).get("enabled") is True,
+                    config.get("context", {}).get("enabled") is True,
+                    Path(str(config.get("context", {}).get("graph_path", ""))).is_file(),
+                    config.get("model", {}).get("structured_query_tools_enabled") is True,
+                    config.get("aci", {}).get("enabled") is True,
+                    config.get("aci", {}).get("typed_mutations_enabled") is True,
+                )
+            )
+            condition_evidence = (
+                innovation_config_evidence if self.case.variant == "innovation" else no_skill_evidence
+            )
+            if not condition_evidence:
+                infrastructure_errors.append(f"{self.case.variant}_condition_violated")
             if not (artifact_dir / "events.jsonl").is_file():
                 infrastructure_errors.append("events_missing")
             if not public_validation or not hidden_validation:
@@ -540,11 +580,14 @@ class StateEventBaselineRunner:
             report = {
                 "schema_version": BASELINE_SCHEMA_VERSION,
                 "run_id": run_id,
+                "variant": self.case.variant,
                 "experiment_valid": experiment_valid,
                 "infrastructure_errors": infrastructure_errors,
                 "source_project_unchanged": source_unchanged,
                 "hidden_oracle_cleaned": oracle_cleanup,
                 "no_skill_evidence": no_skill_evidence,
+                "innovation_config_evidence": innovation_config_evidence,
+                "condition_evidence": condition_evidence,
                 "agent": {
                     "submitted": agent_submitted,
                     "exit_status": agent_result.get("exit_status", ""),
