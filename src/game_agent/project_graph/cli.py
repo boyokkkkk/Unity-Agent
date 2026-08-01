@@ -47,6 +47,13 @@ def _parser() -> argparse.ArgumentParser:
         default="role_mmr",
     )
     query.add_argument("--limit", type=int, default=10)
+    query.add_argument(
+        "--semantic-model",
+        default="",
+        help="Optional SentenceTransformer model for multilingual semantic fusion.",
+    )
+    query.add_argument("--semantic-weight", type=float, default=0.35)
+    query.add_argument("--semantic-cache", type=Path)
     query.add_argument("--output", type=Path)
 
     audit = commands.add_parser("audit-agent", help="Run a real Agent graph-adoption audit")
@@ -121,6 +128,9 @@ def main() -> None:
         args.variant,
         limit=args.limit,
         strategy=args.strategy,
+        semantic_model=args.semantic_model,
+        semantic_weight=args.semantic_weight,
+        semantic_cache_path=args.semantic_cache,
     ).to_dict()
     payload = {
         "schema_version": "game-agent-project-graph-query-v1",

@@ -49,6 +49,38 @@ CORE_AGENT_TOOLS = [POWERSHELL_TOOL, SUBMIT_TOOL]
 AGENT_TOOLS = [POWERSHELL_TOOL, *ACI_TOOLS, SUBMIT_TOOL]
 TOOL_SCHEMAS = {tool["function"]["name"]: tool["function"]["parameters"] for tool in AGENT_TOOLS}
 
+_TOOL_ARGUMENT_ALIASES = {
+    "artifact_read": {"artifact_id": "artifact_ref"},
+}
+
+
+def normalize_tool_arguments(tool_name: str, args: object) -> tuple[object, list[str]]:
+    """Apply only deterministic, lossless aliases before schema validation."""
+    if not isinstance(args, dict):
+        return args, []
+    normalized = dict(args)
+    repairs: list[str] = []
+    for alias, canonical in _TOOL_ARGUMENT_ALIASES.get(tool_name, {}).items():
+        if alias in normalized and canonical not in normalized:
+            normalized[canonical] = normalized.pop(alias)
+            repairs.append(f"{alias}->{canonical}")
+    return normalized, repairs
+
+
+def tool_argument_retry_hint(tool_name: str) -> str:
+    schema = TOOL_SCHEMAS.get(tool_name)
+    if not schema:
+        return ""
+    properties = schema.get("properties", {})
+    example = {}
+    placeholders = {
+        "string": "<string>", "integer": 1, "boolean": True,
+        "array": [], "object": {},
+    }
+    for key in schema.get("required", []):
+        example[key] = placeholders.get(properties.get(key, {}).get("type"), "<value>")
+    return f" Retry exactly with {tool_name} arguments shaped as: {json.dumps(example)}"
+
 
 def select_agent_tools(
     structured_queries_enabled: bool = True,
@@ -59,11 +91,7 @@ def select_agent_tools(
     if tool_names is None:
         return AGENT_TOOLS
     selected = set(tool_names)
-    return [
-        POWERSHELL_TOOL,
-        *(tool for tool in ACI_TOOLS if tool["function"]["name"] in selected),
-        SUBMIT_TOOL,
-    ]
+    return [tool for tool in AGENT_TOOLS if tool["function"]["name"] in selected]
 
 
 def validate_tool_arguments(tool_name: str, args: object) -> str:
@@ -127,15 +155,17 @@ def parse_toolcall_actions(
         except Exception as e:
             error_msg = f"Error parsing tool call arguments: {e}."
         tool_name = tool_call.function.name
+        args, repairs = normalize_tool_arguments(tool_name, args)
         error_msg += validate_tool_arguments(tool_name, args)
         if error_msg:
+            error_msg += tool_argument_retry_hint(tool_name)
             raise FormatError(
                 {
                     "role": "user",
                     "content": Template(format_error_template, undefined=StrictUndefined).render(
                         actions=[], error=error_msg.strip(), has_tool_calls=True, **template_kwargs
                     ),
-                    "extra": {"interrupt_type": "FormatError"},
+                    "extra": {"interrupt_type": "FormatError", "argument_repairs": repairs},
                 }
             )
         if tool_name == "powershell":

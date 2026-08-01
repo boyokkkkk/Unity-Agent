@@ -15,6 +15,7 @@ from game_agent.project_graph.evaluation import (
     LocalizationTaskSet,
 )
 from game_agent.project_graph.retrieval import LocalizationRetriever
+from game_agent.project_graph.semantic import MultilingualSemanticIndex
 from game_agent.project_graph.roslyn import RoslynCodeParser
 from game_agent.project_graph.schema import (
     GRAPH_SCHEMA_VERSION,
@@ -165,13 +166,23 @@ class RoslynParserTest(unittest.TestCase):
             source.parent.mkdir()
             source.write_text(
                 """
+                using System;
                 using UnityEngine;
                 using UnityEngine.UI;
                 public class Controller : MonoBehaviour {
                     [SerializeField] private GameObject panel;
                     [SerializeField] private Button button;
-                    private void Awake() { button.onClick.AddListener(Show); }
-                    public void Begin() { Show(); }
+                    private int state;
+                    public event EventHandler OnStateChanged;
+                    private void Awake() {
+                        button.onClick.AddListener(Show);
+                        OnStateChanged += Show;
+                    }
+                    public void Begin() {
+                        state = 1;
+                        OnStateChanged?.Invoke(this, EventArgs.Empty);
+                        Show();
+                    }
                     private void Show() {}
                 }
                 """,
@@ -183,9 +194,112 @@ class RoslynParserTest(unittest.TestCase):
             self.assertTrue(any(node.kind == NodeKind.FIELD and node.attributes["serialized"] for node in graph.nodes.values()))
             self.assertEqual(1, graph.stats()["edge_kinds"]["CALLS"])
             self.assertEqual(1, graph.stats()["edge_kinds"]["UNITY_EVENT_CALL"])
+            self.assertEqual(1, graph.stats()["edge_kinds"]["SUBSCRIBES_TO"])
+            self.assertEqual(1, graph.stats()["edge_kinds"]["PUBLISHES_EVENT"])
+            self.assertEqual(1, graph.stats()["edge_kinds"]["WRITES_STATE"])
+            event_edges = {
+                edge.kind: edge for edge in graph.edges
+                if edge.kind in {
+                    EdgeKind.SUBSCRIBES_TO,
+                    EdgeKind.PUBLISHES_EVENT,
+                    EdgeKind.WRITES_STATE,
+                }
+            }
+            self.assertEqual("Show", graph.nodes[event_edges[EdgeKind.SUBSCRIBES_TO].source].name)
+            self.assertEqual("OnStateChanged", graph.nodes[event_edges[EdgeKind.PUBLISHES_EVENT].target].name)
+            self.assertEqual("state", graph.nodes[event_edges[EdgeKind.WRITES_STATE].target].name)
 
 
 class LocalizationAblationTest(unittest.TestCase):
+    def test_multilingual_semantic_fusion_maps_chinese_symptom_to_state_controller(self):
+        class FakeMultilingualEncoder:
+            def encode(self, texts, **kwargs):
+                import numpy as np
+
+                vectors = []
+                for text in texts:
+                    if "状态" in text or "StateManager" in text or "writes state field" in text:
+                        vectors.append([1.0, 0.0])
+                    else:
+                        vectors.append([0.0, 1.0])
+                return np.asarray(vectors, dtype=float)
+
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            state_path = "Assets/Scripts/StateManager.cs"
+            ui_path = "Assets/Scripts/UI/CountdownUI.cs"
+            for path, source in (
+                (state_path, "class StateManager { int state; void Begin() { state = 1; } }"),
+                (ui_path, "class CountdownUI { void Show() {} }"),
+            ):
+                target = project / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(source, encoding="utf-8")
+            graph = ProjectGraph(project_path=str(project))
+            for node in (
+                Node("state-file", NodeKind.CSHARP_FILE, "StateManager.cs", state_path),
+                Node("state-method", NodeKind.METHOD, "Begin", state_path),
+                Node("state-field", NodeKind.FIELD, "state", state_path),
+                Node("ui-file", NodeKind.CSHARP_FILE, "CountdownUI.cs", ui_path),
+                Node("ui-method", NodeKind.METHOD, "Show", ui_path),
+            ):
+                graph.add_node(node)
+            graph.add_edge(Edge("state-method", "state-field", EdgeKind.WRITES_STATE))
+            retriever = LocalizationRetriever(
+                graph,
+                project,
+                semantic_encoder=FakeMultilingualEncoder(),
+            )
+
+            result = retriever.retrieve(
+                "玩家交互后状态切换了，但倒计时界面没有刷新",
+                "A2",
+                limit=2,
+                strategy="relevance",
+                semantic_model="fake-multilingual",
+                semantic_weight=1.0,
+            )
+
+            self.assertEqual(state_path, result.files[0]["path"])
+            self.assertEqual("enabled", result.semantic["status"])
+            self.assertEqual("fake-multilingual", result.semantic["model"])
+
+    def test_semantic_index_reuses_cached_corpus_embeddings(self):
+        class CountingEncoder:
+            def __init__(self):
+                self.calls = []
+
+            def encode(self, texts, **kwargs):
+                import numpy as np
+
+                self.calls.append(list(texts))
+                return np.asarray([[1.0, 0.0] for _ in texts], dtype=float)
+
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            cache = Path(directory) / "semantic-index.npz"
+            documents = {"Assets/State.cs": "state transition controller"}
+            first_encoder = CountingEncoder()
+            first = MultilingualSemanticIndex(
+                documents,
+                model_name="fake",
+                cache_path=cache,
+                encoder=first_encoder,
+            )
+            first.score("状态切换")
+            second_encoder = CountingEncoder()
+            second = MultilingualSemanticIndex(
+                documents,
+                model_name="fake",
+                cache_path=cache,
+                encoder=second_encoder,
+            )
+            second.score("状态切换")
+
+            self.assertTrue(cache.is_file())
+            self.assertTrue(second.cache_hit)
+            self.assertEqual(2, len(first_encoder.calls))
+            self.assertEqual(1, len(second_encoder.calls))
+
     def test_role_aware_diversity_collapses_paths_and_enforces_test_quota(self):
         rows = [
             {"id": "test-file", "path": "Assets/Tests/PlayMode/KitchenManagerTests.cs", "kind": "CSHARP_FILE", "score": 1.0},

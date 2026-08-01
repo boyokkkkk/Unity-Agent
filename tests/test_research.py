@@ -62,7 +62,7 @@ class RegistryAndModelTest(unittest.TestCase):
         }
         response_names = {tool["name"] for tool in response.response_tools}
         self.assertEqual(
-            {"powershell", "submit", *names},
+            set(names),
             chat_names,
         )
         self.assertEqual(chat_names, response_names)

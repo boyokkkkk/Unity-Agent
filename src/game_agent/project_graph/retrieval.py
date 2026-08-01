@@ -3,13 +3,14 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
 import networkx as nx
 
 from .schema import EdgeKind, Node, NodeKind, ProjectGraph
+from .semantic import MultilingualSemanticIndex, SemanticSearchUnavailable
 
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_]*|[\u4e00-\u9fff]")
@@ -94,6 +95,7 @@ class LocalizationResult:
     assets: list[dict[str, Any]]
     ranked_nodes: list[dict[str, Any]]
     dependency_paths: list[dict[str, Any]]
+    semantic: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -104,11 +106,18 @@ class LocalizationResult:
             "assets": self.assets,
             "ranked_nodes": self.ranked_nodes,
             "dependency_paths": self.dependency_paths,
+            "semantic": self.semantic,
         }
 
 
 class LocalizationRetriever:
-    def __init__(self, graph: ProjectGraph, project_path: Path):
+    def __init__(
+        self,
+        graph: ProjectGraph,
+        project_path: Path,
+        *,
+        semantic_encoder: Any | None = None,
+    ):
         self.graph = graph
         self.project_path = project_path.resolve()
         self.file_documents = self._load_file_documents()
@@ -116,6 +125,9 @@ class LocalizationRetriever:
         self.node_index = TextIndex(
             {node.id: _node_text(node) for node in graph.nodes.values()}
         )
+        self.semantic_encoder = semantic_encoder
+        self._semantic_indexes: dict[tuple[str, str], MultilingualSemanticIndex] = {}
+        self.semantic_documents = self._semantic_documents()
         self.one_hop: dict[str, set[str]] = defaultdict(set)
         for edge in graph.edges:
             self.one_hop[edge.source].add(edge.target)
@@ -130,12 +142,22 @@ class LocalizationRetriever:
         strategy: str = "relevance",
         max_test_candidates: int = 1,
         mmr_lambda: float = 0.82,
+        semantic_model: str = "",
+        semantic_weight: float = 0.35,
+        semantic_cache_path: Path | None = None,
     ) -> LocalizationResult:
         variant = variant.upper()
         if strategy not in {"relevance", "path_collapse", "path_quota", "role_mmr"}:
             raise ValueError(
                 "strategy must be relevance, path_collapse, path_quota, or role_mmr"
             )
+        semantic_weight = max(0.0, min(1.0, semantic_weight))
+        semantic_scores, semantic_metadata = self._semantic_scores(
+            query,
+            model_name=semantic_model,
+            cache_path=semantic_cache_path,
+        )
+        semantic_metadata["weight"] = semantic_weight if semantic_model else 0.0
         if variant == "A0":
             return self._a0(
                 query,
@@ -143,6 +165,9 @@ class LocalizationRetriever:
                 strategy=strategy,
                 max_test_candidates=max_test_candidates,
                 mmr_lambda=mmr_lambda,
+                semantic_scores=semantic_scores,
+                semantic_metadata=semantic_metadata,
+                semantic_weight=semantic_weight,
             )
         if variant not in {"A1", "A2"}:
             raise ValueError("variant must be A0, A1, or A2")
@@ -153,6 +178,9 @@ class LocalizationRetriever:
             strategy=strategy,
             max_test_candidates=max_test_candidates,
             mmr_lambda=mmr_lambda,
+            semantic_scores=semantic_scores,
+            semantic_metadata=semantic_metadata,
+            semantic_weight=semantic_weight,
         )
 
     def _load_file_documents(self) -> dict[str, str]:
@@ -171,8 +199,13 @@ class LocalizationRetriever:
         strategy: str,
         max_test_candidates: int,
         mmr_lambda: float,
+        semantic_scores: dict[str, float],
+        semantic_metadata: dict[str, Any],
+        semantic_weight: float,
     ) -> LocalizationResult:
         file_scores = self.file_index.score(query)
+        if semantic_scores:
+            file_scores = _blend_scores(file_scores, semantic_scores, semantic_weight)
         files = _rank_items(file_scores, limit, key_name="path")
         files = self._diversify_rows(
             files,
@@ -189,6 +222,7 @@ class LocalizationRetriever:
             assets=[],
             ranked_nodes=[],
             dependency_paths=[],
+            semantic=semantic_metadata,
         )
 
     def _graph_variant(
@@ -200,9 +234,17 @@ class LocalizationRetriever:
         strategy: str,
         max_test_candidates: int,
         mmr_lambda: float,
+        semantic_scores: dict[str, float],
+        semantic_metadata: dict[str, Any],
+        semantic_weight: float,
     ) -> LocalizationResult:
         allowed_nodes = CODE_KINDS if variant == "A1" else set(NodeKind)
-        allowed_edges = {EdgeKind.CALLS} if variant == "A1" else set(EdgeKind)
+        allowed_edges = {
+            EdgeKind.CALLS,
+            EdgeKind.SUBSCRIBES_TO,
+            EdgeKind.PUBLISHES_EVENT,
+            EdgeKind.WRITES_STATE,
+        } if variant == "A1" else set(EdgeKind)
         network = nx.DiGraph()
         for node in self.graph.nodes.values():
             if node.kind in allowed_nodes:
@@ -221,6 +263,8 @@ class LocalizationRetriever:
 
         lexical = self.node_index.score(query)
         file_scores = self.file_index.score(query)
+        if semantic_scores:
+            file_scores = _blend_scores(file_scores, semantic_scores, semantic_weight)
         personalization: dict[str, float] = {}
         for node_id in network:
             node = self.graph.nodes[node_id]
@@ -307,7 +351,71 @@ class LocalizationRetriever:
             assets=assets,
             ranked_nodes=ranked_nodes,
             dependency_paths=paths,
+            semantic=semantic_metadata,
         )
+
+    def _semantic_scores(
+        self,
+        query: str,
+        *,
+        model_name: str,
+        cache_path: Path | None,
+    ) -> tuple[dict[str, float], dict[str, Any]]:
+        if not model_name:
+            return {}, {"status": "disabled", "model": ""}
+        cache_key = (model_name, str(cache_path.resolve()) if cache_path else "")
+        index = self._semantic_indexes.get(cache_key)
+        if index is None:
+            index = MultilingualSemanticIndex(
+                self.semantic_documents,
+                model_name=model_name,
+                cache_path=cache_path,
+                encoder=self.semantic_encoder,
+            )
+            self._semantic_indexes[cache_key] = index
+        try:
+            return index.score(query), index.metadata()
+        except SemanticSearchUnavailable as exc:
+            return {}, {
+                "status": "unavailable",
+                "model": model_name,
+                "reason": str(exc),
+            }
+
+    def _semantic_documents(self) -> dict[str, str]:
+        summaries: dict[str, list[str]] = defaultdict(list)
+        for node in self.graph.nodes.values():
+            if not node.path.casefold().endswith(".cs"):
+                continue
+            attributes = " ".join(
+                str(node.attributes.get(key, ""))
+                for key in ("declaring_type", "field_type", "return_type", "bases")
+            )
+            summaries[node.path].append(
+                f"{node.kind.value} {node.name} {attributes}".strip()
+            )
+        relation_phrases = {
+            EdgeKind.CALLS: "calls",
+            EdgeKind.SUBSCRIBES_TO: "subscribes to event",
+            EdgeKind.PUBLISHES_EVENT: "publishes event",
+            EdgeKind.WRITES_STATE: "writes state field",
+        }
+        for edge in self.graph.edges:
+            phrase = relation_phrases.get(edge.kind)
+            source = self.graph.nodes.get(edge.source)
+            target = self.graph.nodes.get(edge.target)
+            if not phrase or source is None or target is None:
+                continue
+            relation = f"{source.name} {phrase} {target.name}"
+            if source.path.casefold().endswith(".cs"):
+                summaries[source.path].append(relation)
+            if target.path.casefold().endswith(".cs") and target.path != source.path:
+                summaries[target.path].append(relation)
+        documents: dict[str, str] = {}
+        for path, source_document in self.file_documents.items():
+            structural = "\n".join(dict.fromkeys(summaries.get(path, [])))
+            documents[path] = f"{path}\n{structural}\n{source_document}"[:50000]
+        return documents
 
     def _diversify_node_ids(
         self,
@@ -530,6 +638,9 @@ class LocalizationRetriever:
 def _edge_weight(kind: EdgeKind) -> float:
     return {
         EdgeKind.CALLS: 1.0,
+        EdgeKind.SUBSCRIBES_TO: 1.5,
+        EdgeKind.PUBLISHES_EVENT: 1.6,
+        EdgeKind.WRITES_STATE: 1.5,
         EdgeKind.ATTACHED_TO: 1.4,
         EdgeKind.CONTAINS: 1.1,
         EdgeKind.PREFAB_SOURCE: 1.3,
@@ -540,12 +651,15 @@ def _edge_weight(kind: EdgeKind) -> float:
 
 RELATION_PRIORITY = {
     "CODE_COMPONENT": 0,
-    EdgeKind.ATTACHED_TO.value: 1,
-    EdgeKind.CONTAINS.value: 2,
-    EdgeKind.PREFAB_SOURCE.value: 3,
-    EdgeKind.SERIALIZED_REF.value: 4,
-    EdgeKind.UNITY_EVENT_CALL.value: 5,
-    EdgeKind.CALLS.value: 6,
+    EdgeKind.SUBSCRIBES_TO.value: 1,
+    EdgeKind.PUBLISHES_EVENT.value: 2,
+    EdgeKind.WRITES_STATE.value: 3,
+    EdgeKind.ATTACHED_TO.value: 4,
+    EdgeKind.CONTAINS.value: 5,
+    EdgeKind.PREFAB_SOURCE.value: 6,
+    EdgeKind.SERIALIZED_REF.value: 7,
+    EdgeKind.UNITY_EVENT_CALL.value: 8,
+    EdgeKind.CALLS.value: 9,
 }
 
 
@@ -625,6 +739,29 @@ def _rank_items(
         {key_name: key, "score": score}
         for key, score in sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:limit]
     ]
+
+
+def _blend_scores(
+    lexical_scores: dict[str, float],
+    semantic_scores: dict[str, float],
+    semantic_weight: float,
+) -> dict[str, float]:
+    """Blend independently normalized lexical and multilingual similarities."""
+    lexical_maximum = max(lexical_scores.values(), default=0.0)
+    semantic_maximum = max(semantic_scores.values(), default=0.0)
+    keys = set(lexical_scores) | set(semantic_scores)
+    return {
+        key: (
+            (1.0 - semantic_weight)
+            * lexical_scores.get(key, 0.0)
+            / max(lexical_maximum, 1e-12)
+            + semantic_weight
+            * semantic_scores.get(key, 0.0)
+            / max(semantic_maximum, 1e-12)
+        )
+        for key in keys
+        if lexical_scores.get(key, 0.0) > 0 or semantic_scores.get(key, 0.0) > 0
+    }
 
 
 def _node_result(node: Node, score: float) -> dict[str, Any]:

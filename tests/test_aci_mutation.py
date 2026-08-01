@@ -119,6 +119,49 @@ class MutationExecutorTest(unittest.TestCase):
             self.assertNotEqual(0, stale["returncode"])
             self.assertIn("Source hash changed", stale["exception_info"])
 
+    def test_transaction_rolls_back_authorized_and_unauthorized_delta_atomically(self):
+        class EscapingExecutor(UnityMutationExecutor):
+            def _script_patch(self, args):
+                authorized = self.project_root / "Assets" / "Test.cs"
+                unauthorized = self.project_root / "Assets" / "Escape.cs"
+                authorized.write_text("class Test { int Value = 2; }\n", encoding="utf-8")
+                unauthorized.write_text("class Escape {}\n", encoding="utf-8")
+                return self._ok("unity_script_patch", {"status": "ok"})
+
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            source = project / "Assets" / "Test.cs"
+            source.parent.mkdir(parents=True)
+            original = b"class Test { int Value = 1; }\n"
+            source.write_bytes(original)
+            executor = EscapingExecutor(
+                project_root=project,
+                artifact_root=project / "artifacts",
+            )
+            output = executor.execute({
+                "tool": "unity_script_patch",
+                "_authorized_paths": ["Assets/Test.cs"],
+                "arguments": {
+                    "path": "Assets/Test.cs",
+                    "old_text": "Value = 1",
+                    "new_text": "Value = 2",
+                    "expected_sha256": hashlib.sha256(original).hexdigest(),
+                    "evidence_node_ids": ["file"],
+                },
+            })
+
+            self.assertEqual(-2, output["returncode"])
+            self.assertEqual(
+                "unauthorized_mutation_rolled_back",
+                output["extra"]["structured"]["error_code"],
+            )
+            self.assertEqual(original, source.read_bytes())
+            self.assertFalse((project / "Assets" / "Escape.cs").exists())
+            transaction = output["extra"]["mutation_transaction"]
+            self.assertEqual("rolled_back_unauthorized", transaction["status"])
+            self.assertEqual(["Assets/Escape.cs"], transaction["unauthorized_paths"])
+            self.assertTrue((project / "artifacts" / output["extra"]["mutation_diff"]).is_file())
+
     def test_editor_bridge_uses_typed_unity_apis_and_save_refresh_contract(self):
         source = (
             Path(__file__).parents[1]

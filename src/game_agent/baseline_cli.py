@@ -5,7 +5,7 @@ import json
 import uuid
 from pathlib import Path
 
-from game_agent.baseline_runner import BaselineCase, StateEventBaselineRunner
+from game_agent.baseline_runner import DEFAULT_TASK, ENGLISH_TASK, BaselineCase, StateEventBaselineRunner
 
 
 def main() -> None:
@@ -16,6 +16,7 @@ def main() -> None:
     parser.add_argument("--output-root", default="artifacts/baselines/state-event-v1")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--variant", choices=("baseline", "innovation"), default="baseline")
+    parser.add_argument("--task-language", choices=("zh", "en"), default="zh")
     parser.add_argument("--keep-workspace", action="store_true")
     args = parser.parse_args()
 
@@ -27,6 +28,7 @@ def main() -> None:
             config_path=Path(args.config),
             artifact_dir=artifact_dir,
             editor_path=Path(args.editor),
+            task=ENGLISH_TASK if args.task_language == "en" else DEFAULT_TASK,
             variant=args.variant,
             keep_workspace=args.keep_workspace,
         )

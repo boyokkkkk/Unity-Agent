@@ -12,6 +12,7 @@ from game_agent.aci import QUERY_TOOL_NAMES, StructuredQueryExecutor
 from game_agent.context import ContextAssembler, ContextConfig, EvidenceStatus, ProjectContextStore
 from game_agent.framework.agents.default import DefaultAgent
 from game_agent.framework.environments.local import LocalEnvironment
+from game_agent.framework.exceptions import FormatError
 from game_agent.framework.models.utils.actions_toolcall import AGENT_TOOLS, parse_toolcall_actions
 from game_agent.framework.models.utils.actions_toolcall_response import parse_response_actions
 from game_agent.project_graph.schema import Edge, EdgeKind, Node, NodeKind, ProjectGraph
@@ -88,10 +89,12 @@ class StructuredQueryExecutorTest(unittest.TestCase):
         code_refs, _ = self.call("code_find_references", node_id="show", direction="incoming")
 
         self.assertEqual("prefab", assets["results"][0]["id"])
+        self.assertGreater(assets["results"][0]["score"], 0)
         self.assertEqual("go", objects["results"][0]["id"])
         self.assertEqual("CountdownCanvas", detail["object"]["name"])
         self.assertTrue(any(item["node"]["id"] == "go" for item in refs["results"]))
         self.assertEqual("show", symbols["results"][0]["id"])
+        self.assertGreater(symbols["results"][0]["score"], 0)
         self.assertEqual({"CALLS", "UNITY_EVENT_CALL"}, {item["edge_kind"] for item in code_refs["results"]})
         self.assertTrue({"go", "component", "show"}.issubset(self.context.working_set.entries))
         self.assertTrue(any(item.status == EvidenceStatus.SOURCE_VERIFIED for item in self.context.evidence.items.values()))
@@ -156,6 +159,43 @@ class StructuredToolProtocolTest(unittest.TestCase):
         )
         self.assertEqual("unity_object_read", responses[0]["tool"])
         self.assertEqual("go", responses[0]["arguments"]["node_id"])
+
+    def test_tool_protocol_repairs_artifact_id_alias_for_both_model_protocols(self):
+        artifact_ref = "evidence-artifacts/evidence_123.txt"
+        chat_call = SimpleNamespace(
+            id="call-chat",
+            function=SimpleNamespace(
+                name="artifact_read",
+                arguments=json.dumps({"artifact_id": artifact_ref}),
+            ),
+        )
+        chat = parse_toolcall_actions([chat_call], format_error_template="{{ error }}")
+        responses = parse_response_actions(
+            [{
+                "type": "function_call",
+                "id": "call-response",
+                "name": "artifact_read",
+                "arguments": json.dumps({"artifact_id": artifact_ref}),
+            }],
+            format_error_template="{{ error }}",
+        )
+
+        self.assertEqual({"artifact_ref": artifact_ref}, chat[0]["arguments"])
+        self.assertEqual({"artifact_ref": artifact_ref}, responses[0]["arguments"])
+
+    def test_invalid_tool_arguments_return_copyable_retry_shape(self):
+        bad_call = SimpleNamespace(
+            id="call-bad",
+            function=SimpleNamespace(name="artifact_read", arguments="{}"),
+        )
+
+        with self.assertRaises(FormatError) as raised:
+            parse_toolcall_actions([bad_call], format_error_template="{{ error }}")
+
+        self.assertIn(
+            'artifact_read arguments shaped as: {"artifact_ref": "<string>"}',
+            raised.exception.messages[0]["content"],
+        )
 
     def test_default_agent_routes_query_without_powershell_and_records_p1_state(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:

@@ -124,6 +124,7 @@ class DefaultAgent:
         self.last_result: dict = {}
         self._last_interrupt: InterruptAgentFlow | None = None
         self._tool_exposure: dict = {}
+        self._allowed_tool_names: set[str] = set()
         self._last_tool_schema_tokens = 0
 
     def _emit(self, event: str, *, component: str, **data) -> None:
@@ -398,7 +399,7 @@ class DefaultAgent:
         self._configure_tool_exposure()
         raw_input_tokens = self._estimate_input_tokens(self.messages)
         self.context_assembler.set_control_state(
-            self.aci_controller.action_compiler.state()
+            self.aci_controller.protocol_state()
         )
         model_messages = self.context_assembler.assemble(
             self.messages,
@@ -524,8 +525,12 @@ class DefaultAgent:
         exposure = self.aci_controller.tool_exposure()
         setter = getattr(self.model, "set_available_tool_names", None)
         applied = callable(setter)
+        selected_names = set(exposure.tool_names)
+        if not self.config.aci.workflow_enabled:
+            selected_names.update({"powershell", "submit"})
         if applied:
-            setter(exposure.tool_names)
+            setter(selected_names)
+        self._allowed_tool_names = selected_names
         self._tool_exposure = exposure.to_dict() | {"applied": applied}
 
     def _record_usage(self, message: dict, *, fallback_prompt_tokens: int) -> None:
@@ -706,7 +711,9 @@ class DefaultAgent:
                 explanation,
             )
 
+        semantic_progress_before = self.aci_controller.semantic_progress_version()
         outputs = [self._execute_action(action) for action in actions]
+        semantic_progress_after = self.aci_controller.semantic_progress_version()
         result_hash = self._result_hash(outputs)
         warnings = []
 
@@ -717,7 +724,16 @@ class DefaultAgent:
                 f"The same PowerShell action has been requested {repeated_count} consecutive times. Change strategy."
             )
 
-        if self._last_result_hash and result_hash == self._last_result_hash:
+        if self.config.aci.workflow_enabled:
+            if semantic_progress_after > semantic_progress_before:
+                self.no_progress_rounds = 0
+            else:
+                self.no_progress_rounds += 1
+                warnings.append(
+                    f"No controller-approved semantic progress was produced for "
+                    f"{self.no_progress_rounds} consecutive round(s)."
+                )
+        elif self._last_result_hash and result_hash == self._last_result_hash:
             self.no_progress_rounds += 1
             warnings.append(
                 f"No new tool information was produced for {self.no_progress_rounds} consecutive round(s)."
@@ -735,6 +751,27 @@ class DefaultAgent:
             self.consecutive_tool_failures = 0
 
         added = self._append_action_observations(message, actions, outputs, warnings=warnings)
+        automatic_submission = (
+            self.aci_controller.automatic_submission()
+            if self.config.aci.workflow_enabled else None
+        )
+        if automatic_submission:
+            self._emit(
+                "agent_finish",
+                component="agent",
+                finish_reason="controller_submission_contract_complete",
+            )
+            raise Submitted(
+                {
+                    "role": "exit",
+                    "content": automatic_submission,
+                    "extra": {
+                        "exit_status": "Submitted",
+                        "submission": automatic_submission,
+                        "automatic_submission": True,
+                    },
+                }
+            )
         if warnings:
             self._emit(
                 "agent_progress_warning",
@@ -745,6 +782,48 @@ class DefaultAgent:
                 consecutive_tool_failures=self.consecutive_tool_failures,
             )
 
+        if 0 < self.config.max_no_progress_rounds <= self.no_progress_rounds:
+            if self.config.aci.workflow_enabled:
+                decision = self.aci_controller.handle_no_progress()
+                if decision is not None and not decision.terminate:
+                    self.no_progress_rounds = 0
+                    self.consecutive_tool_failures = 0
+                    recovery = self.model.format_message(
+                        role="user",
+                        content=(
+                            "<workflow-no-progress-recovery>\n"
+                            + decision.message
+                            + "\nFollow the controller's required_next_actions.\n"
+                            "</workflow-no-progress-recovery>"
+                        ),
+                        extra={
+                            "workflow_no_progress_recovery": True,
+                            "phase_before": decision.phase_before.value,
+                            "phase_after": decision.phase_after.value,
+                        },
+                    )
+                    added.extend(self.add_messages(recovery))
+                    self._emit(
+                        "workflow_no_progress_recovery",
+                        component="agent",
+                        phase_before=decision.phase_before.value,
+                        phase_after=decision.phase_after.value,
+                        explanation=decision.message,
+                    )
+                    return added
+                explanation = decision.message if decision is not None else (
+                    f"Stopped after {self.no_progress_rounds} rounds without semantic progress."
+                )
+            else:
+                explanation = (
+                    f"Stopped after {self.no_progress_rounds} consecutive rounds without new tool information."
+                )
+            self._raise_progress_limit(
+                NoProgressExceeded,
+                "NoProgressExceeded",
+                "no_progress",
+                explanation,
+            )
         if (
             0 < self.config.max_consecutive_tool_failures <= self.consecutive_tool_failures
         ):
@@ -753,13 +832,6 @@ class DefaultAgent:
                 "ConsecutiveToolFailuresExceeded",
                 "consecutive_tool_failures",
                 f"Stopped after {self.consecutive_tool_failures} consecutive failed tool executions.",
-            )
-        if 0 < self.config.max_no_progress_rounds <= self.no_progress_rounds:
-            self._raise_progress_limit(
-                NoProgressExceeded,
-                "NoProgressExceeded",
-                "no_progress",
-                f"Stopped after {self.no_progress_rounds} consecutive rounds without new tool information.",
             )
         return added
 
@@ -773,6 +845,29 @@ class DefaultAgent:
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def _execute_action(self, action: dict) -> dict:
+        tool = str(action.get("tool", ""))
+        if self.config.aci.workflow_enabled and tool == "powershell":
+            return self.aci_controller.guard_general_shell()
+        if self.config.aci.workflow_enabled and tool not in self._allowed_tool_names:
+            return {
+                "output": json.dumps(
+                    {
+                        "status": "blocked",
+                        "tool": tool,
+                        "guard": "workflow_tool_unavailable",
+                        "message": f"{tool} is not exposed during the current workflow phase.",
+                        "workflow_state": (
+                            self.aci_controller.workflow.public_state()
+                            if self.aci_controller.workflow is not None else {}
+                        ),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                "returncode": -2,
+                "exception_info": f"{tool} is not exposed during the current workflow phase.",
+                "extra": {"blocked": True, "guard": "workflow_tool_unavailable"},
+            }
         if action.get("tool") not in ACI_TOOL_NAMES:
             return self.env.execute(action)
         started = time.perf_counter()
@@ -1061,6 +1156,7 @@ class DefaultAgent:
             'consecutive_repeated_actions': self.consecutive_repeated_actions,
             'no_progress_rounds': self.no_progress_rounds,
             'consecutive_tool_failures': self.consecutive_tool_failures,
+            'semantic_progress_version': self.aci_controller.semantic_progress_version(),
         }
         return validate_trajectory(
             recursive_merge(agent_data, self.model.serialize(), self.env.serialize(), *extra_dicts)

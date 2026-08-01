@@ -39,6 +39,14 @@ static string TypeName(TypeDeclarationSyntax type)
 static Dictionary<string, object?> Attrs(params (string Key, object? Value)[] values) =>
     values.ToDictionary(item => item.Key, item => item.Value);
 
+static string ExpressionName(ExpressionSyntax expression) => expression switch
+{
+    IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+    MemberAccessExpressionSyntax member => member.Name.Identifier.ValueText,
+    MemberBindingExpressionSyntax binding => binding.Name.Identifier.ValueText,
+    _ => expression.ToString().Split('.').LastOrDefault() ?? expression.ToString(),
+};
+
 if (args.Length != 4 || args[0] != "--project" || args[2] != "--output")
 {
     Console.Error.WriteLine("Usage: RoslynProjectGraph --project <UnityProject> --output <graph.json>");
@@ -58,9 +66,15 @@ var nodes = new Dictionary<string, Dictionary<string, object?>>();
 var edges = new List<Dictionary<string, object?>>();
 var edgeKeys = new HashSet<string>();
 var methodIdsByName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+var methodIdsByTypeAndName = new Dictionary<(string Type, string Name), List<string>>();
 var pendingCalls = new List<(string Source, string Name, int Arity, string Expression, int Line)>();
 var fieldIdsByTypeAndName = new Dictionary<(string Type, string Name), string>();
+var fieldTypesByTypeAndName = new Dictionary<(string Type, string Name), string>();
+var eventIdsByTypeAndName = new Dictionary<(string Type, string Name), string>();
+var eventIdsByName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 var pendingUnityEvents = new List<(string Source, string TargetName, string EventExpression, int Line)>();
+var pendingEventSubscriptions = new List<(string Registrar, string SubscriberType, string HandlerName, string EventOwnerType, string EventName, string Expression, int Line)>();
+var pendingEventTriggers = new List<(string Publisher, string DeclaringType, string EventName, string Expression, int Line)>();
 
 void AddNode(string id, string kind, string name, string path, Dictionary<string, object?> attributes)
 {
@@ -130,6 +144,30 @@ foreach (var file in Directory.EnumerateFiles(assets, "*.cs", SearchOption.AllDi
                         ("attributes", attributes)
                     ));
                 fieldIdsByTypeAndName[(fullName, variable.Identifier.ValueText)] = fieldId;
+                fieldTypesByTypeAndName[(fullName, variable.Identifier.ValueText)] = field.Declaration.Type.ToString();
+            }
+        }
+
+        foreach (var eventField in type.Members.OfType<EventFieldDeclarationSyntax>())
+        {
+            foreach (var variable in eventField.Declaration.Variables)
+            {
+                var eventName = variable.Identifier.ValueText;
+                var eventId = StableId("cs-field", fullName, eventName);
+                AddNode(eventId, "FIELD", eventName, relative,
+                    Attrs(
+                        ("declaring_type", fullName),
+                        ("declaring_type_id", typeId),
+                        ("field_type", eventField.Declaration.Type.ToString()),
+                        ("serialized", false),
+                        ("is_event", true)
+                    ));
+                fieldIdsByTypeAndName[(fullName, eventName)] = eventId;
+                eventIdsByTypeAndName[(fullName, eventName)] = eventId;
+                eventIdsByTypeAndName[(fullName.Split('.').Last(), eventName)] = eventId;
+                if (!eventIdsByName.TryGetValue(eventName, out var declarations))
+                    eventIdsByName[eventName] = declarations = new();
+                declarations.Add(eventId);
             }
         }
 
@@ -149,6 +187,42 @@ foreach (var file in Directory.EnumerateFiles(assets, "*.cs", SearchOption.AllDi
             if (!methodIdsByName.TryGetValue(methodName, out var overloads))
                 methodIdsByName[methodName] = overloads = new();
             overloads.Add(methodId);
+            if (!methodIdsByTypeAndName.TryGetValue((fullName, methodName), out var typedOverloads))
+                methodIdsByTypeAndName[(fullName, methodName)] = typedOverloads = new();
+            typedOverloads.Add(methodId);
+
+            foreach (var assignment in method.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                var leftName = ExpressionName(assignment.Left);
+                var line = tree.GetLineSpan(assignment.Span).StartLinePosition.Line + 1;
+                if (assignment.IsKind(SyntaxKind.AddAssignmentExpression))
+                {
+                    var handlerName = ExpressionName(assignment.Right);
+                    var ownerRoot = assignment.Left is MemberAccessExpressionSyntax member
+                        ? member.Expression.ToString().Split('.')[0]
+                        : fullName;
+                    var eventOwnerType = fieldTypesByTypeAndName.TryGetValue((fullName, ownerRoot), out var fieldType)
+                        ? fieldType
+                        : ownerRoot;
+                    pendingEventSubscriptions.Add((
+                        methodId,
+                        fullName,
+                        handlerName,
+                        eventOwnerType,
+                        leftName,
+                        assignment.ToString(),
+                        line
+                    ));
+                    continue;
+                }
+                if (fieldIdsByTypeAndName.TryGetValue((fullName, leftName), out var writtenField))
+                    AddEdge(methodId, writtenField, "WRITES_STATE",
+                        Attrs(
+                            ("expression", assignment.ToString()),
+                            ("operation", assignment.OperatorToken.ValueText),
+                            ("line", line)
+                        ));
+            }
 
             foreach (var call in method.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
@@ -166,6 +240,26 @@ foreach (var file in Directory.EnumerateFiles(assets, "*.cs", SearchOption.AllDi
                     call.Expression.ToString(),
                     tree.GetLineSpan(call.Span).StartLinePosition.Line + 1
                 ));
+                if (calledName == "Invoke")
+                {
+                    string eventName = call.Expression switch
+                    {
+                        MemberAccessExpressionSyntax member => ExpressionName(member.Expression),
+                        MemberBindingExpressionSyntax => call.Ancestors()
+                            .OfType<ConditionalAccessExpressionSyntax>()
+                            .Select(item => ExpressionName(item.Expression))
+                            .FirstOrDefault() ?? "",
+                        _ => "",
+                    };
+                    if (!string.IsNullOrWhiteSpace(eventName))
+                        pendingEventTriggers.Add((
+                            methodId,
+                            fullName,
+                            eventName,
+                            call.ToString(),
+                            tree.GetLineSpan(call.Span).StartLinePosition.Line + 1
+                        ));
+                }
                 if (call.Expression is MemberAccessExpressionSyntax addListener
                     && addListener.Name.Identifier.ValueText == "AddListener"
                     && call.ArgumentList.Arguments.Count > 0)
@@ -203,6 +297,52 @@ foreach (var file in Directory.EnumerateFiles(assets, "*.cs", SearchOption.AllDi
             }
         }
     }
+}
+
+foreach (var subscription in pendingEventSubscriptions)
+{
+    List<string> events;
+    if (!string.IsNullOrWhiteSpace(subscription.EventOwnerType)
+        && eventIdsByTypeAndName.TryGetValue((subscription.EventOwnerType, subscription.EventName), out var ownedEvent))
+        events = new() { ownedEvent };
+    else
+    {
+        if (!eventIdsByName.TryGetValue(subscription.EventName, out var namedEvents))
+            continue;
+        events = namedEvents;
+    }
+    List<string> handlers;
+    if (methodIdsByTypeAndName.TryGetValue((subscription.SubscriberType, subscription.HandlerName), out var typedHandlers))
+        handlers = typedHandlers;
+    else
+    {
+        if (!methodIdsByName.TryGetValue(subscription.HandlerName, out var namedHandlers))
+            continue;
+        handlers = namedHandlers;
+    }
+    foreach (var handler in handlers)
+    foreach (var eventId in events)
+        AddEdge(handler, eventId, "SUBSCRIBES_TO",
+            Attrs(
+                ("registrar_method_id", subscription.Registrar),
+                ("expression", subscription.Expression),
+                ("line", subscription.Line),
+                ("resolution", handlers.Count == 1 && events.Count == 1 ? "unique" : "name")
+            ));
+}
+
+foreach (var trigger in pendingEventTriggers)
+{
+    var targets = eventIdsByTypeAndName.TryGetValue((trigger.DeclaringType, trigger.EventName), out var localEvent)
+        ? new List<string> { localEvent }
+        : eventIdsByName.GetValueOrDefault(trigger.EventName, new List<string>());
+    foreach (var eventId in targets)
+        AddEdge(trigger.Publisher, eventId, "PUBLISHES_EVENT",
+            Attrs(
+                ("expression", trigger.Expression),
+                ("line", trigger.Line),
+                ("resolution", targets.Count == 1 ? "unique" : "name")
+            ));
 }
 
 foreach (var call in pendingCalls)

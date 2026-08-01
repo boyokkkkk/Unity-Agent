@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
 from game_agent.project_graph.retrieval import LocalizationRetriever
-from game_agent.project_graph.schema import GRAPH_SCHEMA_VERSION, Node, ProjectGraph
+from game_agent.project_graph.schema import GRAPH_SCHEMA_VERSION, Node, NodeKind, ProjectGraph
 
 from .models import TaskWorkingSet, WorkingSetEntry
 
@@ -122,35 +123,110 @@ class ProjectContextStore:
         strategy: str = "role_mmr",
         max_test_candidates: int = 1,
         mmr_lambda: float = 0.82,
+        semantic_model: str = "",
+        semantic_weight: float = 0.35,
+        semantic_cache_path: Path | None = None,
+        causal_query_decomposition: bool = False,
+        causal_role_retention: bool = False,
     ) -> list[WorkingSetEntry]:
-        result = self._retriever.retrieve(
-            query,
-            "A2",
-            limit=limit,
-            strategy=strategy,
-            max_test_candidates=max_test_candidates,
-            mmr_lambda=mmr_lambda,
-        )
-        scores: dict[str, float] = {}
-        ordered_ids: list[str] = []
+        queries = _decompose_causal_query(query) if causal_query_decomposition else [query]
+        results = [
+            self._retriever.retrieve(
+                subquery,
+                "A2",
+                limit=max(limit * 3, 12) if len(queries) > 1 else limit,
+                strategy=strategy,
+                max_test_candidates=max_test_candidates,
+                mmr_lambda=mmr_lambda,
+                semantic_model=semantic_model,
+                semantic_weight=semantic_weight,
+                semantic_cache_path=semantic_cache_path,
+            )
+            for subquery in queries
+        ]
+        # Localization is consumed as a bounded *file* frontier.  Previously
+        # ranked symbol IDs were sliced before paths were merged and before
+        # file scores could affect ordering.  Aggregate every source by path,
+        # retain one useful symbol representative, then rank and truncate the
+        # merged groups.  Non-code graph objects remain independent groups.
+        ranked_by_path: dict[str, list[str]] = {}
+        for result in results:
+            for item in result.ranked_nodes:
+                node_id = str(item["id"])
+                node = self.graph.nodes.get(node_id)
+                if node is not None and node.path:
+                    ranked_by_path.setdefault(_normalize_path(node.path), []).append(node_id)
 
-        def add(node_id: str, score: float) -> None:
-            if node_id not in scores:
-                ordered_ids.append(node_id)
-            scores[node_id] = max(scores.get(node_id, 0.0), score)
+        groups: dict[str, dict[str, Any]] = {}
+        insertion = 0
 
-        for item in result.ranked_nodes:
-            add(str(item["id"]), float(item.get("score", 0.0)))
-        for collection in (result.game_objects, result.assets):
-            for item in collection:
-                add(str(item["id"]), float(item.get("score", 0.0)))
-        for item in result.files:
-            for node_id in self._path_index.get(_normalize_path(str(item.get("path", ""))), []):
-                add(node_id, float(item.get("score", 0.0)))
+        def add(node_id: str, score: float, *, path: str = "", rrf: float = 0.0) -> None:
+            nonlocal insertion
+            node = self.graph.nodes[node_id]
+            path_key = _normalize_path(path or node.path)
+            key = f"path:{path_key}" if path_key else f"node:{node_id}"
+            existing = groups.get(key)
+            if existing is None:
+                groups[key] = {
+                    "node_id": node_id, "score": score, "rrf": rrf, "order": insertion
+                }
+                insertion += 1
+                return
+            existing["score"] = max(float(existing["score"]), score)
+            existing["rrf"] = float(existing.get("rrf", 0.0)) + rrf
+
+        for result in results:
+            for rank, item in enumerate(result.files, start=1):
+                path = str(item.get("path", ""))
+                path_key = _normalize_path(path)
+                path_nodes = self._path_index.get(path_key, [])
+                representative = next(
+                    (node_id for node_id in ranked_by_path.get(path_key, []) if node_id in path_nodes),
+                    next(
+                        (
+                            node_id for node_id in path_nodes
+                            if self.graph.nodes[node_id].kind == NodeKind.CSHARP_FILE
+                        ),
+                        path_nodes[0] if path_nodes else "",
+                    ),
+                )
+                if representative:
+                    add(
+                        representative,
+                        float(item.get("score", 0.0)),
+                        path=path,
+                        rrf=1.0 / (60.0 + rank),
+                    )
+
+        for result in results:
+            for collection in (result.ranked_nodes, result.game_objects, result.assets):
+                for item in collection:
+                    node_id = str(item["id"])
+                    node = self.graph.nodes.get(node_id)
+                    if node is not None:
+                        add(node_id, float(item.get("score", 0.0)), path=node.path)
+        if len(results) > 1:
+            sort_key = lambda item: (
+                    -float(item.get("rrf", 0.0)),
+                    -float(item["score"]),
+                    int(item["order"]),
+                )
+        else:
+            sort_key = lambda item: (-float(item["score"]), int(item["order"]))
+        ordered = sorted(groups.values(), key=sort_key)
+        if len(results) > 1:
+            maximum_rrf = max((float(item.get("rrf", 0.0)) for item in ordered), default=1.0)
+            for item in ordered:
+                item["score"] = float(item.get("rrf", 0.0)) / max(maximum_rrf, 1e-12)
+        if causal_role_retention:
+            ordered = _retain_causal_roles(ordered, self.graph, limit)
+        else:
+            ordered = ordered[:limit]
         working_set = self.working_set(task_id)
         entries = []
-        for node_id in ordered_ids[:limit]:
-            score = scores[node_id]
+        for item in ordered:
+            node_id = str(item["node_id"])
+            score = float(item["score"])
             node = self.graph.nodes[node_id]
             entry = working_set.add(self._entry(node, relevance=score))
             entries.append(entry)
@@ -385,3 +461,61 @@ class ProjectContextStore:
 
 def _normalize_path(value: str) -> str:
     return value.replace("\\", "/").lstrip("./").casefold()
+
+
+def _decompose_causal_query(query: str) -> list[str]:
+    """Split a bug report into trigger, transition, publication, and observer searches."""
+    lowered = query.casefold()
+    causal_markers = (
+        "interact", "input", "state", "transition", "event", "observer", "ui",
+        "触发", "输入", "状态", "事件", "界面", "订阅",
+    )
+    if not any(marker in lowered for marker in causal_markers):
+        return [query]
+    identifiers = list(dict.fromkeys(re.findall(r"\b(?:On[A-Z]\w+|[A-Z][A-Za-z0-9_]*UI)\b", query)))
+    identifier_text = " ".join(identifiers)
+    parts = [
+        query,
+        f"{identifier_text} interaction input action subscriber handler trigger",
+        f"{identifier_text} game state transition countdown manager controller writes state",
+        f"{identifier_text} OnStateChanged event publication invoke publisher",
+        f"{identifier_text} UI observer refresh OnStateChanged subscriber",
+    ]
+    return list(dict.fromkeys(part.strip() for part in parts if part.strip()))
+
+
+def _causal_role(node: Node) -> str:
+    value = f"{node.name} {Path(node.path).stem} {node.kind.value}".casefold()
+    if "test" in value:
+        return "test"
+    if any(token in value for token in ("manager", "controller", "state", "coordinator")):
+        return "controller"
+    if any(token in value for token in ("input", "interaction", "event")):
+        return "event_source"
+    if any(token in value for token in ("ui", "view", "panel", "canvas")):
+        return "ui"
+    return "source"
+
+
+def _retain_causal_roles(
+    ordered: list[dict[str, Any]], graph: ProjectGraph, limit: int
+) -> list[dict[str, Any]]:
+    """Reserve one bounded candidate for every causal role before truncation."""
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+    for role in ("event_source", "controller", "ui"):
+        match = next(
+            (
+                item for item in ordered
+                if str(item["node_id"]) not in selected_ids
+                and _causal_role(graph.nodes[str(item["node_id"])]) == role
+            ),
+            None,
+        )
+        if match is not None:
+            selected.append(match)
+            selected_ids.add(str(match["node_id"]))
+    selected.extend(
+        item for item in ordered if str(item["node_id"]) not in selected_ids
+    )
+    return selected[:limit]

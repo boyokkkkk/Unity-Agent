@@ -9,7 +9,9 @@ from game_agent.framework.exceptions import FormatError
 from game_agent.aci.schemas import ACI_TOOL_NAMES
 from game_agent.framework.models.utils.actions_toolcall import (
     AGENT_TOOLS,
+    normalize_tool_arguments,
     select_agent_tools,
+    tool_argument_retry_hint,
     validate_tool_arguments,
 )
 
@@ -76,12 +78,16 @@ def parse_response_actions(
         except Exception as exc:
             arguments = {}
             error = f"Error parsing tool call arguments: {exc}."
+        arguments, repairs = normalize_tool_arguments(str(name), arguments)
         error += validate_tool_arguments(str(name), arguments)
         if error:
+            error += tool_argument_retry_hint(str(name))
             text = Template(format_error_template, undefined=StrictUndefined).render(
                 error=error.strip(), actions=[], has_tool_calls=True, **template_kwargs,
             )
-            raise _format_error(text)
+            format_error = _format_error(text)
+            format_error.messages[0].setdefault("extra", {})["argument_repairs"] = repairs
+            raise format_error
         call_id = call.get("call_id") or call.get("id")
         if name == "powershell":
             actions.append({"tool": "powershell", "command": arguments["command"], "tool_call_id": call_id})

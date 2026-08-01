@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RoslynProjectGraph")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9f91220e1452b64dfb4a9e98bf5bad3f8d4fa873")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+78454fd6a71c8fa804c83fb291f0ce791fc90b1b")]
 [assembly: System.Reflection.AssemblyProductAttribute("RoslynProjectGraph")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RoslynProjectGraph")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

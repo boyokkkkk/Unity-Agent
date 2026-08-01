@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from game_agent.project_graph.semantic import semantic_cache_name
 
 from .models import (
     ContextMemory,
@@ -51,6 +52,12 @@ class ContextConfig(BaseModel):
     ] = "role_mmr"
     max_test_candidates: int = Field(default=1, ge=0)
     retrieval_mmr_lambda: float = Field(default=0.82, ge=0.0, le=1.0)
+    semantic_search_enabled: bool = False
+    semantic_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    semantic_weight: float = Field(default=0.35, ge=0.0, le=1.0)
+    semantic_cache_path: str = ""
+    causal_query_decomposition_enabled: bool = False
+    causal_role_retention_enabled: bool = False
     max_working_set_entries: int = Field(default=24, ge=1)
     max_candidate_details: int = Field(default=5, ge=0)
     max_recent_tool_results: int = Field(default=1, ge=0)
@@ -150,6 +157,14 @@ class ContextAssembler:
                         strategy=self.config.retrieval_strategy,
                         max_test_candidates=self.config.max_test_candidates,
                         mmr_lambda=self.config.retrieval_mmr_lambda,
+                        semantic_model=(
+                            self.config.semantic_model
+                            if self.config.semantic_search_enabled else ""
+                        ),
+                        semantic_weight=self.config.semantic_weight,
+                        semantic_cache_path=self._semantic_cache_path(),
+                        causal_query_decomposition=self.config.causal_query_decomposition_enabled,
+                        causal_role_retention=self.config.causal_role_retention_enabled,
                     )
                 except (OSError, ValueError):
                     entries = []
@@ -165,8 +180,11 @@ class ContextAssembler:
                             sources=[f"graph:{entry.node_id}"],
                             node_ids=[entry.node_id],
                             confidence=min(1.0, max(0.0, entry.relevance)),
+                            repository_revision=self._project_revision(),
                         )
                         entry.evidence_ids.append(evidence.id)
+                        # Auto-label working set entries with evidence as relevant
+                        self.working_set.label(entry.node_id, True, evidence_id=evidence.id)
 
     def begin_turn(self, task: str) -> None:
         if not self.task_id:
@@ -201,6 +219,7 @@ class ContextAssembler:
             sources=sources,
             node_ids=node_ids or [],
             confidence=confidence,
+            repository_revision=self._project_revision(),
         )
         self.memory.add_unique("verified_facts", claim)
         for node_id in node_ids or []:
@@ -220,6 +239,7 @@ class ContextAssembler:
             sources=sources or [],
             node_ids=node_ids or [],
             confidence=1.0,
+            repository_revision=self._project_revision(),
         )
         self.memory.add_unique("rejected_hypotheses", hypothesis)
         for node_id in node_ids or []:
@@ -304,6 +324,7 @@ class ContextAssembler:
             category = (
                 "mutation" if extra.get("aci_mutation")
                 else "validation" if extra.get("aci_control")
+                else "workflow" if extra.get("aci_workflow")
                 else "query" if extra.get("aci")
                 else _command_category(command)
             )
@@ -326,7 +347,12 @@ class ContextAssembler:
                 category=category,
                 success=success,
             )
-            self.recent_tools.append(tool_observation)
+
+            # Token optimization: Don't add successful validation to recent_tools (saves ~800 tokens)
+            skip_recent_tools = category == "validation" and success
+            if not skip_recent_tools:
+                self.recent_tools.append(tool_observation)
+
             if extra.get("aci"):
                 self._record_structured_query(tool_name, extra)
                 if category == "query":
@@ -407,12 +433,17 @@ class ContextAssembler:
             status = EvidenceStatus.OBSERVED
         node_ids = [str(value) for value in extra.get("node_ids", []) if value]
         sources = [str(value) for value in extra.get("evidence_sources", []) if value]
+        artifact_path = str(extra.get("evidence_artifact_path", "")).strip() or None
+        artifact_sha256 = str(extra.get("evidence_artifact_sha256", "")).strip() or None
         evidence = self.evidence.add(
             claim,
             status=status,
             sources=sources or [f"aci:{tool_name}"],
             node_ids=node_ids,
             confidence=0.9 if status == EvidenceStatus.SOURCE_VERIFIED else 0.65,
+            repository_revision=self._project_revision(),
+            artifact_path=artifact_path,
+            artifact_sha256=artifact_sha256,
         )
         self.structured_query_evidence_count += 1
         self.structured_query_nodes_mapped += len(set(node_ids))
@@ -422,6 +453,9 @@ class ContextAssembler:
             entry = self.working_set.entries.get(node_id)
             if entry is not None and evidence.id not in entry.evidence_ids:
                 entry.evidence_ids.append(evidence.id)
+                # Auto-label as relevant when evidence is added
+                if entry.relevance_label is None:
+                    entry.relevance_label = True
         if status in {EvidenceStatus.SOURCE_VERIFIED, EvidenceStatus.RUNTIME_VERIFIED}:
             self.memory.add_unique("verified_facts", claim)
 
@@ -456,6 +490,23 @@ class ContextAssembler:
             "structured_query_evidence": self.structured_query_evidence_count,
             "control_state": self.control_state,
         }
+
+    def _semantic_cache_path(self) -> Path | None:
+        if not self.config.semantic_search_enabled:
+            return None
+        if self.config.semantic_cache_path:
+            configured = Path(self.config.semantic_cache_path)
+            return configured.resolve() if configured.is_absolute() else (
+                (self.artifact_root or self.project_root) / configured
+            ).resolve()
+        if self.config.graph_path:
+            graph_path = Path(self.config.graph_path)
+            if not graph_path.is_absolute():
+                graph_path = (self.project_root / graph_path).resolve()
+            return graph_path.parent / semantic_cache_name(self.config.semantic_model)
+        if self.artifact_root:
+            return self.artifact_root / semantic_cache_name(self.config.semantic_model)
+        return None
 
     def _open_store(self) -> ProjectContextStore | None:
         if not self.config.graph_path:
@@ -537,6 +588,7 @@ class ContextAssembler:
                 sources=[path],
                 node_ids=node_ids,
                 confidence=0.5,
+                repository_revision=self._project_revision(),
             )
             for node_id in node_ids:
                 if node_id in self.working_set.entries:
@@ -548,6 +600,7 @@ class ContextAssembler:
         lowered = command.casefold()
         validation = "playmode" if "playmode" in lowered else "editmode" if "editmode" in lowered else "compile"
         if success:
+            # Token optimization: Success = minimal indicator, don't keep verbose summary
             if validation in self.memory.pending_validations:
                 self.memory.pending_validations.remove(validation)
             self.memory.last_failure = None
@@ -556,12 +609,16 @@ class ContextAssembler:
                 status=EvidenceStatus.RUNTIME_VERIFIED,
                 sources=[observation.artifact_ref or f"command:{command}"],
                 confidence=1.0,
+                repository_revision=self._project_revision(),
             )
             self.memory.add_unique("verified_facts", evidence.claim)
             self._set_phase("validation", "Complete remaining validation and review evidence before submission.")
+            # Don't append to recent_tools for successful validations - saves ~800 tokens per validation
         else:
+            # Failure: Keep detailed summary in recent_tools for diagnosis
             self.memory.add_unique("pending_validations", validation)
             self._set_phase("diagnosis", "Use the latest structured validation failure to revise the root-cause hypothesis.")
+            # observation is already in recent_tools from the caller
 
     def _set_phase(self, phase: str, goal: str) -> None:
         if phase != self.phase:
@@ -577,6 +634,9 @@ class ContextAssembler:
             current = phase_indexes[phase]
             for index, item in enumerate(self.plan):
                 item["status"] = "completed" if index < current else "in_progress" if index == current else "pending"
+
+    def _project_revision(self) -> str:
+        return self.project_store.version.project_revision if self.project_store is not None else ""
 
     @staticmethod
     def _default_plan() -> list[dict[str, str]]:
@@ -597,13 +657,13 @@ class ContextAssembler:
         durable_instructions: list[str],
         recent_messages: list[dict[str, str]],
     ) -> str:
-        verified = [item.to_dict() for item in self.evidence.verified()][-self.config.max_evidence_items :]
+        verified = [item.to_context_dict() for item in self.evidence.verified()][-self.config.max_evidence_items :]
         active = [
-            item.to_dict() for item in self.evidence.active()
+            item.to_context_dict() for item in self.evidence.active()
             if item.status != EvidenceStatus.SUGGESTED
         ][-self.config.max_evidence_items :]
         suggested = [
-            item.to_dict() for item in self.evidence.active()
+            item.to_context_dict() for item in self.evidence.active()
             if item.status == EvidenceStatus.SUGGESTED
         ][: self.config.max_evidence_items]
         working_refs = [
@@ -613,12 +673,18 @@ class ContextAssembler:
                 "name": entry.name,
                 "path": entry.path,
                 "status": entry.status,
-                "relevance": round(entry.relevance, 6),
                 "evidence_ids": entry.evidence_ids,
             }
             for entry in self.working_set.entries.values()
         ]
         recent_tools = [item.to_dict() for item in self.recent_tools[-self.config.max_recent_tool_results :]]
+        workflow = self.control_state.get("workflow", {})
+        compact_control = {
+            key: value for key, value in self.control_state.items()
+            if key != "workflow"
+        }
+        context_metrics = self.metrics()
+        context_metrics.pop("control_state", None)
         payload = {
             "task": self.original_task,
             "latest_request": self.turn_requests[-1] if self.turn_requests else self.original_task,
@@ -630,15 +696,24 @@ class ContextAssembler:
             "observed_evidence": active,
             "graph_suggestions": suggested,
             "working_set": working_refs,
-            "evidence_conditioned_control": self.control_state,
+            "evidence_conditioned_control": compact_control,
             "candidate_details": details,
             "recent_messages": recent_messages,
             "recent_tool_results": recent_tools,
             "budget": budget,
-            "context_metrics": self.metrics(),
+            "context_metrics": context_metrics,
         }
+        workflow_capsule = ""
+        if isinstance(workflow, dict) and workflow:
+            workflow_capsule = (
+                "<workflow-state>\n"
+                "This controller-owned state is durable and overrides stale conversational plans.\n"
+                + json.dumps(workflow, ensure_ascii=False, indent=2)
+                + "\n</workflow-state>\n"
+            )
         return (
-            "<virtual-project-context>\n"
+            workflow_capsule
+            + "<virtual-project-context>\n"
             "This is a task-scoped view over durable project knowledge. Graph suggestions are not verified facts. "
             "Use artifact_ref to reopen an externalized raw result only when necessary.\n"
             + json.dumps(payload, ensure_ascii=False, indent=2)

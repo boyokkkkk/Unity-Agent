@@ -4,6 +4,7 @@ Version: 0.2.0
 Requires-Python: >=3.10
 Requires-Dist: jinja2
 Requires-Dist: litellm!=1.82.7,!=1.82.8,>=1.75.5
+Requires-Dist: networkx>=3.2
 Requires-Dist: pydantic>=2
 Requires-Dist: pyyaml
 Requires-Dist: requests>=2.31

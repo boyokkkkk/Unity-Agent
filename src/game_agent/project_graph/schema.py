@@ -26,11 +26,24 @@ class NodeKind(str, Enum):
 
 class EdgeKind(str, Enum):
     CALLS = "CALLS"
+    SUBSCRIBES_TO = "SUBSCRIBES_TO"
+    PUBLISHES_EVENT = "PUBLISHES_EVENT"
+    WRITES_STATE = "WRITES_STATE"
     ATTACHED_TO = "ATTACHED_TO"
     CONTAINS = "CONTAINS"
     PREFAB_SOURCE = "PREFAB_SOURCE"
     SERIALIZED_REF = "SERIALIZED_REF"
     UNITY_EVENT_CALL = "UNITY_EVENT_CALL"
+
+
+CORE_EDGE_KINDS = {
+    EdgeKind.CALLS,
+    EdgeKind.ATTACHED_TO,
+    EdgeKind.CONTAINS,
+    EdgeKind.PREFAB_SOURCE,
+    EdgeKind.SERIALIZED_REF,
+    EdgeKind.UNITY_EVENT_CALL,
+}
 
 
 def stable_id(namespace: str, *parts: str) -> str:
@@ -150,7 +163,7 @@ class ProjectGraph:
                 errors.append(f"missing target node: {edge.target}")
         if require_six_edge_kinds:
             present = {edge.kind for edge in self.edges}
-            for kind in EdgeKind:
+            for kind in CORE_EDGE_KINDS:
                 if kind not in present:
                     errors.append(f"missing edge kind: {kind.value}")
         return errors

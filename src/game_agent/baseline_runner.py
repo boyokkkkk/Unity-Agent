@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import shutil
+import tempfile
 import time
 import traceback
 import uuid
@@ -26,6 +27,13 @@ DEFAULT_TASK = (
     "玩家在开始界面按下交互键后，游戏应进入倒计时；目前教程界面没有关闭，"
     "倒计时界面也没有出现。问题可能位于游戏状态切换与 UI 刷新链路。"
     "请定位根因，进行最小修复，并通过相关 Unity 测试验证。"
+)
+ENGLISH_TASK = (
+    "After the player presses the interact key on the start screen, the game should enter the "
+    "countdown state. Currently the tutorial UI does not close and the countdown UI does not "
+    "appear. The defect is likely in the interaction input, game-state transition, OnStateChanged "
+    "event publication, or UI observer refresh chain. Locate the root cause, make the smallest "
+    "possible repair, and validate it with the relevant Unity tests."
 )
 TARGET_SCRIPT = Path("Assets/Scripts/KitchenGameManager.cs")
 RELEVANT_FILES = (
@@ -463,7 +471,8 @@ class StateEventBaselineRunner:
         infrastructure_errors: list[str] = []
 
         try:
-            workspace_root = artifact_dir / "workspace"
+            # Create workspace in temp directory, not in artifacts (avoid 1.6GB per experiment)
+            workspace_root = Path(tempfile.gettempdir()) / "game-agent-baselines" / run_id
             lease = create_task_workspace(source, workspace_root, mode=self.case.isolation)
             project = lease.project_path
             inject_state_event_defect(project, artifact_dir)

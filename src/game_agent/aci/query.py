@@ -270,6 +270,7 @@ class StructuredQueryExecutor:
         if not target.is_file():
             return self._error("code_file_read", "source_missing", f"Source does not exist: {relative}")
         raw = target.read_bytes()
+        sha256 = hashlib.sha256(raw).hexdigest()
         lines = raw.decode("utf-8", errors="replace").splitlines()
         start = max(1, int(args.get("start_line", 1)))
         end = min(len(lines), int(args.get("end_line", start + 199)))
@@ -277,17 +278,35 @@ class StructuredQueryExecutor:
             raise ValueError("end_line must be >= start_line")
         maximum = max(256, min(50000, int(args.get("max_chars", 12000))))
         content = "\n".join(lines[start - 1:end])
+
+        # Persist full file content to evidence artifact for mutation execution
+        from game_agent.context import EvidenceLedger
+        evidence_id = EvidenceLedger.id_for(
+            f"Read source file {relative} at SHA-256 {sha256}.",
+            [f"source:{relative}:{start}-{end}"]
+        )
+        artifact_relative = ""
+        if self.artifact_root:
+            artifact_dir = self.artifact_root / "evidence-artifacts"
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            artifact_file = artifact_dir / f"{evidence_id.replace(':', '_')}.txt"
+            # Store full file content, not just the viewed range
+            full_content = "\n".join(lines)
+            artifact_file.write_text(full_content, encoding="utf-8")
+            artifact_relative = artifact_file.relative_to(self.artifact_root).as_posix()
+
         self._map([node.id])
         payload = {
             "status": "ok",
             "node": _summary(node),
             "path": relative,
-            "sha256": hashlib.sha256(raw).hexdigest(),
+            "sha256": sha256,
             "start_line": start,
             "end_line": end,
             "total_lines": len(lines),
             "truncated": len(content) > maximum,
             "content": content[:maximum],
+            "evidence_artifact": artifact_relative,
         }
         return self._ok(
             "code_file_read",
@@ -295,7 +314,9 @@ class StructuredQueryExecutor:
             ids=[node.id],
             sources=[f"source:{relative}:{start}-{end}"],
             status="source_verified",
-            claim=f"Read source file {relative} at SHA-256 {payload['sha256']}.",
+            claim=f"Read source file {relative} at SHA-256 {sha256}.",
+            artifact_path=artifact_relative,
+            artifact_sha256=sha256,
         )
 
     def _code_diagnostics(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -351,7 +372,13 @@ class StructuredQueryExecutor:
     def _need_graph(self, tool: str) -> dict[str, Any] | None:
         return None if self.store is not None else self._unavailable(tool, "No project graph is configured; set context.graph_path.")
 
-    def _search(self, query: str, kinds: set[NodeKind], prefix: str, limit: int) -> list[Node]:
+    def _search(
+        self,
+        query: str,
+        kinds: set[NodeKind],
+        prefix: str,
+        limit: int,
+    ) -> list[tuple[float, Node]]:
         terms, path_prefix = tokenize(query), _norm(prefix)
         scored: list[tuple[int, Node]] = []
         for node in self.store.graph.nodes.values():
@@ -363,7 +390,7 @@ class StructuredQueryExecutor:
             if score:
                 scored.append((score, node))
         scored.sort(key=lambda item: (-item[0], item[1].path.casefold(), item[1].name.casefold(), item[1].id))
-        return [node for _, node in scored[:limit]]
+        return [(float(score), node) for score, node in scored[:limit]]
 
     def _resolve(self, *, node_id: str = "", path: str = "", hierarchy: str = "", name: str = "", kinds: set[NodeKind] | None = None) -> list[Node]:
         if node_id:
@@ -413,13 +440,33 @@ class StructuredQueryExecutor:
         if self.store:
             self.store.map_node_ids(self.context.task_id or "unbound", ids)
 
-    def _nodes(self, tool: str, query: str, nodes: list[Node]) -> dict[str, Any]:
-        ids = [node.id for node in nodes]
+    def _nodes(
+        self,
+        tool: str,
+        query: str,
+        nodes: list[Node] | list[tuple[float, Node]],
+    ) -> dict[str, Any]:
+        ranked: list[tuple[float | None, Node]] = [
+            (float(item[0]), item[1]) if isinstance(item, tuple) else (None, item)
+            for item in nodes
+        ]
+        ids = [node.id for _, node in ranked]
         self._map(ids)
-        return self._ok(tool, {"status": "ok", "query": query, "total": len(nodes), "results": [_summary(node) for node in nodes]}, ids=ids, sources=_graph_sources(ids), status="observed", claim=f"Observed {len(nodes)} indexed candidate(s) for {query!r}.")
+        results = []
+        for score, node in ranked:
+            summary = _summary(node)
+            if score is not None:
+                summary["score"] = score
+            results.append(summary)
+        return self._ok(tool, {"status": "ok", "query": query, "total": len(ranked), "results": results}, ids=ids, sources=_graph_sources(ids), status="observed", claim=f"Observed {len(ranked)} indexed candidate(s) for {query!r}.")
 
-    def _ok(self, tool: str, payload: dict[str, Any], *, ids: list[str] | None = None, sources: list[str] | None = None, status: str = "", claim: str = "") -> dict[str, Any]:
-        return {"output": json.dumps(payload, ensure_ascii=False, indent=2), "returncode": 0, "exception_info": "", "extra": {"aci": True, "query_tool": tool, "structured": payload, "node_ids": list(dict.fromkeys(ids or [])), "evidence_sources": list(dict.fromkeys(sources or [])), "evidence_status": status, "evidence_claim": claim}}
+    def _ok(self, tool: str, payload: dict[str, Any], *, ids: list[str] | None = None, sources: list[str] | None = None, status: str = "", claim: str = "", artifact_path: str = "", artifact_sha256: str = "") -> dict[str, Any]:
+        extra = {"aci": True, "query_tool": tool, "structured": payload, "node_ids": list(dict.fromkeys(ids or [])), "evidence_sources": list(dict.fromkeys(sources or [])), "evidence_status": status, "evidence_claim": claim}
+        if artifact_path:
+            extra["evidence_artifact_path"] = artifact_path
+        if artifact_sha256:
+            extra["evidence_artifact_sha256"] = artifact_sha256
+        return {"output": json.dumps(payload, ensure_ascii=False, indent=2), "returncode": 0, "exception_info": "", "extra": extra}
 
     def _empty(self, tool: str, reason: str) -> dict[str, Any]:
         return self._ok(tool, {"status": "ok", "total": 0, "results": [], "reason": reason})

@@ -1,4 +1,6 @@
 [console_scripts]
 game-agent = game_agent.cli:main
+game-agent-baseline = game_agent.baseline_cli:main
 game-agent-benchmark = game_agent.benchmark.cli:main
 game-agent-console = game_agent.console:main
+game-agent-graph = game_agent.project_graph.cli:main

@@ -18,6 +18,7 @@ from game_agent.context import (
 from game_agent.framework.agents.default import DefaultAgent
 from game_agent.framework.environments.local import LocalEnvironment
 from game_agent.project_graph.schema import Edge, EdgeKind, Node, NodeKind, ProjectGraph
+from game_agent.project_graph.retrieval import LocalizationResult
 
 
 def context_graph(project: Path) -> ProjectGraph:
@@ -61,6 +62,91 @@ def context_graph(project: Path) -> ProjectGraph:
 
 
 class ProjectContextStoreTest(unittest.TestCase):
+    def test_causal_query_fusion_retains_input_controller_and_ui_before_limit(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            graph = ProjectGraph(project_path=str(project))
+            paths = (
+                "Assets/GameInput.cs",
+                "Assets/KitchenGameManager.cs",
+                "Assets/TutorialUI.cs",
+                "Assets/CuttingCounter.cs",
+            )
+            for index, path in enumerate(paths):
+                target = project / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("class Source {}", encoding="utf-8")
+                graph.add_node(Node(f"n{index}", NodeKind.CSHARP_FILE, Path(path).stem, path))
+            store = ProjectContextStore.from_graph(graph, project_root=project)
+            calls = []
+
+            def retrieve(query, *args, **kwargs):
+                calls.append(query)
+                if "input action" in query:
+                    order = [0, 3, 1, 2]
+                elif "state transition" in query:
+                    order = [1, 3, 0, 2]
+                elif "UI observer" in query:
+                    order = [2, 3, 1, 0]
+                else:
+                    order = [3, 0, 1, 2]
+                return LocalizationResult(
+                    variant="A2", strategy="role_mmr",
+                    files=[{"path": paths[i], "score": 1.0 - rank * 0.1} for rank, i in enumerate(order)],
+                    game_objects=[], assets=[], ranked_nodes=[], dependency_paths=[],
+                )
+
+            store._retriever.retrieve = retrieve
+            entries = store.locate(
+                "causal", "Interaction input state event UI observer failure",
+                limit=3, causal_query_decomposition=True, causal_role_retention=True,
+            )
+
+            self.assertGreaterEqual(len(calls), 4)
+            self.assertEqual(
+                {"GameInput", "KitchenGameManager", "TutorialUI"},
+                {entry.name for entry in entries},
+            )
+
+    def test_locate_merges_and_scores_by_file_before_limit(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            graph = ProjectGraph(project_path=str(project))
+            for path in ("Assets/A.cs", "Assets/B.cs"):
+                target = project / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("class Source {}", encoding="utf-8")
+            for node in (
+                Node("file-a", NodeKind.CSHARP_FILE, "A.cs", "Assets/A.cs"),
+                Node("method-a", NodeKind.METHOD, "A", "Assets/A.cs"),
+                Node("file-b", NodeKind.CSHARP_FILE, "B.cs", "Assets/B.cs"),
+                Node("method-b", NodeKind.METHOD, "B", "Assets/B.cs"),
+            ):
+                graph.add_node(node)
+            store = ProjectContextStore.from_graph(graph, project_root=project)
+            store._retriever.retrieve = lambda *args, **kwargs: LocalizationResult(
+                variant="A2",
+                strategy="role_mmr",
+                files=[
+                    {"path": "Assets/B.cs", "score": 0.9},
+                    {"path": "Assets/A.cs", "score": 0.8},
+                ],
+                game_objects=[],
+                assets=[],
+                ranked_nodes=[
+                    {"id": "method-a", "score": 0.99},
+                    {"id": "file-a", "score": 0.98},
+                    {"id": "method-b", "score": 0.5},
+                ],
+                dependency_paths=[],
+            )
+
+            entries = store.locate("task", "query", limit=2)
+
+            self.assertEqual(["method-a", "method-b"], [entry.node_id for entry in entries])
+            self.assertEqual([0.99, 0.9], [entry.relevance for entry in entries])
+            self.assertEqual(2, len({entry.path for entry in entries}))
+
     def test_existing_working_set_keeps_the_strictest_capacity(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
@@ -194,6 +280,7 @@ class ContextAssemblerTest(unittest.TestCase):
             store = ProjectContextStore.from_graph(context_graph(project), project_root=project)
             assembler = ContextAssembler(
                 ContextConfig(
+                    auto_locate=False,
                     max_recent_tool_results=1,
                     max_candidate_details=3,
                     compression_trigger_ratio=0.5,
@@ -202,6 +289,10 @@ class ContextAssemblerTest(unittest.TestCase):
                 project_store=store,
             )
             assembler.reset("Fix KitchenManager countdown", task_id="task")
+            # File-level localization deliberately collapses code candidates;
+            # map the separately judged scene object explicitly for this
+            # evidence-precision assertion.
+            store.map_node_ids("task", ["start", "go"])
             assembler.record_verified_fact(
                 "StartCountdown calls ShowCountdown.",
                 sources=["Assets/Scripts/KitchenManager.cs:1"],
