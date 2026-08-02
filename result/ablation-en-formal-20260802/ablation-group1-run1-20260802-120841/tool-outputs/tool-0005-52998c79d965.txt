@@ -1,0 +1,316 @@
+{
+  "status": "accepted",
+  "diagnosis": {
+    "version": 1,
+    "symptom": "After the player presses the interact key on the start screen, the tutorial UI does not close and the countdown UI does not appear because the OnStateChanged event is not published when transitioning to State.CountdownToStart.",
+    "root_targets": [
+      "C2"
+    ],
+    "causal_chain": [
+      {
+        "statement": "KitchenGameManager.GameInput_OnInteraction PUBLISHES_EVENT KitchenGameManager.OnStateChanged (absent)",
+        "evidence_ids": [
+          "evidence:b77fe266ba1e03f1"
+        ],
+        "subject": "KitchenGameManager.GameInput_OnInteraction",
+        "predicate": "PUBLISHES_EVENT",
+        "object": "KitchenGameManager.OnStateChanged",
+        "polarity": "absent",
+        "fact_ids": [
+          "fact:59a6f83628b0ce00"
+        ],
+        "negative_evidence": {
+          "scope": "KitchenGameManager.GameInput_OnInteraction",
+          "edge_kind": "PUBLISHES_EVENT",
+          "graph_revision": "graph:6b10fbb9c1f6653e",
+          "observed_matches": 0,
+          "complete": true
+        }
+      }
+    ],
+    "proposed_mutations": [],
+    "validation_plan": [
+      "compile",
+      "editmode",
+      "playmode"
+    ],
+    "remaining_uncertainty": [],
+    "repository_revision": "7940dc3958cd880b",
+    "status": "accepted",
+    "gaps": [],
+    "evidence_artifacts": {
+      "evidence:b77fe266ba1e03f1": "evidence-artifacts/evidence_b77fe266ba1e03f1.txt"
+    }
+  },
+  "gaps": [],
+  "required_next_actions": [
+    "Call patch_prepare with an absent causal fact that provides ast_anchor and repair_exemplar."
+  ],
+  "workflow_state": {
+    "phase": "prepare_edit",
+    "plan": {
+      "objective": "After the player presses the interact key on the start screen, the game should enter the countdown state. Currently the tutorial UI does not close and the countdown UI does not appear. The defect is likely in the interaction input, game-state transition, OnStateChanged event publication, or UI observer refresh chain.",
+      "hypotheses": [
+        "The GameInput.OnInteractAction event is not properly triggering KitchenGameManager.GameInput_OnInteraction handler.",
+        "KitchenGameManager.GameInput_OnInteraction updates state but fails to publish OnStateChanged event.",
+        "TutorialUI.KitchenGameManager_OnStateChanged is subscribed but does not receive OnStateChanged due to missing invocation.",
+        "The UI update logic in TutorialUI.Hide is not correctly wired or invoked."
+      ],
+      "required_evidence": [
+        "Confirm GameInput.OnInteractAction is declared and raised on key press.",
+        "Confirm KitchenGameManager.GameInput_OnInteraction is subscribed and executes on event.",
+        "Confirm KitchenGameManager.state is set to State.CountdownToStart inside GameInput_OnInteraction.",
+        "Confirm KitchenGameManager.OnStateChanged is invoked after state change in GameInput_OnInteraction.",
+        "Confirm TutorialUI.KitchenGameManager_OnStateChanged is subscribed and calls Hide()."
+      ],
+      "success_criteria": [
+        "GameInput_OnInteraction handler sets state = State.CountdownToStart and invokes OnStateChanged?.Invoke(this, EventArgs.Empty).",
+        "TutorialUI receives OnStateChanged and calls Hide().",
+        "No compile errors; EditMode and PlayMode validation pass."
+      ],
+      "validation_plan": [
+        "compile",
+        "editmode",
+        "playmode"
+      ]
+    },
+    "search_budget": {
+      "enabled": true,
+      "global_limit": 2,
+      "global_used": 0,
+      "graph_expansion_limit": 3,
+      "graph_expansion_used": 0
+    },
+    "candidate_frontier": [
+      {
+        "candidate_id": "C4",
+        "entity_type": "METHOD",
+        "path": "Assets/Scripts/Counters/StoveCounter.cs",
+        "symbol": "Interact",
+        "role": "source",
+        "score": 1.0,
+        "reasons": [
+          "project graph candidate rank 4"
+        ],
+        "read_level": "unread",
+        "evidence_ids": []
+      },
+      {
+        "candidate_id": "C2",
+        "entity_type": "FIELD",
+        "path": "Assets/Scripts/KitchenGameManager.cs",
+        "symbol": "OnStateChanged",
+        "role": "controller",
+        "score": 0.9853664530927565,
+        "reasons": [
+          "project graph candidate rank 2"
+        ],
+        "read_level": "full",
+        "evidence_ids": [
+          "evidence:b77fe266ba1e03f1"
+        ]
+      },
+      {
+        "candidate_id": "C3",
+        "entity_type": "METHOD",
+        "path": "Assets/Scripts/UI/TutorialUI.cs",
+        "symbol": "Hide",
+        "role": "ui",
+        "score": 0.9367167681204829,
+        "reasons": [
+          "project graph candidate rank 3"
+        ],
+        "read_level": "full",
+        "evidence_ids": [
+          "evidence:d5ceb44877284d06"
+        ]
+      },
+      {
+        "candidate_id": "C1",
+        "entity_type": "METHOD",
+        "path": "Assets/Scripts/GameInput.cs",
+        "symbol": "RebindBinding",
+        "role": "event_source",
+        "score": 0.5627645876093081,
+        "reasons": [
+          "project graph candidate rank 1"
+        ],
+        "read_level": "full",
+        "evidence_ids": [
+          "evidence:b444e4fd20406726"
+        ]
+      }
+    ],
+    "diagnosis": {
+      "version": 1,
+      "symptom": "After the player presses the interact key on the start screen, the tutorial UI does not close and the countdown UI does not appear because the OnStateChanged event is not published when transitioning to State.CountdownToStart.",
+      "root_targets": [
+        "C2"
+      ],
+      "status": "accepted",
+      "remaining_uncertainty": [],
+      "causal_chain": [
+        {
+          "subject": "KitchenGameManager.GameInput_OnInteraction",
+          "predicate": "PUBLISHES_EVENT",
+          "object": "KitchenGameManager.OnStateChanged",
+          "polarity": "absent",
+          "fact_ids": [
+            "fact:59a6f83628b0ce00"
+          ],
+          "negative_evidence": {
+            "scope": "KitchenGameManager.GameInput_OnInteraction",
+            "edge_kind": "PUBLISHES_EVENT",
+            "graph_revision": "graph:6b10fbb9c1f6653e",
+            "observed_matches": 0,
+            "complete": true
+          }
+        }
+      ]
+    },
+    "diagnosis_versions": 1,
+    "progress": {
+      "version": 4,
+      "events": [
+        {
+          "event_id": "P1",
+          "event_type": "implementation_read",
+          "phase_before": "inspect",
+          "phase_after": "inspect",
+          "evidence_ids": [
+            "evidence:b77fe266ba1e03f1"
+          ],
+          "details": {
+            "candidate_id": "C2",
+            "view": "full",
+            "path": "Assets/Scripts/KitchenGameManager.cs"
+          },
+          "advances": true
+        },
+        {
+          "event_id": "P2",
+          "event_type": "implementation_read",
+          "phase_before": "inspect",
+          "phase_after": "inspect",
+          "evidence_ids": [
+            "evidence:d5ceb44877284d06"
+          ],
+          "details": {
+            "candidate_id": "C3",
+            "view": "full",
+            "path": "Assets/Scripts/UI/TutorialUI.cs"
+          },
+          "advances": true
+        },
+        {
+          "event_id": "P3",
+          "event_type": "implementation_read",
+          "phase_before": "inspect",
+          "phase_after": "diagnose",
+          "evidence_ids": [
+            "evidence:b444e4fd20406726"
+          ],
+          "details": {
+            "candidate_id": "C1",
+            "view": "full",
+            "path": "Assets/Scripts/GameInput.cs"
+          },
+          "advances": true
+        },
+        {
+          "event_id": "P4",
+          "event_type": "diagnosis_accepted",
+          "phase_before": "diagnose",
+          "phase_after": "prepare_edit",
+          "evidence_ids": [
+            "evidence:b77fe266ba1e03f1"
+          ],
+          "details": {
+            "diagnosis_version": 1,
+            "authorized_candidate_ids": [
+              "C2"
+            ]
+          },
+          "advances": true
+        }
+      ]
+    },
+    "authorized_candidate_ids": [
+      "C2"
+    ],
+    "authorized_paths": [
+      "assets/scripts/kitchengamemanager.cs"
+    ],
+    "missing_evidence_candidate_ids": [],
+    "required_causal_roles": [
+      "controller",
+      "event_source",
+      "ui"
+    ],
+    "read_causal_roles": [
+      "controller",
+      "event_source",
+      "ui"
+    ],
+    "missing_causal_roles": [],
+    "causal_fact_matrix": {
+      "graph_revision": "graph:6b10fbb9c1f6653e",
+      "status": "diagnosis_locked",
+      "selected_facts": [
+        {
+          "fact_id": "fact:59a6f83628b0ce00",
+          "slot": "event_publication",
+          "subject": "KitchenGameManager.GameInput_OnInteraction",
+          "predicate": "PUBLISHES_EVENT",
+          "object": "KitchenGameManager.OnStateChanged",
+          "polarity": "absent",
+          "locations": [
+            "Assets/Scripts/KitchenGameManager.cs:42",
+            "Assets/Scripts/KitchenGameManager.cs"
+          ],
+          "ast_anchor": "state = State.CountdownToStart",
+          "repair_exemplar": "OnStateChanged?.Invoke(this, EventArgs.Empty)",
+          "negative_evidence": {
+            "scope": "KitchenGameManager.GameInput_OnInteraction",
+            "edge_kind": "PUBLISHES_EVENT",
+            "graph_revision": "graph:6b10fbb9c1f6653e",
+            "observed_matches": 0,
+            "complete": true
+          }
+        }
+      ]
+    },
+    "patch_status": "not_prepared",
+    "patch_gaps": [],
+    "compile_repair_attempts": 0,
+    "prepared_mutations": [],
+    "prepared_patch_token": "",
+    "stage_directive": "",
+    "submission_contract": {
+      "plan_accepted": true,
+      "diagnosis_accepted": true,
+      "mutation_required": true,
+      "mutation_count": 0,
+      "no_change_diagnosis_accepted": false,
+      "changed_paths_authorized": false,
+      "diagnostics_passed": false,
+      "compile_passed": false,
+      "required_tests_passed": false,
+      "critical_uncertainties_resolved": true,
+      "validation_complete": false,
+      "final_review_passed": false
+    },
+    "reviews": [],
+    "required_next_actions": [
+      "Call patch_prepare with an absent causal fact that provides ast_anchor and repair_exemplar."
+    ],
+    "forbidden": [
+      "global_search",
+      "relation_expansion",
+      "mutation",
+      "validation",
+      "submit",
+      "powershell"
+    ]
+  }
+}

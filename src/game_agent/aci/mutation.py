@@ -29,6 +29,15 @@ class AciConfig(BaseModel):
     require_location_evidence: bool = True
     require_target_read: bool = True
     require_causal_role_evidence: bool = False
+    require_structured_causal_claims: bool = False
+    max_compile_repair_attempts: int = Field(default=2, ge=0, le=5)
+    automatic_validation_enabled: bool = False
+    evidence_artifact_enabled: bool = True
+    evidence_recovery_enabled: bool = True
+    bounded_search_enabled: bool = True
+    project_graph_enabled: bool = True
+    submission_contract_enabled: bool = True
+    validation_gates_enabled: bool = True
     workflow_enabled: bool = False
     global_search_limit: int = Field(default=2, ge=0)
     graph_expansion_limit: int = Field(default=3, ge=0)
@@ -76,7 +85,9 @@ class UnityMutationExecutor:
             return self._execute_control(tool, args)
         if tool not in MUTATION_TOOL_NAMES:
             return self._error(tool, "unknown_mutation", f"Unknown mutation tool: {tool}")
-        if not self.config.enabled or not self.config.typed_mutations_enabled:
+        if not self.config.enabled:
+            return self._unavailable(tool, "Unity mutations are disabled by configuration.")
+        if not self.config.typed_mutations_enabled and tool != "unity_execute_csharp":
             return self._unavailable(tool, "Typed Unity mutations are disabled by configuration.")
         transaction = None
         try:
@@ -204,6 +215,41 @@ class UnityMutationExecutor:
             "manifest_ref": manifest_path.relative_to(self.artifact_root).as_posix(),
         }
 
+    def restore_checkpoint(self, checkpoint_id: str) -> list[str]:
+        """Restore only the files declared by a controller-created checkpoint."""
+        checkpoint_root = (self.artifact_root / "checkpoints" / checkpoint_id).resolve()
+        checkpoints_root = (self.artifact_root / "checkpoints").resolve()
+        if checkpoint_root.parent != checkpoints_root:
+            raise ValueError("checkpoint_id escapes the checkpoint store")
+        manifest_path = checkpoint_root / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("checkpoint_id") != checkpoint_id:
+            raise ValueError("checkpoint manifest identity mismatch")
+        restored: list[str] = []
+        files_root = checkpoint_root / "files"
+        for record in manifest.get("files", []):
+            relative = self._normalize_relative(str(record.get("path", "")))
+            target = self._project_path(relative, allow_missing=True)
+            snapshot = files_root / Path(relative)
+            if bool(record.get("exists")):
+                if not snapshot.is_file():
+                    raise OSError(f"checkpoint snapshot is missing: {relative}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(snapshot, target)
+            elif target.is_file():
+                target.unlink()
+            meta_relative = str(record.get("meta_path", ""))
+            meta_target = Path(f"{target}.meta")
+            if meta_relative:
+                meta_snapshot = files_root / Path(meta_relative)
+                if not meta_snapshot.is_file():
+                    raise OSError(f"checkpoint meta snapshot is missing: {meta_relative}")
+                shutil.copy2(meta_snapshot, meta_target)
+            elif meta_target.is_file():
+                meta_target.unlink()
+            restored.append(relative)
+        return restored
+
     def metrics(self) -> dict[str, Any]:
         total = self.typed_mutation_count + self.escape_hatch_count
         return {
@@ -256,8 +302,9 @@ class UnityMutationExecutor:
             artifact_file = self.artifact_root / evidence_artifact_path
             if artifact_file.exists() and artifact_file.is_file():
                 try:
-                    evidence_text = artifact_file.read_text(encoding="utf-8")
-                    evidence_sha = hashlib.sha256(evidence_text.encode("utf-8")).hexdigest()
+                    evidence_raw = artifact_file.read_bytes()
+                    evidence_text = evidence_raw.decode("utf-8")
+                    evidence_sha = hashlib.sha256(evidence_raw).hexdigest()
                 except Exception:
                     evidence_text = None
                     evidence_sha = None
@@ -270,6 +317,13 @@ class UnityMutationExecutor:
         expected = self._required(args, "expected_sha256").casefold()
         old = str(args.get("old_text", ""))
         new = str(args.get("new_text", ""))
+
+        if current_sha.casefold() != expected:
+            return self._error(
+                "unity_script_patch",
+                "source_hash_changed",
+                f"Source hash changed for {relative}; re-read the file before applying a patch.",
+            )
 
         # Check old_text in evidence content
         occurrences_in_evidence = evidence_text.count(old)
@@ -318,7 +372,11 @@ class UnityMutationExecutor:
                     file_changed=True,
                 )
 
-        target.write_text(patched_text, encoding="utf-8")
+        # current_text was decoded from raw bytes and already contains the
+        # repository's exact newline convention.  Text-mode writes on Windows
+        # would translate every existing LF again (CRLF -> CRCRLF), making a
+        # one-line patch appear as a whole-file rewrite.
+        target.write_bytes(patched_text.encode("utf-8"))
         after_sha = hashlib.sha256(target.read_bytes()).hexdigest()
 
         payload = {

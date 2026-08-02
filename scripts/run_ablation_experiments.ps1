@@ -19,14 +19,14 @@ Get-Content ".env" | Where-Object { $_ -match '^\s*[A-Za-z_][A-Za-z0-9_]*\s*=' }
 
 $groupNames = @{
     1 = "Full System (baseline)"
-    2 = "Remove P1"
-    3 = "Remove P0+P1"
+    2 = "Remove Evidence-Based Recovery"
+    3 = "Remove Evidence Artifact Materialization"
     4 = "Remove Dynamic Tool Exposure"
     5 = "Remove Bounded Search Budget"
-    6 = "Remove Project Graph"
+    6 = "Remove Project Graph Retrieval"
     7 = "Remove Submission Contract"
     8 = "Remove Typed Mutations"
-    9 = "Remove Validation"
+    9 = "Remove Agent Validation Gates"
 }
 
 $sep = "=" * 80
@@ -73,7 +73,7 @@ for ($group = $StartGroup; $group -le $EndGroup; $group++) {
         Write-Host "[$currentRun/$totalRuns - $progress%] Group $group Run $run" -ForegroundColor Cyan
         Write-Host "  Run ID: $runId"
 
-        $cmd = ".\.venv\Scripts\game-agent-baseline.exe --project `"$ProjectPath`" --config `"$configPath`" --editor `"$EditorPath`" --output-root `"$OutputRoot`" --run-id `"$runId`" --variant innovation --keep-workspace"
+        $cmd = ".\.venv\Scripts\game-agent-baseline.exe --project `"$ProjectPath`" --config `"$configPath`" --editor `"$EditorPath`" --output-root `"$OutputRoot`" --run-id `"$runId`" --variant innovation --task-language en --keep-workspace"
 
         if ($DryRun) {
             Write-Host "  Command: $cmd" -ForegroundColor Yellow

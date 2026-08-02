@@ -1,0 +1,13 @@
+{
+  "exit_status": "Submitted",
+  "submission": "Controller verified the complete submission contract. Diagnosis: After interact key press on start screen, tutorial UI does not close and countdown UI does not appear because OnStateChanged event is not published during state transition.. Changed paths: Assets/Scripts/KitchenGameManager.cs. Validation passed: diagnostics, compile, required tests.",
+  "automatic_submission": true,
+  "token_usage": {
+    "prompt_tokens": 63939,
+    "completion_tokens": 2113,
+    "total_tokens": 66052,
+    "last_input_tokens": 10813,
+    "max_input_tokens": 32768,
+    "max_total_tokens": 81920
+  }
+}

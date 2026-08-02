@@ -1,0 +1,755 @@
+{
+  "schema_version": "context-ablation-schedule-v1",
+  "runs": [
+    {
+      "condition": "C4",
+      "task_id": "stove-visual-component",
+      "seed": 505
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-progress-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C0",
+      "task_id": "state-event-publication",
+      "seed": 505
+    },
+    {
+      "condition": "C2",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C2",
+      "task_id": "delivery-result-subscription",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "delivery-result-subscription",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "state-event-publication",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "options-sfx-button-listener",
+      "seed": 404
+    },
+    {
+      "condition": "C4",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-visual-component",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C0",
+      "task_id": "options-sfx-button-listener",
+      "seed": 202
+    },
+    {
+      "condition": "C2",
+      "task_id": "delivery-result-subscription",
+      "seed": 505
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-visual-component",
+      "seed": 404
+    },
+    {
+      "condition": "C1",
+      "task_id": "delivery-result-subscription",
+      "seed": 505
+    },
+    {
+      "condition": "C0",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C1",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-progress-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C2",
+      "task_id": "state-event-publication",
+      "seed": 303
+    },
+    {
+      "condition": "C1",
+      "task_id": "delivery-result-subscription",
+      "seed": 404
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-progress-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-progress-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-progress-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C0",
+      "task_id": "state-event-publication",
+      "seed": 101
+    },
+    {
+      "condition": "C3",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C1",
+      "task_id": "delivery-result-subscription",
+      "seed": 202
+    },
+    {
+      "condition": "C2",
+      "task_id": "options-sfx-button-listener",
+      "seed": 505
+    },
+    {
+      "condition": "C3",
+      "task_id": "state-event-publication",
+      "seed": 404
+    },
+    {
+      "condition": "C0",
+      "task_id": "delivery-result-subscription",
+      "seed": 404
+    },
+    {
+      "condition": "C3",
+      "task_id": "delivery-result-subscription",
+      "seed": 505
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-progress-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C2",
+      "task_id": "delivery-result-subscription",
+      "seed": 202
+    },
+    {
+      "condition": "C3",
+      "task_id": "state-event-publication",
+      "seed": 101
+    },
+    {
+      "condition": "C3",
+      "task_id": "delivery-result-subscription",
+      "seed": 101
+    },
+    {
+      "condition": "C1",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-progress-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C0",
+      "task_id": "options-sfx-button-listener",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "state-event-publication",
+      "seed": 202
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-progress-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C4",
+      "task_id": "options-sfx-button-listener",
+      "seed": 101
+    },
+    {
+      "condition": "C2",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C2",
+      "task_id": "delivery-result-subscription",
+      "seed": 101
+    },
+    {
+      "condition": "C2",
+      "task_id": "state-event-publication",
+      "seed": 505
+    },
+    {
+      "condition": "C4",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C1",
+      "task_id": "state-event-publication",
+      "seed": 101
+    },
+    {
+      "condition": "C1",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-visual-component",
+      "seed": 202
+    },
+    {
+      "condition": "C2",
+      "task_id": "state-event-publication",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-visual-component",
+      "seed": 202
+    },
+    {
+      "condition": "C1",
+      "task_id": "options-sfx-button-listener",
+      "seed": 303
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-progress-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C2",
+      "task_id": "state-event-publication",
+      "seed": 404
+    },
+    {
+      "condition": "C2",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C3",
+      "task_id": "options-sfx-button-listener",
+      "seed": 303
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-progress-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C3",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C4",
+      "task_id": "delivery-result-subscription",
+      "seed": 505
+    },
+    {
+      "condition": "C0",
+      "task_id": "state-event-publication",
+      "seed": 303
+    },
+    {
+      "condition": "C4",
+      "task_id": "options-sfx-button-listener",
+      "seed": 202
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-progress-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C1",
+      "task_id": "state-event-publication",
+      "seed": 505
+    },
+    {
+      "condition": "C2",
+      "task_id": "options-sfx-button-listener",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-visual-component",
+      "seed": 505
+    },
+    {
+      "condition": "C0",
+      "task_id": "options-sfx-button-listener",
+      "seed": 404
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-progress-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C4",
+      "task_id": "state-event-publication",
+      "seed": 303
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-visual-component",
+      "seed": 404
+    },
+    {
+      "condition": "C1",
+      "task_id": "options-sfx-button-listener",
+      "seed": 404
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-visual-component",
+      "seed": 404
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-progress-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-progress-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C0",
+      "task_id": "state-event-publication",
+      "seed": 404
+    },
+    {
+      "condition": "C2",
+      "task_id": "options-sfx-button-listener",
+      "seed": 101
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-visual-component",
+      "seed": 505
+    },
+    {
+      "condition": "C3",
+      "task_id": "options-sfx-button-listener",
+      "seed": 202
+    },
+    {
+      "condition": "C1",
+      "task_id": "state-event-publication",
+      "seed": 303
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-visual-component",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "delivery-result-subscription",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "state-event-publication",
+      "seed": 202
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-progress-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C0",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C1",
+      "task_id": "options-sfx-button-listener",
+      "seed": 202
+    },
+    {
+      "condition": "C1",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C4",
+      "task_id": "state-event-publication",
+      "seed": 404
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-visual-component",
+      "seed": 505
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-progress-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-visual-component",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "delivery-result-subscription",
+      "seed": 101
+    },
+    {
+      "condition": "C0",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-visual-component",
+      "seed": 404
+    },
+    {
+      "condition": "C3",
+      "task_id": "delivery-result-subscription",
+      "seed": 202
+    },
+    {
+      "condition": "C0",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C0",
+      "task_id": "delivery-result-subscription",
+      "seed": 505
+    },
+    {
+      "condition": "C1",
+      "task_id": "state-event-publication",
+      "seed": 404
+    },
+    {
+      "condition": "C4",
+      "task_id": "options-sfx-button-listener",
+      "seed": 505
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-visual-component",
+      "seed": 404
+    },
+    {
+      "condition": "C0",
+      "task_id": "delivery-result-subscription",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-visual-component",
+      "seed": 303
+    },
+    {
+      "condition": "C0",
+      "task_id": "options-sfx-button-listener",
+      "seed": 505
+    },
+    {
+      "condition": "C3",
+      "task_id": "delivery-result-subscription",
+      "seed": 404
+    },
+    {
+      "condition": "C1",
+      "task_id": "options-sfx-button-listener",
+      "seed": 505
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-visual-component",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "options-sfx-button-listener",
+      "seed": 101
+    },
+    {
+      "condition": "C3",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C0",
+      "task_id": "delivery-result-subscription",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-progress-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C0",
+      "task_id": "delivery-result-subscription",
+      "seed": 202
+    },
+    {
+      "condition": "C2",
+      "task_id": "options-sfx-button-listener",
+      "seed": 202
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-progress-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C4",
+      "task_id": "state-event-publication",
+      "seed": 101
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-visual-component",
+      "seed": 202
+    },
+    {
+      "condition": "C1",
+      "task_id": "delivery-result-subscription",
+      "seed": 303
+    },
+    {
+      "condition": "C0",
+      "task_id": "state-event-publication",
+      "seed": 202
+    },
+    {
+      "condition": "C3",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-visual-component",
+      "seed": 303
+    },
+    {
+      "condition": "C2",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "delivery-result-subscription",
+      "seed": 202
+    },
+    {
+      "condition": "C4",
+      "task_id": "options-sfx-button-listener",
+      "seed": 303
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-progress-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C2",
+      "task_id": "delivery-result-subscription",
+      "seed": 404
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-visual-component",
+      "seed": 505
+    },
+    {
+      "condition": "C2",
+      "task_id": "state-event-publication",
+      "seed": 202
+    },
+    {
+      "condition": "C2",
+      "task_id": "options-sfx-button-listener",
+      "seed": 404
+    },
+    {
+      "condition": "C4",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-visual-component",
+      "seed": 303
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-progress-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C1",
+      "task_id": "state-event-publication",
+      "seed": 202
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-progress-reference",
+      "seed": 404
+    },
+    {
+      "condition": "C4",
+      "task_id": "stove-progress-reference",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "options-sfx-button-listener",
+      "seed": 404
+    },
+    {
+      "condition": "C3",
+      "task_id": "state-event-publication",
+      "seed": 505
+    },
+    {
+      "condition": "C1",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C1",
+      "task_id": "delivery-result-subscription",
+      "seed": 101
+    },
+    {
+      "condition": "C4",
+      "task_id": "delivery-result-subscription",
+      "seed": 404
+    },
+    {
+      "condition": "C3",
+      "task_id": "options-sfx-button-listener",
+      "seed": 505
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-visual-component",
+      "seed": 202
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-visual-component",
+      "seed": 101
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-visual-component",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C4",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-visual-component",
+      "seed": 101
+    },
+    {
+      "condition": "C0",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C0",
+      "task_id": "options-sfx-button-listener",
+      "seed": 303
+    },
+    {
+      "condition": "C4",
+      "task_id": "state-event-publication",
+      "seed": 505
+    },
+    {
+      "condition": "C2",
+      "task_id": "plates-scriptableobject-reference",
+      "seed": 303
+    },
+    {
+      "condition": "C3",
+      "task_id": "stove-progress-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C0",
+      "task_id": "stove-progress-reference",
+      "seed": 202
+    },
+    {
+      "condition": "C1",
+      "task_id": "options-sfx-button-listener",
+      "seed": 101
+    },
+    {
+      "condition": "C1",
+      "task_id": "stove-progress-reference",
+      "seed": 505
+    },
+    {
+      "condition": "C2",
+      "task_id": "stove-visual-component",
+      "seed": 202
+    }
+  ]
+}

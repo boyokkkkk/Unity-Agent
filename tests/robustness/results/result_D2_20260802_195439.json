@@ -1,0 +1,32 @@
+{
+  "task_id": "D2",
+  "task_name": "边界情况 - 不存在的文件",
+  "task_type": "edge_case",
+  "priority": "P2",
+  "complexity": "unknown",
+  "timestamp": "2026-08-02T19:54:39.568996",
+  "success": true,
+  "meets_all_criteria": true,
+  "overall_success": true,
+  "elapsed_time": 25.980029344558716,
+  "mutations_applied": 0,
+  "total_tokens": 0,
+  "error": null,
+  "criteria_check": {
+    "min_mutations": {
+      "required": null,
+      "actual": 0,
+      "met": null
+    },
+    "token_budget": {
+      "budget": 15000,
+      "actual": 0,
+      "met": true
+    },
+    "time_budget": {
+      "budget": 45,
+      "actual": 25.980029344558716,
+      "met": true
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "status": "replan",
+  "tool": "code_file_read",
+  "location": {
+    "path": "Assets/Scripts/KitchenGameManager.cs",
+    "node_ids": []
+  },
+  "observed": {
+    "path": "Assets/Scripts/KitchenGameManager.cs",
+    "sha256": "077ee23e87c18e622057850ab7b339caee599e11f4a9ca69669bd74107e1b13d",
+    "start_line": 1,
+    "end_line": 125,
+    "total_lines": 125
+  },
+  "blocked_action": "code_file_read:Assets/Scripts/KitchenGameManager.cs:1-*:077ee23e87c18e622057850ab7b339caee599e11f4a9ca69669bd74107e1b13d",
+  "blocked_reason": "The same source range at the same file SHA has already been read successfully.",
+  "unresolved_slots": [],
+  "admissible_next_actions": [
+    {
+      "tool": "code_file_read",
+      "arguments": {
+        "node_id": "cs-method:3a1f44b65b7321ba93b3",
+        "path": "Assets/Scripts/GameInput.cs"
+      }
+    },
+    {
+      "tool": "code_file_read",
+      "arguments": {
+        "node_id": "cs-method:540d30b396e167874c45",
+        "path": "Assets/Scripts/Counters/StoveCounter.cs"
+      }
+    },
+    {
+      "tool": "code_find_references",
+      "arguments": {
+        "node_id": "cs-field:24bab7bcad31280885dd",
+        "direction": "both"
+      }
+    }
+  ]
+}

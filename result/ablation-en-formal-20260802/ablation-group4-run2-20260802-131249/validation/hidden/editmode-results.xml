@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="2" result="Failed(Child)" total="2" passed="1" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-02 05:15:33Z" end-time="2026-08-02 05:15:33Z" duration="0.0447623">
+  <test-suite type="TestSuite" id="1011" name="Kitchen_Chaos" fullname="Kitchen_Chaos" runstate="Runnable" testcasecount="2" result="Failed" site="Child" start-time="2026-08-02 05:15:33Z" end-time="2026-08-02 05:15:33Z" duration="0.044762" total="2" passed="1" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties />
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1014" name="KitchenChaos.BaselineOracle.EditMode.dll" fullname="C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group4-run2-20260802-131249/Library/ScriptAssemblies/KitchenChaos.BaselineOracle.EditMode.dll" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-08-02 05:15:33Z" end-time="2026-08-02 05:15:33Z" duration="0.028291" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="17212" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestFixture" id="1012" name="StateEventBaselineEditModeOracle" fullname="StateEventBaselineEditModeOracle" classname="StateEventBaselineEditModeOracle" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-08-02 05:15:33Z" end-time="2026-08-02 05:15:33Z" duration="0.027225" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-case id="1013" name="WaitingInteraction_EntersCountdownAndPublishesOneStateEvent" fullname="StateEventBaselineEditModeOracle.WaitingInteraction_EntersCountdownAndPublishesOneStateEvent" methodname="WaitingInteraction_EntersCountdownAndPublishesOneStateEvent" classname="StateEventBaselineEditModeOracle" runstate="Runnable" seed="938219591" result="Failed" start-time="2026-08-02 05:15:33Z" end-time="2026-08-02 05:15:33Z" duration="0.016708" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[  Expected: 1
+  But was:  0
+]]></message>
+            <stack-trace><![CDATA[at StateEventBaselineEditModeOracle.WaitingInteraction_EntersCountdownAndPublishesOneStateEvent () [0x00104] in C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group4-run2-20260802-131249\Assets\Tests\BaselineOracle\EditMode\StateEventBaselineEditModeOracle.cs:31
+]]></stack-trace>
+          </failure>
+        </test-case>
+      </test-suite>
+    </test-suite>
+    <test-suite type="Assembly" id="1017" name="KitchenChaos.EditModeTests.dll" fullname="C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group4-run2-20260802-131249/Library/ScriptAssemblies/KitchenChaos.EditModeTests.dll" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 05:15:33Z" end-time="2026-08-02 05:15:33Z" duration="0.005970" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="17212" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+      </properties>
+      <test-suite type="TestFixture" id="1015" name="KitchenGameManagerContractTests" fullname="KitchenGameManagerContractTests" classname="KitchenGameManagerContractTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 05:15:33Z" end-time="2026-08-02 05:15:33Z" duration="0.005424" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1016" name="ExistingStateManagementApi_IsAvailable" fullname="KitchenGameManagerContractTests.ExistingStateManagementApi_IsAvailable" methodname="ExistingStateManagementApi_IsAvailable" classname="KitchenGameManagerContractTests" runstate="Runnable" seed="1712413393" result="Passed" start-time="2026-08-02 05:15:33Z" end-time="2026-08-02 05:15:33Z" duration="0.001812" asserts="0">
+          <properties />
+        </test-case>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

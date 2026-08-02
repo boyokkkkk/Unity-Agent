@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="2" result="Passed" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-02 04:29:14Z" end-time="2026-08-02 04:29:14Z" duration="0.0355274">
+  <test-suite type="TestSuite" id="1000" name="Kitchen_Chaos" fullname="Kitchen_Chaos" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-08-02 04:29:14Z" end-time="2026-08-02 04:29:14Z" duration="0.035527" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties />
+    <test-suite type="Assembly" id="1003" name="KitchenChaos.BaselineOracle.PlayMode.dll" fullname="C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group1-run5-20260802-122500/Library/ScriptAssemblies/KitchenChaos.BaselineOracle.PlayMode.dll" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 04:29:14Z" end-time="2026-08-02 04:29:14Z" duration="0.028262" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="25912" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+      </properties>
+      <test-suite type="TestFixture" id="1001" name="StateEventBaselinePlayModeOracle" fullname="StateEventBaselinePlayModeOracle" classname="StateEventBaselinePlayModeOracle" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 04:29:14Z" end-time="2026-08-02 04:29:14Z" duration="0.027029" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1002" name="WaitingInteraction_UpdatesObservableStateWithoutSkippingCountdown" fullname="StateEventBaselinePlayModeOracle.WaitingInteraction_UpdatesObservableStateWithoutSkippingCountdown" methodname="WaitingInteraction_UpdatesObservableStateWithoutSkippingCountdown" classname="StateEventBaselinePlayModeOracle" runstate="Runnable" seed="193397119" result="Passed" start-time="2026-08-02 04:29:14Z" end-time="2026-08-02 04:29:14Z" duration="0.017468" asserts="0">
+          <properties>
+            <property name="_JOINTYPE" value="UnityCombinatorial" />
+          </properties>
+        </test-case>
+      </test-suite>
+    </test-suite>
+    <test-suite type="Assembly" id="1006" name="KitchenChaos.PlayModeTests.dll" fullname="C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group1-run5-20260802-122500/Library/ScriptAssemblies/KitchenChaos.PlayModeTests.dll" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 04:29:14Z" end-time="2026-08-02 04:29:14Z" duration="0.002356" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="25912" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+      </properties>
+      <test-suite type="TestFixture" id="1004" name="KitchenGameManagerPlayModeTests" fullname="KitchenGameManagerPlayModeTests" classname="KitchenGameManagerPlayModeTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 04:29:14Z" end-time="2026-08-02 04:29:14Z" duration="0.002004" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1005" name="ExpiredCountdown_TransitionsToGamePlaying" fullname="KitchenGameManagerPlayModeTests.ExpiredCountdown_TransitionsToGamePlaying" methodname="ExpiredCountdown_TransitionsToGamePlaying" classname="KitchenGameManagerPlayModeTests" runstate="Runnable" seed="681328562" result="Passed" start-time="2026-08-02 04:29:14Z" end-time="2026-08-02 04:29:14Z" duration="0.001488" asserts="0">
+          <properties>
+            <property name="_JOINTYPE" value="UnityCombinatorial" />
+          </properties>
+        </test-case>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

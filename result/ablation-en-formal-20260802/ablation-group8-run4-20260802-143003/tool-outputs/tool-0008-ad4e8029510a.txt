@@ -1,0 +1,286 @@
+{
+  "status": "prepared",
+  "patch_token": "patch:e876e5735ba54d3adde3282c",
+  "causal_fact_id": "fact:59a6f83628b0ce00",
+  "ast_scope": "KitchenGameManager.GameInput_OnInteraction",
+  "repair_exemplar": "OnStateChanged?.Invoke(this, EventArgs.Empty)",
+  "mutation_preview": {
+    "path": "Assets/Scripts/KitchenGameManager.cs",
+    "old_text": "state = State.CountdownToStart;",
+    "new_text": "state = State.CountdownToStart;\n            OnStateChanged?.Invoke(this, EventArgs.Empty);",
+    "expected_sha256": "077ee23e87c18e622057850ab7b339caee599e11f4a9ca69669bd74107e1b13d",
+    "evidence_node_ids": [
+      "cs-field:24bab7bcad31280885dd"
+    ]
+  },
+  "required_next_action": {
+    "tool": "patch_apply",
+    "arguments": {
+      "patch_token": "patch:e876e5735ba54d3adde3282c"
+    }
+  },
+  "workflow_state": {
+    "phase": "edit",
+    "plan": {
+      "objective": "After the player presses the interact key on the start screen, the game should enter the countdown state. Currently the tutorial UI does not close and the countdown UI does not appear. The defect is likely in the interaction input, game-state transition, OnStateChanged event publication, or UI observer refresh chain.",
+      "hypotheses": [
+        "The GameInput.OnInteractAction event is not being triggered on the start screen.",
+        "KitchenGameManager.GameInput_OnInteraction handler updates state but fails to publish OnStateChanged.",
+        "TutorialUI.KitchenGameManager_OnStateChanged observer is not subscribed or not reacting correctly.",
+        "The state transition logic in KitchenGameManager is incomplete or misordered."
+      ],
+      "required_evidence": [
+        "Confirm GameInput.OnInteractAction is raised when interact key is pressed on start screen.",
+        "Verify KitchenGameManager.GameInput_OnInteraction writes state = State.CountdownToStart and publishes OnStateChanged.",
+        "Check TutorialUI subscribes to KitchenGameManager.OnStateChanged and calls Hide() on state change.",
+        "Inspect whether KitchenGameManager.Update also publishes OnStateChanged inappropriately or blocks the intended flow."
+      ],
+      "success_criteria": [
+        "GameInput.OnInteractAction fires correctly on start screen.",
+        "KitchenGameManager transitions to State.CountdownToStart and raises OnStateChanged.",
+        "TutorialUI.Hide() is invoked when state changes to CountdownToStart.",
+        "No unintended side effects or duplicate publications occur."
+      ],
+      "validation_plan": [
+        "compile",
+        "editmode",
+        "playmode"
+      ]
+    },
+    "search_budget": {
+      "enabled": true,
+      "global_limit": 2,
+      "global_used": 0,
+      "graph_expansion_limit": 3,
+      "graph_expansion_used": 0
+    },
+    "candidate_frontier": [
+      {
+        "candidate_id": "C4",
+        "entity_type": "METHOD",
+        "path": "Assets/Scripts/Counters/StoveCounter.cs",
+        "symbol": "Interact",
+        "role": "source",
+        "score": 1.0,
+        "reasons": [
+          "project graph candidate rank 4"
+        ],
+        "read_level": "unread",
+        "evidence_ids": []
+      },
+      {
+        "candidate_id": "C2",
+        "entity_type": "FIELD",
+        "path": "Assets/Scripts/KitchenGameManager.cs",
+        "symbol": "OnStateChanged",
+        "role": "controller",
+        "score": 0.9853664530927565,
+        "reasons": [
+          "project graph candidate rank 2"
+        ],
+        "read_level": "full",
+        "evidence_ids": [
+          "evidence:b77fe266ba1e03f1"
+        ]
+      },
+      {
+        "candidate_id": "C3",
+        "entity_type": "METHOD",
+        "path": "Assets/Scripts/UI/TutorialUI.cs",
+        "symbol": "Hide",
+        "role": "ui",
+        "score": 0.9367167681204829,
+        "reasons": [
+          "project graph candidate rank 3"
+        ],
+        "read_level": "full",
+        "evidence_ids": [
+          "evidence:d5ceb44877284d06"
+        ]
+      },
+      {
+        "candidate_id": "C1",
+        "entity_type": "METHOD",
+        "path": "Assets/Scripts/GameInput.cs",
+        "symbol": "RebindBinding",
+        "role": "event_source",
+        "score": 0.5627645876093081,
+        "reasons": [
+          "project graph candidate rank 1"
+        ],
+        "read_level": "full",
+        "evidence_ids": [
+          "evidence:b444e4fd20406726"
+        ]
+      }
+    ],
+    "diagnosis": {
+      "version": 1,
+      "symptom": "After the player presses the interact key on the start screen, the tutorial UI does not close and the countdown UI does not appear because the OnStateChanged event is not published when transitioning to CountdownToStart state.",
+      "root_targets": [
+        "C2"
+      ],
+      "status": "accepted",
+      "remaining_uncertainty": [],
+      "causal_chain": [
+        {
+          "subject": "KitchenGameManager.GameInput_OnInteraction",
+          "predicate": "PUBLISHES_EVENT",
+          "object": "KitchenGameManager.OnStateChanged",
+          "polarity": "absent",
+          "fact_ids": [
+            "fact:59a6f83628b0ce00"
+          ],
+          "negative_evidence": {
+            "scope": "KitchenGameManager.GameInput_OnInteraction",
+            "edge_kind": "PUBLISHES_EVENT",
+            "graph_revision": "graph:6b10fbb9c1f6653e",
+            "observed_matches": 0,
+            "complete": true
+          }
+        }
+      ]
+    },
+    "diagnosis_versions": 1,
+    "progress": {
+      "version": 6,
+      "events": [
+        {
+          "event_id": "P4",
+          "event_type": "diagnosis_accepted",
+          "phase_before": "diagnose",
+          "phase_after": "prepare_edit",
+          "evidence_ids": [
+            "evidence:b77fe266ba1e03f1"
+          ],
+          "details": {
+            "diagnosis_version": 1,
+            "authorized_candidate_ids": [
+              "C2"
+            ]
+          },
+          "advances": true
+        },
+        {
+          "event_id": "P5",
+          "event_type": "patch_prepared",
+          "phase_before": "prepare_edit",
+          "phase_after": "edit",
+          "evidence_ids": [
+            "evidence:b77fe266ba1e03f1"
+          ],
+          "details": {
+            "target": "C2",
+            "causal_fact_id": "fact:59a6f83628b0ce00",
+            "path": "Assets/Scripts/KitchenGameManager.cs",
+            "patch_token": "patch:e876e5735ba54d3adde3282c"
+          },
+          "advances": true
+        },
+        {
+          "event_id": "P6",
+          "event_type": "mutation_failed",
+          "phase_before": "edit",
+          "phase_after": "prepare_edit",
+          "evidence_ids": [],
+          "details": {
+            "tool": "unity_execute_csharp",
+            "message": "unity_execute_csharp failed (1)\n-r:\"D:/unity/unity editor/2021.3.45f1c1/Editor/Data/UnityReferenceAssemblies/unity-4.8-api/System.Runtime.Serialization.dll\"\n-r:\"D:/unity/unity editor/2021.3.45f1c1/Editor/Data/UnityReferenceAssemblies/unity-4.8-api/System.Transactions.dll\"\n-r:\"D:/unity/unity editor/2021.3.45f1c1/Editor/Data/UnityReferenceAssemblies/unity-4.8-api/System.Xml.dll\"\n-r:\"D:/unity/unity editor/2021.3.45f1c1/Editor/Data/UnityReferenceAssemblies/unity-4.8-api/System.Xml.Linq.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Cinemachine.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/com.unity.cinemachine.editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/PPv2URPConverters.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.2D.Sprite.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.2D.Tilemap.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Burst.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Burst.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.EditorCoroutines.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.InputSystem.ForUI.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.InputSystem.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Mathematics.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Mathematics.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Performance.Profile-Analyzer.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.PlasticSCM.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.RenderPipeline.Universal.ShaderLibrary.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.RenderPipelines.Core.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.RenderPipelines.Core.Runtime.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.RenderPipelines.Core.ShaderLibrary.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.RenderPipelines.ShaderGraph.ShaderGraphLibrary.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.RenderPipelines.Universal.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.RenderPipelines.Universal.Runtime.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.RenderPipelines.Universal.Shaders.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Rider.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Searcher.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.ShaderGraph.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.TestTools.CodeCoverage.Editor.OpenCover.Model.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.TestTools.CodeCoverage.Editor.OpenCover.Mono.Reflection.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.TestTools.CodeCoverage.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.TextMeshPro.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.TextMeshPro.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Timeline.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.Timeline.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualScripting.Core.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualScripting.Core.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualScripting.Flow.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualScripting.Flow.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualScripting.SettingsProvider.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualScripting.Shared.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualScripting.State.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualScripting.State.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VisualStudio.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/Unity.VSCode.Editor.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/UnityEditor.SpatialTracking.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/UnityEditor.TestRunner.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/UnityEditor.UI.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/UnityEditor.XR.LegacyInputHelpers.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/UnityEngine.SpatialTracking.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/UnityEngine.TestRunner.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/UnityEngine.UI.ref.dll\"\n-r:\"Library/Bee/artifacts/1900b0aE.dag/UnityEngine.XR.LegacyInputHelpers.ref.dll\"\n\"Assets/Editor/GameAgentAciEscape.cs\"\n-langversion:9.0\n/deterministic\n/optimize+\n/debug:portable\n/nologo\n/RuntimeMetadataVersion:v4.0.30319\n/nowarn:0169\n/nowarn:0649\n/nowarn:1701\n/nowarn:1702\n/utf8output\n/preferreduilang:en-US\n/additionalfile:\"Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp-Editor.AdditionalFile.txt\"\n##### Custom Environment Variables\nDOTNET_MULTILEVEL_LOOKUP=0\n##### ExitCode\n1\n##### Output\nAssets\\Editor\\GameAgentAciEscape.cs(8,9): error CS0128: A local variable or function named 'path' is already defined in this scope\n*** Tundra build failed (7.84 seconds), 664 items updated, 668 evaluated\nAssets\\Editor\\GameAgentAciEscape.cs(8,9): error CS0128: A local variable or function named 'path' is already defined in this scope\nAssetDatabase: script compilation time: 8.909723s\nScripts have compiler errors.\nExiting without the bug reporter. Application will terminate with return code 1",
+            "diagnostic": null
+          },
+          "advances": false
+        },
+        {
+          "event_id": "P7",
+          "event_type": "patch_prepared",
+          "phase_before": "prepare_edit",
+          "phase_after": "edit",
+          "evidence_ids": [
+            "evidence:b77fe266ba1e03f1"
+          ],
+          "details": {
+            "target": "C2",
+            "causal_fact_id": "fact:59a6f83628b0ce00",
+            "path": "Assets/Scripts/KitchenGameManager.cs",
+            "patch_token": "patch:e876e5735ba54d3adde3282c"
+          },
+          "advances": true
+        }
+      ]
+    },
+    "authorized_candidate_ids": [
+      "C2"
+    ],
+    "authorized_paths": [
+      "assets/scripts/kitchengamemanager.cs"
+    ],
+    "missing_evidence_candidate_ids": [],
+    "required_causal_roles": [
+      "controller",
+      "event_source",
+      "ui"
+    ],
+    "read_causal_roles": [
+      "controller",
+      "event_source",
+      "ui"
+    ],
+    "missing_causal_roles": [],
+    "causal_fact_matrix": {
+      "graph_revision": "graph:6b10fbb9c1f6653e",
+      "status": "diagnosis_locked",
+      "selected_facts": [
+        {
+          "fact_id": "fact:59a6f83628b0ce00",
+          "slot": "event_publication",
+          "subject": "KitchenGameManager.GameInput_OnInteraction",
+          "predicate": "PUBLISHES_EVENT",
+          "object": "KitchenGameManager.OnStateChanged",
+          "polarity": "absent",
+          "locations": [
+            "Assets/Scripts/KitchenGameManager.cs:42",
+            "Assets/Scripts/KitchenGameManager.cs"
+          ],
+          "ast_anchor": "state = State.CountdownToStart",
+          "repair_exemplar": "OnStateChanged?.Invoke(this, EventArgs.Empty)",
+          "negative_evidence": {
+            "scope": "KitchenGameManager.GameInput_OnInteraction",
+            "edge_kind": "PUBLISHES_EVENT",
+            "graph_revision": "graph:6b10fbb9c1f6653e",
+            "observed_matches": 0,
+            "complete": true
+          }
+        }
+      ]
+    },
+    "patch_status": "prepared",
+    "patch_gaps": [],
+    "compile_repair_attempts": 0,
+    "prepared_mutations": [],
+    "prepared_patch_token": "patch:e876e5735ba54d3adde3282c",
+    "stage_directive": "",
+    "submission_contract": {
+      "plan_accepted": true,
+      "diagnosis_accepted": true,
+      "mutation_required": true,
+      "mutation_count": 0,
+      "no_change_diagnosis_accepted": false,
+      "changed_paths_authorized": false,
+      "diagnostics_passed": false,
+      "compile_passed": false,
+      "required_tests_passed": false,
+      "critical_uncertainties_resolved": true,
+      "validation_complete": false,
+      "final_review_passed": false
+    },
+    "reviews": [],
+    "required_next_actions": [
+      "Call patch_apply with the controller-provided patch_token; do not copy patch text."
+    ],
+    "forbidden": [
+      "global_search",
+      "submit",
+      "powershell"
+    ]
+  }
+}

@@ -58,6 +58,10 @@ class MutationService:
         self.failure_count = 0
         self.rollback_count = 0
 
+        # Add logger
+        import logging
+        self.logger = logging.getLogger("mutation_service")
+
     def execute_mutation(
         self,
         action: dict[str, Any],
@@ -81,24 +85,47 @@ class MutationService:
             # Execute through the existing mutation executor
             result = self.executor.execute(action)
 
-            # Check if execution was successful
-            if result.get("status") == "success":
+            # Log the full result for debugging
+            self.logger.info(f"Mutation result returncode: {result.get('returncode')}")
+            extra = result.get("extra", {})
+            structured = extra.get("structured", {})
+            status = structured.get("status")
+
+            self.logger.info(f"Mutation result status: {status}")
+            if not status:
+                self.logger.error(f"No status in structured result")
+                self.logger.error(f"Result keys: {list(result.keys())}")
+                self.logger.error(f"Extra keys: {list(extra.keys())}")
+
+            # Check if execution was successful (status is in extra.structured)
+            # ACI tools return "ok" for success
+            if status in ("success", "ok"):
                 self.success_count += 1
+
+                # Extract transaction info from structured result
+                transaction_id = structured.get("transaction_id", "")
+                checkpoint_id = structured.get("checkpoint_id", "")
+                changed_paths = structured.get("changed_paths", [])
+
                 return MutationResult(
                     success=True,
-                    transaction_id=result.get("transaction_id", ""),
-                    checkpoint_id=result.get("checkpoint_id", ""),
-                    changed_paths=result.get("changed_paths", []),
+                    transaction_id=transaction_id,
+                    checkpoint_id=checkpoint_id,
+                    changed_paths=changed_paths,
                     error=None,
                 )
             else:
                 self.failure_count += 1
+
+                # Extract error info
+                error_msg = structured.get("message", result.get("exception_info", "Unknown mutation error"))
+
                 return MutationResult(
                     success=False,
-                    transaction_id=result.get("transaction_id", ""),
-                    checkpoint_id=result.get("checkpoint_id", ""),
+                    transaction_id=structured.get("transaction_id", ""),
+                    checkpoint_id=structured.get("checkpoint_id", ""),
                     changed_paths=[],
-                    error=result.get("error", "Unknown mutation error"),
+                    error=error_msg,
                 )
 
         except Exception as e:

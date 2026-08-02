@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="2" result="Failed(Child)" total="2" passed="1" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-02 05:26:09Z" end-time="2026-08-02 05:26:09Z" duration="0.0372361">
+  <test-suite type="TestSuite" id="1000" name="Kitchen_Chaos" fullname="Kitchen_Chaos" runstate="Runnable" testcasecount="2" result="Failed" site="Child" start-time="2026-08-02 05:26:09Z" end-time="2026-08-02 05:26:09Z" duration="0.037236" total="2" passed="1" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties />
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="1003" name="KitchenChaos.BaselineOracle.PlayMode.dll" fullname="C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group4-run5-20260802-132313/Library/ScriptAssemblies/KitchenChaos.BaselineOracle.PlayMode.dll" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-08-02 05:26:09Z" end-time="2026-08-02 05:26:09Z" duration="0.030015" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="29096" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestFixture" id="1001" name="StateEventBaselinePlayModeOracle" fullname="StateEventBaselinePlayModeOracle" classname="StateEventBaselinePlayModeOracle" runstate="Runnable" testcasecount="1" result="Failed" site="Child" start-time="2026-08-02 05:26:09Z" end-time="2026-08-02 05:26:09Z" duration="0.028818" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-case id="1002" name="WaitingInteraction_UpdatesObservableStateWithoutSkippingCountdown" fullname="StateEventBaselinePlayModeOracle.WaitingInteraction_UpdatesObservableStateWithoutSkippingCountdown" methodname="WaitingInteraction_UpdatesObservableStateWithoutSkippingCountdown" classname="StateEventBaselinePlayModeOracle" runstate="Runnable" seed="624487814" result="Failed" start-time="2026-08-02 05:26:09Z" end-time="2026-08-02 05:26:09Z" duration="0.019363" asserts="0">
+          <properties>
+            <property name="_JOINTYPE" value="UnityCombinatorial" />
+          </properties>
+          <failure>
+            <message><![CDATA[  Expected: 1
+  But was:  0
+]]></message>
+            <stack-trace><![CDATA[at StateEventBaselinePlayModeOracle+<WaitingInteraction_UpdatesObservableStateWithoutSkippingCountdown>d__0.MoveNext () [0x000fe] in C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group4-run5-20260802-132313\Assets\Tests\BaselineOracle\PlayMode\StateEventBaselinePlayModeOracle.cs:31
+at UnityEngine.TestTools.TestEnumerator+<Execute>d__7.MoveNext () [0x0003a] in C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group4-run5-20260802-132313\Library\PackageCache\com.unity.test-framework@1.1.33\UnityEngine.TestRunner\NUnitExtensions\Attributes\TestEnumerator.cs:46
+]]></stack-trace>
+          </failure>
+        </test-case>
+      </test-suite>
+    </test-suite>
+    <test-suite type="Assembly" id="1006" name="KitchenChaos.PlayModeTests.dll" fullname="C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group4-run5-20260802-132313/Library/ScriptAssemblies/KitchenChaos.PlayModeTests.dll" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 05:26:09Z" end-time="2026-08-02 05:26:09Z" duration="0.002399" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="29096" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+      </properties>
+      <test-suite type="TestFixture" id="1004" name="KitchenGameManagerPlayModeTests" fullname="KitchenGameManagerPlayModeTests" classname="KitchenGameManagerPlayModeTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 05:26:09Z" end-time="2026-08-02 05:26:09Z" duration="0.002005" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1005" name="ExpiredCountdown_TransitionsToGamePlaying" fullname="KitchenGameManagerPlayModeTests.ExpiredCountdown_TransitionsToGamePlaying" methodname="ExpiredCountdown_TransitionsToGamePlaying" classname="KitchenGameManagerPlayModeTests" runstate="Runnable" seed="1738990963" result="Passed" start-time="2026-08-02 05:26:09Z" end-time="2026-08-02 05:26:09Z" duration="0.001517" asserts="0">
+          <properties>
+            <property name="_JOINTYPE" value="UnityCombinatorial" />
+          </properties>
+        </test-case>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

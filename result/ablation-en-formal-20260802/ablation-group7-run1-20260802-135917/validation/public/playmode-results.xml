@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-02 06:02:39Z" end-time="2026-08-02 06:02:39Z" duration="0.0270512">
+  <test-suite type="TestSuite" id="1000" name="Kitchen_Chaos" fullname="Kitchen_Chaos" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 06:02:39Z" end-time="2026-08-02 06:02:39Z" duration="0.027051" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties />
+    <test-suite type="Assembly" id="1003" name="KitchenChaos.PlayModeTests.dll" fullname="C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group7-run1-20260802-135917/Library/ScriptAssemblies/KitchenChaos.PlayModeTests.dll" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 06:02:39Z" end-time="2026-08-02 06:02:39Z" duration="0.022206" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="29256" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+      </properties>
+      <test-suite type="TestFixture" id="1001" name="KitchenGameManagerPlayModeTests" fullname="KitchenGameManagerPlayModeTests" classname="KitchenGameManagerPlayModeTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 06:02:39Z" end-time="2026-08-02 06:02:39Z" duration="0.021119" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1002" name="ExpiredCountdown_TransitionsToGamePlaying" fullname="KitchenGameManagerPlayModeTests.ExpiredCountdown_TransitionsToGamePlaying" methodname="ExpiredCountdown_TransitionsToGamePlaying" classname="KitchenGameManagerPlayModeTests" runstate="Runnable" seed="606468691" result="Passed" start-time="2026-08-02 06:02:39Z" end-time="2026-08-02 06:02:39Z" duration="0.011639" asserts="0">
+          <properties>
+            <property name="_JOINTYPE" value="UnityCombinatorial" />
+          </properties>
+        </test-case>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

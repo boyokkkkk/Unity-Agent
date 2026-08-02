@@ -1,0 +1,13 @@
+{
+  "exit_status": "Submitted",
+  "submission": "Controller verified the complete submission contract. Diagnosis: Tutorial UI does not close and countdown UI does not appear when interact key is pressed because KitchenGameManager.GameInput_OnInteraction fails to publish OnStateChanged event.. Changed paths: Assets/Scripts/KitchenGameManager.cs. Validation passed: diagnostics, compile, editmode, playmode.",
+  "automatic_submission": true,
+  "token_usage": {
+    "prompt_tokens": 71785,
+    "completion_tokens": 2592,
+    "total_tokens": 74377,
+    "last_input_tokens": 10817,
+    "max_input_tokens": 32768,
+    "max_total_tokens": 81920
+  }
+}

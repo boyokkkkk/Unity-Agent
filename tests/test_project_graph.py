@@ -207,7 +207,15 @@ class RoslynParserTest(unittest.TestCase):
             }
             self.assertEqual("Show", graph.nodes[event_edges[EdgeKind.SUBSCRIBES_TO].source].name)
             self.assertEqual("OnStateChanged", graph.nodes[event_edges[EdgeKind.PUBLISHES_EVENT].target].name)
+            self.assertEqual(
+                "OnStateChanged?.Invoke(this, EventArgs.Empty)",
+                event_edges[EdgeKind.PUBLISHES_EVENT].attributes["expression"],
+            )
             self.assertEqual("state", graph.nodes[event_edges[EdgeKind.WRITES_STATE].target].name)
+
+            parser = RoslynCodeParser()
+            self.assertEqual([], parser.validate_syntax(source.read_text(encoding="utf-8")))
+            self.assertTrue(parser.validate_syntax("class C { void M() { .Invoke(); } }"))
 
 
 class LocalizationAblationTest(unittest.TestCase):

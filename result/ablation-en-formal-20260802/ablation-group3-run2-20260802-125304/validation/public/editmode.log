@@ -1,0 +1,326 @@
+[Licensing::Module] Trying to connect to existing licensing client channel...
+[Licensing::IpcConnector] Connection attempt to the License Client on channel: "LicenseClient-Administrator" failed because channel doesn't exist; code: "0x80000002"
+[Licensing::Module] Successfully launched the LicensingClient (PId: 19112)
+[Licensing::IpcConnector] Successfully connected to the License Client on channel: "LicenseClient-Administrator" at "2026-08-02T04:55:59.0657759Z"
+[Licensing::Client] Error: Code 10 while verifying Licensing Client signature (process Id: 19112, path: "D:/unity/unity editor/2021.3.45f1c1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::Module] Error: LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.15.4+eee609c
+  Session Id:              5f4a72abf8b540efa8f9ce0fb1b594b6
+  Correlation Id:          04754eaa505f7b277e4cf2e07751bbd3
+  External correlation Id: 7843135755988358009
+  Machine Id:              TXk87ZntXX+q8pfcg5bwhJeDq80=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-Administrator" (connect: 0.57s, validation: 0.04s, handshake: 0.03s)
+[Licensing::IpcConnector] Successfully connected to the License Notification on channel: "LicenseClient-Administrator-notifications" at "2026-08-02T04:55:59.1397552Z"
+[Licensing::Module] Connected to LicensingClient (PId: 19112, launch time: 0.00, total connection time: 0.65s)
+Entitlement-based licensing initiated
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully updated license
+Built from '2021.3/china_unity/release' branch; Version is '2021.3.45f1c1 (9d8da11b98d3) revision 10325409'; Using compiler version '192829333'; Build Type 'Release'
+OS: 'Windows 11  (10.0.26200) 64bit Professional' Language: 'zh' Physical Memory: 32604 MB
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Serial number assigned to: "F4-BVWU-6JNM-BHHM-ZCN2-XXXX"
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1, IsPro: 0
+[Licensing::Client] Successfully resolved entitlement details
+[Package Manager] Server::Start -- Port 59181 was selected
+
+COMMAND LINE ARGUMENTS:
+D:\unity\unity editor\2021.3.45f1c1\Editor\Unity.exe
+-batchmode
+-projectPath
+C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304
+-logFile
+E:\sysu-course\GameAgent\artifacts\baselines\ablation-en-formal-20260802\ablation-group3-run2-20260802-125304\validation\public\editmode.log
+-runTests
+-testPlatform
+EditMode
+-testResults
+E:\sysu-course\GameAgent\artifacts\baselines\ablation-en-formal-20260802\ablation-group3-run2-20260802-125304\validation\public\editmode-results.xml
+Successfully changed project path to: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304
+C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group3-run2-20260802-125304
+[UnityMemory] Configuration Parameters - Can be set up in boot.config
+    "memorysetup-bucket-allocator-granularity=16"
+    "memorysetup-bucket-allocator-bucket-count=8"
+    "memorysetup-bucket-allocator-block-size=33554432"
+    "memorysetup-bucket-allocator-block-count=8"
+    "memorysetup-main-allocator-block-size=16777216"
+    "memorysetup-thread-allocator-block-size=16777216"
+    "memorysetup-gfx-main-allocator-block-size=16777216"
+    "memorysetup-gfx-thread-allocator-block-size=16777216"
+    "memorysetup-cache-allocator-block-size=4194304"
+    "memorysetup-typetree-allocator-block-size=2097152"
+    "memorysetup-profiler-bucket-allocator-granularity=16"
+    "memorysetup-profiler-bucket-allocator-bucket-count=8"
+    "memorysetup-profiler-bucket-allocator-block-size=33554432"
+    "memorysetup-profiler-bucket-allocator-block-count=8"
+    "memorysetup-profiler-allocator-block-size=16777216"
+    "memorysetup-profiler-editor-allocator-block-size=1048576"
+    "memorysetup-temp-allocator-size-main=16777216"
+    "memorysetup-job-temp-allocator-block-size=2097152"
+    "memorysetup-job-temp-allocator-block-size-background=1048576"
+    "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
+    "memorysetup-temp-allocator-size-background-worker=32768"
+    "memorysetup-temp-allocator-size-job-worker=262144"
+    "memorysetup-temp-allocator-size-preload-manager=33554432"
+    "memorysetup-temp-allocator-size-nav-mesh-worker=65536"
+    "memorysetup-temp-allocator-size-audio-worker=65536"
+    "memorysetup-temp-allocator-size-cloud-worker=32768"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gfx=262144"
+Player connection [23876] Host "[IP] 172.26.105.145 [Port] 55496 [Flags] 2 [Guid] 1376701163 [EditorId] 1376701163 [Version] 1048832 [Id] WindowsEditor(7,PC-202502121805) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" joined multi-casting on [225.0.0.222:54997]...
+
+Player connection [23876] Host "[IP] 172.26.105.145 [Port] 55496 [Flags] 2 [Guid] 1376701163 [EditorId] 1376701163 [Version] 1048832 [Id] WindowsEditor(7,PC-202502121805) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" joined alternative multi-casting on [225.0.0.222:34997]...
+
+AS: AutoStreaming module initializing.
+[Physics::Module] Initialized MultithreadedJobDispatcher with {0} workers.
+[Package Manager] Restoring resolved packages state from cache
+[Licensing::Client] Successfully resolved entitlement details
+[Package Manager] 
+Registered 59 packages:
+  Packages from [https://packages.unity.cn]:
+    com.unity.cinemachine@2.10.3 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.cinemachine@2.10.3)
+    com.unity.collab-proxy@2.5.2 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.collab-proxy@2.5.2)
+    com.unity.ide.rider@3.0.31 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.ide.rider@3.0.31)
+    com.unity.ide.visualstudio@2.0.22 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.ide.visualstudio@2.0.22)
+    com.unity.ide.vscode@1.2.5 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.ide.vscode@1.2.5)
+    com.unity.inputsystem@1.7.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.inputsystem@1.7.0)
+    com.unity.test-framework@1.1.33 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.test-framework@1.1.33)
+    com.unity.textmeshpro@3.0.6 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.textmeshpro@3.0.6)
+    com.unity.timeline@1.6.5 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.timeline@1.6.5)
+    com.unity.visualscripting@1.9.4 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.visualscripting@1.9.4)
+    com.unity.xr.legacyinputhelpers@2.1.11 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.xr.legacyinputhelpers@2.1.11)
+    com.unity.ext.nunit@1.0.6 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.ext.nunit@1.0.6)
+    com.unity.mathematics@1.2.6 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.mathematics@1.2.6)
+    com.unity.burst@1.8.18 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.burst@1.8.18)
+    com.unity.editorcoroutines@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.editorcoroutines@1.0.0)
+    com.unity.performance.profile-analyzer@1.2.2 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.performance.profile-analyzer@1.2.2)
+    com.unity.testtools.codecoverage@1.2.6 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.testtools.codecoverage@1.2.6)
+    com.unity.searcher@4.9.1 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.searcher@4.9.1)
+    com.unity.settings-manager@1.0.3 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.settings-manager@1.0.3)
+  Built-in packages:
+    com.unity.2d.sprite@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.2d.sprite@1.0.0)
+    com.unity.2d.tilemap@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.2d.tilemap@1.0.0)
+    com.unity.feature.development@1.0.1 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.feature.development@1.0.1)
+    com.unity.render-pipelines.universal@12.1.15 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.render-pipelines.universal@12.1.15)
+    com.unity.ugui@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.ugui@1.0.0)
+    com.unity.modules.ai@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.ai@1.0.0)
+    com.unity.modules.androidjni@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.androidjni@1.0.0)
+    com.unity.modules.animation@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.animation@1.0.0)
+    com.unity.modules.assetbundle@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.assetbundle@1.0.0)
+    com.unity.modules.audio@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.audio@1.0.0)
+    com.unity.modules.cloth@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.cloth@1.0.0)
+    com.unity.modules.director@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.director@1.0.0)
+    com.unity.modules.imageconversion@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.imageconversion@1.0.0)
+    com.unity.modules.imgui@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.imgui@1.0.0)
+    com.unity.modules.jsonserialize@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.jsonserialize@1.0.0)
+    com.unity.modules.particlesystem@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.particlesystem@1.0.0)
+    com.unity.modules.physics@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.physics@1.0.0)
+    com.unity.modules.physics2d@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.physics2d@1.0.0)
+    com.unity.modules.screencapture@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.screencapture@1.0.0)
+    com.unity.modules.terrain@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.terrain@1.0.0)
+    com.unity.modules.terrainphysics@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.terrainphysics@1.0.0)
+    com.unity.modules.tilemap@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.tilemap@1.0.0)
+    com.unity.modules.ui@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.ui@1.0.0)
+    com.unity.modules.uielements@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.uielements@1.0.0)
+    com.unity.modules.umbra@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.umbra@1.0.0)
+    com.unity.modules.unityanalytics@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.unityanalytics@1.0.0)
+    com.unity.modules.unitywebrequest@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.unitywebrequest@1.0.0)
+    com.unity.modules.unitywebrequestassetbundle@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.unitywebrequestassetbundle@1.0.0)
+    com.unity.modules.unitywebrequestaudio@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.unitywebrequestaudio@1.0.0)
+    com.unity.modules.unitywebrequesttexture@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\Library\PackageCache\com.unity.modules.unitywebrequesttexture@1.0.0)
+    com.unity.modules.unitywebrequestwww@1.0.0 (location: C:\Users\Administrator\AppData\Local\Temp\game-agent-baselines\ablation-group3-run2-20260802-125304\[Subsystems] No new subsystems found in resolved package list.
+Package Manager log level set to [2]
+[Package Manager] Done registering packages in 0.16s seconds
+Refreshing native plugins compatible for Editor in 7.58 ms, found 3 plugins.
+Preloading 0 native plugins for Editor in 0.00 ms.
+Initialize engine version: 2021.3.45f1c1 (9d8da11b98d3)
+[Subsystems] Discovering subsystems at path D:/unity/unity editor/2021.3.45f1c1/Editor/Data/Resources/UnitySubsystems
+[Subsystems] Discovering subsystems at path C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group3-run2-20260802-125304/Assets
+GfxDevice: creating device client; threaded=0; jobified=0
+Direct3D:
+    Version:  Direct3D 11.0 [level 11.1]
+    Renderer: NVIDIA GeForce RTX 4070 (ID=0x2709)
+    Vendor:   NVIDIA
+    VRAM:     12012 MB
+    Driver:   32.0.15.9186
+[Licensing::Client] Successfully resolved entitlement details
+Initialize mono
+Mono path[0] = 'D:/unity/unity editor/2021.3.45f1c1/Editor/Data/Managed'
+Mono path[1] = 'D:/unity/unity editor/2021.3.45f1c1/Editor/Data/MonoBleedingEdge/lib/mono/unityjit-win32'
+Mono config path = 'D:/unity/unity editor/2021.3.45f1c1/Editor/Data/MonoBleedingEdge/etc'
+Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56640
+Using cacheserver namespaces - metadata:defaultmetadata, artifacts:defaultartifacts
+Using cacheserver namespaces - metadata:defaultmetadata, artifacts:defaultartifacts
+ImportWorker Server TCP listen port: 0
+AcceleratorClientConnectionCallback - disconnected - :0
+Begin MonoManager ReloadAssembly
+Registering precompiled unity dll's ...
+Register platform support module: D:/unity/unity editor/2021.3.45f1c1/Editor/Data/PlaybackEngines/WindowsStandaloneSupport/UnityEditor.WindowsStandalone.Extensions.dll
+Registered in 0.002297 seconds.
+Native extension for WindowsStandalone target not found
+Refreshing native plugins compatible for Editor in 2.17 ms, found 3 plugins.
+Preloading 0 native plugins for Editor in 0.00 ms.
+Mono: successfully reloaded assembly
+- Completed reload, in  0.415 seconds
+Domain Reload Profiling:
+	ReloadAssembly (416ms)
+		BeginReloadAssembly (73ms)
+			ExecutionOrderSort (0ms)
+			DisableScriptedObjects (0ms)
+			BackupInstance (0ms)
+			ReleaseScriptingObjects (0ms)
+			CreateAndSetChildDomain (1ms)
+		EndReloadAssembly (274ms)
+			LoadAssemblies (70ms)
+			RebuildTransferFunctionScriptingTraits (0ms)
+			SetupTypeCache (75ms)
+			ReleaseScriptCaches (0ms)
+			RebuildScriptCaches (18ms)
+			SetupLoadedEditorAssemblies (146ms)
+				LogAssemblyErrors (0ms)
+				InitializePlatformSupportModulesInManaged (5ms)
+				SetLoadedEditorAssemblies (0ms)
+				RefreshPlugins (2ms)
+				BeforeProcessingInitializeOnLoad (1ms)
+				ProcessInitializeOnLoadAttributes (101ms)
+				ProcessInitializeOnLoadMethodAttributes (36ms)
+				AfterProcessingInitializeOnLoad (0ms)
+				EditorAssembliesLoaded (0ms)
+			ExecutionOrderSort2 (0ms)
+			AwakeInstancesAfterBackupRestoration (0ms)
+Platform modules already initialized, skipping
+[Licensing::Client] Successfully resolved entitlement details
+Application.AssetDatabase Initial Refresh Start
+Registering precompiled user dll's ...
+Registered in 0.011049 seconds.
+Starting: D:\unity\unity editor\2021.3.45f1c1\Editor\Data\bee_backend.exe --profile="Library/Bee/backend_profiler0.traceevents" --stdin-canary --dagfile="Library/Bee/1900b0aE.dag" --continue-on-failure ScriptAssemblies
+WorkingDir: C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group3-run2-20260802-125304
+ExitCode: 0 Duration: 0s111ms
+*** Tundra build success (0.09 seconds), 0 items updated, 659 evaluated
+AssetDatabase: script compilation time: 0.348056s
+Begin MonoManager ReloadAssembly
+Native extension for WindowsStandalone target not found
+Refreshing native plugins compatible for Editor in 60.98 ms, found 3 plugins.
+Preloading 0 native plugins for Editor in 0.00 ms.
+Mono: successfully reloaded assembly
+- Completed reload, in  2.788 seconds
+Domain Reload Profiling:
+	ReloadAssembly (2789ms)
+		BeginReloadAssembly (108ms)
+			ExecutionOrderSort (0ms)
+			DisableScriptedObjects (4ms)
+			BackupInstance (0ms)
+			ReleaseScriptingObjects (0ms)
+			CreateAndSetChildDomain (16ms)
+		EndReloadAssembly (2607ms)
+			LoadAssemblies (88ms)
+			RebuildTransferFunctionScriptingTraits (0ms)
+			SetupTypeCache (233ms)
+			ReleaseScriptCaches (0ms)
+			RebuildScriptCaches (54ms)
+			SetupLoadedEditorAssemblies (2199ms)
+				LogAssemblyErrors (0ms)
+				InitializePlatformSupportModulesInManaged (3ms)
+				SetLoadedEditorAssemblies (0ms)
+				RefreshPlugins (61ms)
+				BeforeProcessingInitializeOnLoad (68ms)
+				ProcessInitializeOnLoadAttributes (1985ms)
+				ProcessInitializeOnLoadMethodAttributes (75ms)
+				AfterProcessingInitializeOnLoad (6ms)
+				EditorAssembliesLoaded (0ms)
+			ExecutionOrderSort2 (0ms)
+			AwakeInstancesAfterBackupRestoration (7ms)
+Platform modules already initialized, skipping
+Registering precompiled user dll's ...
+Registered in 0.014434 seconds.
+Asset Pipeline Refresh: Total: 4.813 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
+	Summary:
+		Imports: total=0 (actual=0, local cache=0, cache server=0)
+		Asset DB Process Time: managed=0 ms, native=542 ms
+		Asset DB Callback time: managed=29 ms, native=0 ms
+		Scripting: domain reloads=1, domain reload time=2889 ms, compile time=349 ms, other=1002 ms
+		Project Asset Count: scripts=6500, non-scripts=1939
+		Asset File Changes: new=0, changed=0, moved=0, deleted=0
+		Scan Filter Count: 1
+	InvokeBeforeRefreshCallbacks: 0.633ms
+	ApplyChangesToAssetFolders: 0.047ms
+	Scan: 300.133ms
+	OnSourceAssetsModified: 0.000ms
+	InitializeImportedAssetsSnapshot: 7.578ms
+	GetAllGuidsForCategorization: 0.839ms
+	CategorizeAssets: 121.991ms
+	ImportOutOfDateAssets: 4311.221ms (3960.015ms without children)
+		CompileScripts: 348.909ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 1.293ms
+		InitializingProgressBar: 0.005ms
+		PostProcessAllAssetNotificationsAddChangedAssets: 0.615ms
+		OnDemandSchedulerStart: 0.384ms
+	ReloadSourceAssets: 0.606ms
+	UnloadImportedAssets: 45.342ms
+	PostProcessAllAssets: 29.132ms
+	GatherAllCurrentPrimaryArtifactRevisions: 0.000ms
+	UnloadStreamsBegin: 1.731ms
+	LoadedImportedAssetsSnapshotReleaseGCHandles: 2.872ms
+	GetLoadedSourceAssetsSnapshot: 0.805ms
+	PersistCurrentRevisions: 0.291ms
+	UnloadStreamsEnd: 0.073ms
+	GenerateScriptTypeHashes: 7.119ms
+	Untracked: 19.322ms
+Application.AssetDatabase Initial Refresh End
+Launched and connected shader compiler UnityShaderCompiler.exe after 0.03 seconds
+Scanning for USB devices : 4.324ms
+Initializing Unity extensions:
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[MODES] Loading mode Default (0) for mode-current-id-Kitchen_Chaos
+ProgressiveSceneManager::Cancel()
+Unloading 246 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 304 unused Assets / (1.2 MB). Loaded Objects now: 6013.
+Memory consumption went from 160.2 MB to 159.0 MB.
+Total: 4.404700 ms (FindLiveObjects: 0.281500 ms CreateObjectMapping: 0.189000 ms MarkObjects: 3.494100 ms  DeleteObjects: 0.439200 ms)
+
+[Licensing::Client] Successfully resolved entitlement details
+[Project] Loading completed in 12.305 seconds
+	Project init time: 				0.000 seconds
+		Template init time: 		0.000 seconds
+		Package Manager init time: 		0.000 seconds
+		Asset Database init time: 		0.000 seconds
+		Global illumination init time: 	0.000 seconds
+		Assemblies load time: 			0.000 seconds
+		Unity extensions init time: 	0.001 seconds
+		Asset Database refresh time: 	0.000 seconds
+	Scene opening time: 			0.000 seconds
+
+LICENSE SYSTEM [202682 12:56:10] Next license update check is after 2026-08-03T04:56:06
+
+Running tests for EditMode
+Executing tests with settings: test mode = EditMode
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+UnityEditor.TestTools.TestRunner.CommandLineTest.Executer:InitializeAndExecuteRun (string[]) (at Library/PackageCache/com.unity.test-framework@1.1.33/UnityEditor.TestRunner/CommandLineTest/Executer.cs:47)
+UnityEditor.TestTools.TestRunner.CommandLineTest.TestStarter:UpdateWatch () (at Library/PackageCache/com.unity.test-framework@1.1.33/UnityEditor.TestRunner/CommandLineTest/TestStarter.cs:50)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: Library/PackageCache/com.unity.test-framework@1.1.33/UnityEditor.TestRunner/CommandLineTest/Executer.cs Line: 47)
+
+[UnityConnectServicesConfig] config is NOT valid, switching to default
+Created GICache directory at C:/Users/Administrator/AppData/LocalLow/Unity/Caches/GiCache. Took: 0.052s, timestamps: [12.396 - 12.447]
+gi::BakeBackendSwitch: switching bake backend from 3 to 1.
+[00:00:00] Builtin Sky manager started.
+[00:00:00] Finished 1 Bake Ambient Probe job (0.00s execute, 0.00s integrate, 0.11s wallclock)
+[00:00:00] Finished 1 Bake Ambient Probe job (0.00s execute, 0.00s integrate, 0.05s wallclock)
+Unloading 13 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 1 unused Assets / (19.7 KB). Loaded Objects now: 6091.
+Memory consumption went from 154.2 MB to 154.2 MB.
+Total: 5.575400 ms (FindLiveObjects: 0.399700 ms CreateObjectMapping: 0.344200 ms MarkObjects: 4.811800 ms  DeleteObjects: 0.019100 ms)
+
+Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 0 unused Assets / (0 B). Loaded Objects now: 6097.
+Memory consumption went from 153.2 MB to 153.2 MB.
+Total: 4.652100 ms (FindLiveObjects: 0.239500 ms CreateObjectMapping: 0.162900 ms MarkObjects: 4.240400 ms  DeleteObjects: 0.008800 ms)
+
+Saving results to: E:\sysu-course\GameAgent\artifacts\baselines\ablation-en-formal-20260802\ablation-group3-run2-20260802-125304\validation\public\editmode-results.xml
+[Licensing::IpcConnector] License Notification channel disconnected successfully.
+[Licensing::IpcConnector] License Client channel disconnected successfully.

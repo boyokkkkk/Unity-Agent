@@ -1,0 +1,16 @@
+{
+  "schema_version": "game-agent-unity-checkpoint-v1",
+  "checkpoint_id": "1785645446-9bd80234",
+  "operation": "unity_script_patch",
+  "project_root": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\game-agent-baselines\\ablation-group2-run3-20260802-123621",
+  "created_at": 1785645446.450144,
+  "files": [
+    {
+      "path": "Assets/Scripts/KitchenGameManager.cs",
+      "exists": true,
+      "sha256": "077ee23e87c18e622057850ab7b339caee599e11f4a9ca69669bd74107e1b13d",
+      "meta_path": "Assets/Scripts/KitchenGameManager.cs.meta",
+      "meta_sha256": "3c3fa7bd825dbaade2b783288be87ad6c283c15fee7a06447b72870448db3366"
+    }
+  ]
+}

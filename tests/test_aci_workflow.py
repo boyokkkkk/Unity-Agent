@@ -50,6 +50,37 @@ class WorkflowControllerTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def test_seeded_frontier_does_not_skip_required_plan(self):
+        self.controller.reset()
+
+        self.assertEqual(WorkflowPhase.PLAN, self.controller.workflow.phase)
+        self.assertFalse(self.controller.workflow.submission.plan_accepted)
+        self.assertEqual({"task_plan_submit"}, set(self.controller.tool_exposure().tool_names))
+
+    def test_bounded_search_ablation_never_exhausts_budget(self):
+        controller = UnityAciController(
+            self.context,
+            project_root=self.project,
+            artifact_root=self.artifacts,
+            config=AciConfig(workflow_enabled=True, bounded_search_enabled=False),
+        )
+        for _ in range(100):
+            controller.workflow.search_budget.consume("code_symbol_search")
+        self.assertTrue(controller.workflow.search_budget.available("code_symbol_search"))
+
+    def test_evidence_recovery_ablation_uses_only_generic_guidance(self):
+        self.controller.workflow.evidence_recovery_enabled = False
+        self.controller.workflow.observe_mutation_failure(
+            tool="unity_script_patch",
+            message="anchor missing",
+            diagnostic={
+                "error_code": "old_text_not_found_in_evidence",
+                "evidence_artifact_path": "evidence-artifacts/source.txt",
+            },
+        )
+        self.assertNotIn("artifact_read", self.controller.workflow.stage_directive)
+        self.assertIn("re-read the target source", self.controller.workflow.stage_directive)
+
     def test_frontier_collapses_csharp_file_type_and_method_to_one_candidate(self):
         frontier = CandidateFrontier(max_size=5)
         frontier.add_rows([
@@ -259,6 +290,23 @@ class WorkflowControllerTest(unittest.TestCase):
         event_types = [event.event_type.value for event in self.controller.workflow.progress.events]
         self.assertIn("implementation_read", event_types)
         self.assertIn("diagnosis_accepted", event_types)
+
+    def test_structured_causal_claim_gate_rejects_legacy_unverified_claim(self):
+        candidate, _ = self._read_implementation_candidate()
+        self.controller.config.require_structured_causal_claims = True
+        diagnosis = self._diagnosis_arguments(
+            candidate.candidate_id, candidate.evidence_ids[0]
+        )
+
+        rejected = self.controller.execute({
+            "tool": "diagnosis_submit", "arguments": diagnosis,
+        })
+
+        self.assertEqual(-2, rejected["returncode"])
+        gaps = " ".join(self.controller.workflow.diagnosis.gaps)
+        self.assertIn("predicate is unsupported", gaps)
+        self.assertIn("subject does not exist", gaps)
+        self.assertIn("not supported by a matching causal fact", gaps)
 
     def test_rejected_semantic_uncertainty_returns_to_inspect_for_recovery(self):
         candidate, _ = self._read_implementation_candidate()

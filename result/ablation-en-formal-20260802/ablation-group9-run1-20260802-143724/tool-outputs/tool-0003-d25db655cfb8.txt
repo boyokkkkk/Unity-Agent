@@ -1,0 +1,24 @@
+{
+  "status": "ok",
+  "node": {
+    "id": "cs-method:451be85fc5d687131725",
+    "kind": "METHOD",
+    "name": "Hide",
+    "path": "Assets/Scripts/UI/TutorialUI.cs",
+    "attributes": {
+      "declaring_type": "TutorialUI",
+      "declaring_type_id": "cs-type:ca132a490000ef992b69",
+      "arity": 0,
+      "return_type": "void",
+      "line": 61
+    }
+  },
+  "path": "Assets/Scripts/UI/TutorialUI.cs",
+  "sha256": "d87f3cb83868fb69af066fb830fbe5d6c9c29e3bfa8aa91e459a068900382d0b",
+  "start_line": 61,
+  "end_line": 65,
+  "total_lines": 65,
+  "truncated": false,
+  "content": "    private void Hide()\n    {\n        gameObject.SetActive(false);\n    }\n}",
+  "evidence_artifact": "evidence-artifacts/evidence_2422b7b855086f5c.txt"
+}

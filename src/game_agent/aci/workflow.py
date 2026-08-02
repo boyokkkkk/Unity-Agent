@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Any
 
 from .candidate import CandidateFrontier
-from .diagnosis import DiagnosisRecord
+from .diagnosis import DiagnosisRecord, ProposedMutation
 from .progress import ProgressLedger
 
 
@@ -14,6 +14,7 @@ class WorkflowPhase(StrEnum):
     EXPLORE = "explore"
     INSPECT = "inspect"
     DIAGNOSE = "diagnose"
+    PREPARE_EDIT = "prepare_edit"
     EDIT = "edit"
     VALIDATE = "validate"
     REVIEW = "review"
@@ -28,12 +29,15 @@ GRAPH_EXPANSION_TOOLS = frozenset({"code_find_references", "unity_ref_search"})
 
 @dataclass(slots=True)
 class SearchBudget:
+    enabled: bool = True
     global_limit: int = 2
     global_used: int = 0
     graph_expansion_limit: int = 3
     graph_expansion_used: int = 0
 
     def available(self, tool: str) -> bool:
+        if not self.enabled:
+            return True
         if tool in GLOBAL_SEARCH_TOOLS:
             return self.global_used < self.global_limit
         if tool in GRAPH_EXPANSION_TOOLS:
@@ -141,6 +145,13 @@ class WorkflowState:
     no_progress_interventions: dict[str, int] = field(default_factory=dict)
     blocked_actions: int = 0
     required_causal_roles: set[str] = field(default_factory=set)
+    causal_fact_matrix: dict[str, Any] = field(default_factory=dict)
+    prepared_mutations: list[ProposedMutation] = field(default_factory=list)
+    prepared_patch_token: str = ""
+    patch_status: str = "not_prepared"
+    patch_gaps: list[str] = field(default_factory=list)
+    compile_repair_attempts: int = 0
+    evidence_recovery_enabled: bool = True
 
     @classmethod
     def create(
@@ -151,10 +162,13 @@ class WorkflowState:
         frontier_size: int,
         mutation_required: bool,
         required_causal_roles: set[str] | None = None,
+        bounded_search_enabled: bool = True,
+        evidence_recovery_enabled: bool = True,
     ) -> "WorkflowState":
         return cls(
             phase=WorkflowPhase.PLAN,
             search_budget=SearchBudget(
+                enabled=bounded_search_enabled,
                 global_limit=max(0, global_search_limit),
                 graph_expansion_limit=max(0, graph_expansion_limit),
             ),
@@ -164,12 +178,14 @@ class WorkflowState:
             ),
             submission=SubmissionContract(mutation_required=mutation_required),
             required_causal_roles=set(required_causal_roles or set()),
+            evidence_recovery_enabled=evidence_recovery_enabled,
         )
 
     def accept_plan(self, plan: TaskPlan) -> None:
         self.plan = plan
         self.submission.plan_accepted = True
         self.phase = WorkflowPhase.EXPLORE
+        self._maybe_lock_frontier()
 
     def seed_frontier(self, entries: Any) -> None:
         self.frontier.add_working_set(entries)
@@ -245,6 +261,7 @@ class WorkflowState:
         *,
         authorized_targets: set[str],
         authorized_paths: set[str],
+        prepare_edit: bool = False,
     ) -> None:
         self.diagnosis = diagnosis
         self.diagnosis_history.append(diagnosis)
@@ -254,9 +271,72 @@ class WorkflowState:
         self.missing_evidence_candidate_ids.clear()
         self.stage_directive = ""
         self.last_mutation_failure = None
+        self.prepared_mutations = []
+        self.prepared_patch_token = ""
+        self.patch_status = "not_prepared"
+        self.patch_gaps = []
+        self.compile_repair_attempts = 0
         self.submission.diagnosis_accepted = True
         self.submission.critical_uncertainties_resolved = not diagnosis.remaining_uncertainty
+        self.phase = WorkflowPhase.PREPARE_EDIT if prepare_edit else WorkflowPhase.EDIT
+
+    def accept_patch(
+        self,
+        mutation: ProposedMutation,
+        *,
+        authorized_target: str,
+        authorized_path: str,
+        patch_token: str = "",
+    ) -> None:
+        self.prepared_mutations = [mutation]
+        self.prepared_patch_token = patch_token
+        self.authorized_targets = {authorized_target}
+        self.authorized_paths = {authorized_path.replace("\\", "/").casefold()}
+        self.patch_status = "prepared"
+        self.patch_gaps = []
+        self.stage_directive = ""
         self.phase = WorkflowPhase.EDIT
+
+    def reject_patch(self, gaps: list[str]) -> None:
+        self.prepared_mutations = []
+        self.prepared_patch_token = ""
+        self.authorized_targets.clear()
+        self.authorized_paths.clear()
+        self.patch_status = "rejected"
+        self.patch_gaps = list(gaps)
+        self.stage_directive = (
+            "Patch preparation failed while the accepted diagnosis remains valid. "
+            "Revise only patch_prepare using a controller-provided AST fact and exemplar."
+        )
+        self.phase = WorkflowPhase.PREPARE_EDIT
+
+    def observe_compile_failure(self, message: str, *, retry_allowed: bool) -> None:
+        """Return to patch preparation while retaining the evidence-backed diagnosis."""
+        self.compile_repair_attempts += 1
+        self.prepared_mutations = []
+        self.prepared_patch_token = ""
+        self.authorized_targets.clear()
+        self.authorized_paths.clear()
+        self.patch_status = "compile_rejected"
+        self.patch_gaps = [message]
+        self.submission.mutation_count = max(0, self.submission.mutation_count - 1)
+        self.submission.changed_paths_authorized = False
+        self.submission.diagnostics_passed = False
+        self.submission.compile_passed = False
+        self.submission.required_tests_passed = False
+        self.submission.validation_complete = False
+        self.submission.final_review_passed = False
+        instruction = (
+            "Keep the accepted causal diagnosis and call patch_prepare again using the compiler feedback: "
+            if retry_allowed else
+            "The compile-repair budget is exhausted; call diagnosis_revise before another patch: "
+        )
+        self.stage_directive = (
+            "The patched source was restored from its checkpoint after compile failure. "
+            + instruction
+            + message
+        )
+        self.phase = WorkflowPhase.PREPARE_EDIT
 
     def reject_diagnosis(
         self,
@@ -319,6 +399,11 @@ class WorkflowState:
             self.phase = WorkflowPhase.DIAGNOSE
 
     def observe_mutation(self, *, changed_paths_authorized: bool) -> None:
+        # A prepared patch is a single-use capability.  Once its exact mutation
+        # has been applied, remove both the token and mutation description so a
+        # later model turn cannot replay stale edit authority.
+        self.prepared_mutations = []
+        self.prepared_patch_token = ""
         self.submission.mutation_count += 1
         self.submission.changed_paths_authorized = changed_paths_authorized
         self.submission.diagnostics_passed = False
@@ -337,6 +422,27 @@ class WorkflowState:
         diagnostic: dict[str, Any] | None = None,
     ) -> None:
         """Force failed edits through a fresh localization/diagnosis cycle with evidence-based recovery guidance."""
+        if self.prepared_mutations and self.diagnosis is not None and self.diagnosis.status == "accepted":
+            self.prepared_mutations = []
+            self.prepared_patch_token = ""
+            self.patch_status = "rejected"
+            self.patch_gaps = [message]
+            self.authorized_targets.clear()
+            self.authorized_paths.clear()
+            self.last_mutation_failure = {
+                "tool": tool,
+                "message": message,
+                "paths": list(paths or []),
+                "diagnostic": diagnostic or {},
+            }
+            self.stage_directive = (
+                "The prepared patch failed; call patch_prepare again for the accepted diagnosis."
+                if not self.evidence_recovery_enabled else
+                "The prepared patch failed, but the evidence-backed diagnosis remains accepted. "
+                "Call patch_prepare again with the same causal fact and a corrected insertion."
+            )
+            self.phase = WorkflowPhase.PREPARE_EDIT
+            return
         self.submission.diagnosis_accepted = False
         self.submission.critical_uncertainties_resolved = False
         self.authorized_targets.clear()
@@ -347,6 +453,13 @@ class WorkflowState:
             "paths": list(paths or []),
             "diagnostic": diagnostic or {},
         }
+
+        if not self.evidence_recovery_enabled:
+            self.stage_directive = (
+                "Mutation failed; re-read the target source and revise the diagnosis before retrying."
+            )
+            self.phase = WorkflowPhase.INSPECT
+            return
 
         # Provide specific recovery guidance based on diagnostic
         error_code = diagnostic.get("error_code") if diagnostic else None
@@ -400,8 +513,8 @@ class WorkflowState:
         self.submission.final_review_passed = review.status == "accepted"
         self.phase = WorkflowPhase.SUBMIT if review.status == "accepted" else WorkflowPhase.EDIT
 
-    def public_state(self) -> dict[str, Any]:
-        return {
+    def public_state(self, *, compact: bool = False) -> dict[str, Any]:
+        payload = {
             "phase": self.phase.value,
             "plan": asdict(self.plan) if self.plan is not None else None,
             "search_budget": asdict(self.search_budget),
@@ -419,11 +532,139 @@ class WorkflowState:
             "required_causal_roles": sorted(self.required_causal_roles),
             "read_causal_roles": sorted(self.read_causal_roles()),
             "missing_causal_roles": sorted(self.missing_causal_roles()),
+            "causal_fact_matrix": self.causal_fact_matrix,
+            "patch_status": self.patch_status,
+            "patch_gaps": self.patch_gaps,
+            "compile_repair_attempts": self.compile_repair_attempts,
+            "prepared_mutations": [asdict(item) for item in self.prepared_mutations],
+            "prepared_patch_token": self.prepared_patch_token,
             "stage_directive": self.stage_directive,
             "submission_contract": asdict(self.submission),
             "reviews": [asdict(review) for review in self.reviews],
             "required_next_actions": self.required_next_actions(),
             "forbidden": self.forbidden_actions(),
+        }
+        if compact:
+            payload["causal_fact_matrix"] = self._compact_causal_fact_matrix()
+            payload["progress"] = {
+                "version": self.progress.version,
+                "events": [item.to_dict() for item in self.progress.events[-4:]],
+            }
+            if self.diagnosis is not None:
+                payload["diagnosis"] = {
+                    "version": self.diagnosis.version,
+                    "symptom": self.diagnosis.symptom,
+                    "root_targets": self.diagnosis.root_targets,
+                    "status": self.diagnosis.status,
+                    "remaining_uncertainty": self.diagnosis.remaining_uncertainty,
+                    "causal_chain": [
+                        {
+                            "subject": claim.subject,
+                            "predicate": claim.predicate,
+                            "object": claim.object,
+                            "polarity": claim.polarity,
+                            "fact_ids": claim.fact_ids,
+                            "negative_evidence": (
+                                asdict(claim.negative_evidence)
+                                if claim.negative_evidence is not None else None
+                            ),
+                        }
+                        for claim in self.diagnosis.causal_chain
+                    ],
+                }
+            if self.phase in {
+                WorkflowPhase.PREPARE_EDIT,
+                WorkflowPhase.EDIT,
+                WorkflowPhase.VALIDATE,
+                WorkflowPhase.REVIEW,
+                WorkflowPhase.SUBMIT,
+            }:
+                matrix = self.causal_fact_matrix if isinstance(self.causal_fact_matrix, dict) else {}
+                cited_fact_ids = {
+                    fact_id
+                    for claim in (self.diagnosis.causal_chain if self.diagnosis is not None else [])
+                    for fact_id in claim.fact_ids
+                }
+                selected_facts = [
+                    fact
+                    for slot in matrix.get("slots", {}).values()
+                    if isinstance(slot, dict)
+                    for fact in slot.get("facts", [])
+                    if isinstance(fact, dict) and fact.get("fact_id") in cited_fact_ids
+                ]
+                payload["causal_fact_matrix"] = {
+                    "graph_revision": matrix.get("graph_revision", ""),
+                    "status": "diagnosis_locked",
+                    "selected_facts": selected_facts,
+                }
+                payload["prepared_mutations"] = []
+        return payload
+
+    def _compact_causal_fact_matrix(self) -> dict[str, Any]:
+        matrix = self.causal_fact_matrix if isinstance(self.causal_fact_matrix, dict) else {}
+        slots = matrix.get("slots", {}) if isinstance(matrix.get("slots", {}), dict) else {}
+
+        def facts(slot: str) -> list[dict[str, Any]]:
+            value = slots.get(slot, {})
+            rows = value.get("facts", []) if isinstance(value, dict) else []
+            return [item for item in rows if isinstance(item, dict)]
+
+        missing_publications = [
+            item for item in facts("event_publication")
+            if item.get("polarity") == "absent"
+        ]
+        if not missing_publications:
+            return matrix
+        writers = {str(item.get("subject", "")) for item in missing_publications}
+        events = {str(item.get("object", "")) for item in missing_publications}
+        publications = [
+            item for item in facts("event_publication")
+            if item in missing_publications or str(item.get("object", "")) in events
+        ]
+        trigger_subscriptions = [
+            item for item in facts("trigger_subscription")
+            if str(item.get("subject", "")) in writers
+        ]
+        observer_subscriptions = [
+            item for item in facts("observer_subscription")
+            if str(item.get("object", "")) in events
+        ]
+        observer_handlers = {
+            str(item.get("subject", "")) for item in observer_subscriptions
+        }
+        declared_events = events | {
+            str(item.get("object", "")) for item in trigger_subscriptions
+        }
+        selected = {
+            "event_declaration": [
+                item for item in facts("event_declaration")
+                if str(item.get("object", "")) in declared_events
+            ],
+            "trigger_subscription": trigger_subscriptions,
+            "state_write": [
+                item for item in facts("state_write")
+                if str(item.get("subject", "")) in writers
+            ],
+            "event_publication": publications,
+            "observer_subscription": observer_subscriptions,
+            "observer_effect": [
+                item for item in facts("observer_effect")
+                if str(item.get("subject", "")) in observer_handlers
+            ],
+        }
+        return {
+            "graph_revision": matrix.get("graph_revision", ""),
+            "scope_paths": matrix.get("scope_paths", []),
+            "slots": {
+                name: {
+                    "status": (
+                        "absent" if any(item.get("polarity") == "absent" for item in rows)
+                        else "present" if rows else "unknown"
+                    ),
+                    "facts": rows,
+                }
+                for name, rows in selected.items()
+            },
         }
 
     def required_next_actions(self) -> list[str]:
@@ -475,7 +716,16 @@ class WorkflowState:
                     "already-retrieved candidate before diagnosing: " + ", ".join(unread)
                 ]
             return ["Submit an evidence-linked diagnosis before mutation."]
+        if self.phase == WorkflowPhase.PREPARE_EDIT:
+            return [
+                self.stage_directive
+                or "Call patch_prepare using a controller causal fact, or a unique exact source anchor for a non-event C# repair."
+            ]
         if self.phase == WorkflowPhase.EDIT:
+            if self.prepared_patch_token:
+                return [
+                    "Call patch_apply with the controller-provided patch_token; do not copy patch text."
+                ]
             return [self.stage_directive or "Apply one evidence-backed typed mutation to an authorized target."]
         if self.phase == WorkflowPhase.VALIDATE:
             return ["Complete diagnostics, reload policy, and required Unity validation."]
@@ -494,6 +744,8 @@ class WorkflowState:
             return ["global_search", "mutation", "submit", "powershell"]
         if self.phase == WorkflowPhase.DIAGNOSE:
             return ["global_search", "relation_expansion", "mutation", "submit", "powershell"]
+        if self.phase == WorkflowPhase.PREPARE_EDIT:
+            return ["global_search", "relation_expansion", "mutation", "validation", "submit", "powershell"]
         if self.phase == WorkflowPhase.EDIT:
             return ["global_search", "submit", "powershell"]
         if self.phase == WorkflowPhase.VALIDATE:
@@ -524,6 +776,8 @@ class WorkflowState:
             if unread:
                 self.missing_evidence_candidate_ids = unread
             message = "Diagnosis stalled; only explicitly missing candidate evidence may be read before diagnosis revision."
+        elif before == WorkflowPhase.PREPARE_EDIT and count == 1:
+            message = "Patch preparation stalled; use the AST anchor and repair exemplar from the accepted causal fact."
         elif before == WorkflowPhase.EDIT and count == 1:
             self.stage_directive = "Inspect the authorized diff or roll back the pending approach before another edit."
             message = self.stage_directive
@@ -542,6 +796,8 @@ class WorkflowState:
         )
 
     def _maybe_lock_frontier(self) -> None:
+        if self.phase == WorkflowPhase.PLAN:
+            return
         high_confidence = [
             candidate for candidate in self.frontier.candidates()
             if candidate.score >= 0.65 and candidate.role != "test"

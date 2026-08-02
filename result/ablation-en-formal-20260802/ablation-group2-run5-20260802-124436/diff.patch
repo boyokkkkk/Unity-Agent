@@ -1,0 +1,12 @@
+diff --git a/Assets/Scripts/KitchenGameManager.cs b/Assets/Scripts/KitchenGameManager.cs
+index 644e2e2..f923069 100644
+--- a/Assets/Scripts/KitchenGameManager.cs
++++ b/Assets/Scripts/KitchenGameManager.cs
+@@ -44,6 +44,7 @@ public class KitchenGameManager : MonoBehaviour
+         if (state == State.WaitingToStart)
+         {
+             state = State.CountdownToStart;
++            OnStateChanged?.Invoke(this, EventArgs.Empty);
+             
+         }    
+     }

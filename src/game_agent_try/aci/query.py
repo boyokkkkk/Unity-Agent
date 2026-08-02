@@ -271,7 +271,8 @@ class StructuredQueryExecutor:
             return self._error("code_file_read", "source_missing", f"Source does not exist: {relative}")
         raw = target.read_bytes()
         sha256 = hashlib.sha256(raw).hexdigest()
-        lines = raw.decode("utf-8", errors="replace").splitlines()
+        text = raw.decode("utf-8", errors="replace")
+        lines = text.splitlines()
         start = max(1, int(args.get("start_line", 1)))
         end = min(len(lines), int(args.get("end_line", start + 199)))
         if end < start:
@@ -290,9 +291,8 @@ class StructuredQueryExecutor:
             artifact_dir = self.artifact_root / "evidence-artifacts"
             artifact_dir.mkdir(parents=True, exist_ok=True)
             artifact_file = artifact_dir / f"{evidence_id.replace(':', '_')}.txt"
-            # Store full file content, not just the viewed range
-            full_content = "\n".join(lines)
-            artifact_file.write_text(full_content, encoding="utf-8")
+            # Store ORIGINAL bytes to preserve exact line endings and SHA
+            artifact_file.write_bytes(raw)
             artifact_relative = artifact_file.relative_to(self.artifact_root).as_posix()
 
         self._map([node.id])

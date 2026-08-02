@@ -1,0 +1,9 @@
+{
+  "schema_version": "game-agent-state-event-baseline-v1",
+  "target": "Assets/Scripts/KitchenGameManager.cs",
+  "removed_statement": "OnStateChanged?.Invoke(this, EventArgs.Empty);",
+  "source_sha256": "1f759b7f027f9ab2dc57a9d06b10daa59fbf2f9d0e167e6ce415eb2e78b447f7",
+  "defective_sha256": "3536377bfd6707a2b30aa44f3027b7330ff3c1cf27674c534d0670bb80f785e6",
+  "replacement_count": 1,
+  "patch": "defect.patch"
+}

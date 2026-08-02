@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 from game_agent.project_graph.retrieval import tokenize
-from game_agent.project_graph.schema import EdgeKind, Node, NodeKind
+from game_agent.project_graph.schema import EdgeKind, Node, NodeKind, stable_id
 from game_agent.validation import find_unity_editor
 
 from .schemas import QUERY_TOOL_NAMES
@@ -26,10 +26,19 @@ OBJECT_KINDS = {NodeKind.GAME_OBJECT, NodeKind.COMPONENT}
 class StructuredQueryExecutor:
     """Bounded read-only Unity queries backed by the P1 project context."""
 
-    def __init__(self, context: "ContextAssembler", *, project_root: Path, artifact_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        context: "ContextAssembler",
+        *,
+        project_root: Path,
+        artifact_root: Path | None = None,
+        evidence_artifact_enabled: bool = True,
+    ) -> None:
         self.context = context
         self.project_root = project_root.resolve()
         self.artifact_root = artifact_root.resolve() if artifact_root else None
+        self.evidence_artifact_enabled = evidence_artifact_enabled
+        self._filesystem_nodes: dict[str, Node] = {}
 
     @property
     def store(self) -> "ProjectContextStore | None":
@@ -179,17 +188,25 @@ class StructuredQueryExecutor:
             claim=f"Read indexed Unity object detail for {target.name} ({target.path}).")
 
     def _code_symbol_search(self, args: dict[str, Any]) -> dict[str, Any]:
-        unavailable = self._need_graph("code_symbol_search")
-        if unavailable:
-            return unavailable
         query = _required(args, "query")
+        if self.store is None:
+            return self._nodes(
+                "code_symbol_search",
+                query,
+                self._filesystem_code_search(
+                    query,
+                    prefix=str(args.get("path_prefix", "")),
+                    limit=_limit(args),
+                ),
+            )
         kinds = (_node_kinds(args.get("kinds"), CODE_KINDS) or set()) & CODE_KINDS
         return self._nodes("code_symbol_search", query, self._search(query, kinds, str(args.get("path_prefix", "")), _limit(args)))
 
     def _code_find_references(self, args: dict[str, Any]) -> dict[str, Any]:
-        unavailable = self._need_graph("code_find_references")
-        if unavailable:
-            return unavailable
+        if self.store is None:
+            symbol = _required(args, "symbol")
+            rows = self._filesystem_code_search(symbol, prefix="", limit=_limit(args))
+            return self._nodes("code_find_references", symbol, rows)
         seeds = self._resolve(node_id=str(args.get("node_id", "")), path=str(args.get("file_path", "")), name=str(args.get("symbol", "")), kinds=CODE_KINDS)
         if not seeds:
             return self._empty("code_find_references", "No matching code symbol.")
@@ -252,14 +269,23 @@ class StructuredQueryExecutor:
         )
 
     def _code_file_read(self, args: dict[str, Any]) -> dict[str, Any]:
-        unavailable = self._need_graph("code_file_read")
-        if unavailable:
-            return unavailable
-        nodes = self._resolve(
-            node_id=str(args.get("node_id", "")),
-            path=str(args.get("path", "")),
-            kinds=CODE_KINDS,
-        )
+        if self.store is None:
+            node_id = str(args.get("node_id", ""))
+            path = str(args.get("path", ""))
+            node = self._filesystem_nodes.get(node_id)
+            if node is None and path:
+                relative = path.replace("\\", "/").lstrip("./")
+                candidate = (self.project_root / relative).resolve()
+                if candidate.is_file() and candidate.suffix.casefold() == ".cs":
+                    node = Node(stable_id("fs-cs", relative), NodeKind.CSHARP_FILE, candidate.stem, relative)
+                    self._filesystem_nodes[node.id] = node
+            nodes = [node] if node is not None else []
+        else:
+            nodes = self._resolve(
+                node_id=str(args.get("node_id", "")),
+                path=str(args.get("path", "")),
+                kinds=CODE_KINDS,
+            )
         if not nodes:
             return self._empty("code_file_read", "No matching indexed C# file or symbol.")
         node = nodes[0]
@@ -286,7 +312,7 @@ class StructuredQueryExecutor:
             [f"source:{relative}:{start}-{end}"]
         )
         artifact_relative = ""
-        if self.artifact_root:
+        if self.artifact_root and self.evidence_artifact_enabled:
             artifact_dir = self.artifact_root / "evidence-artifacts"
             artifact_dir.mkdir(parents=True, exist_ok=True)
             artifact_file = artifact_dir / f"{evidence_id.replace(':', '_')}.txt"
@@ -318,6 +344,43 @@ class StructuredQueryExecutor:
             artifact_path=artifact_relative,
             artifact_sha256=sha256,
         )
+
+    def _filesystem_code_search(
+        self,
+        query: str,
+        *,
+        prefix: str,
+        limit: int,
+    ) -> list[tuple[float, Node]]:
+        terms = tokenize(query)
+        normalized_prefix = _norm(prefix)
+        scored: list[tuple[float, Node]] = []
+        assets = self.project_root / "Assets"
+        if not assets.is_dir():
+            return []
+        for path in assets.rglob("*.cs"):
+            relative = path.relative_to(self.project_root).as_posix()
+            if normalized_prefix and not _norm(relative).startswith(normalized_prefix):
+                continue
+            try:
+                source = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            searchable = f"{path.stem} {relative} {source[:20000]}".casefold()
+            score = float(sum(3 if term in path.stem.casefold() else 1 for term in terms if term in searchable))
+            if score <= 0:
+                continue
+            node = Node(
+                stable_id("fs-cs", relative),
+                NodeKind.CSHARP_FILE,
+                path.stem,
+                relative,
+                {"filesystem_fallback": True},
+            )
+            self._filesystem_nodes[node.id] = node
+            scored.append((score, node))
+        scored.sort(key=lambda item: (-item[0], item[1].path.casefold()))
+        return scored[:limit]
 
     def _code_diagnostics(self, args: dict[str, Any]) -> dict[str, Any]:
         unavailable = self._need_graph("code_diagnostics")

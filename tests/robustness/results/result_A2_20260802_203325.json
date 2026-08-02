@@ -1,0 +1,32 @@
+{
+  "task_id": "A2",
+  "task_name": "Medium Bug - 游戏暂停时音乐继续播放",
+  "task_type": "bug_fix",
+  "priority": "P0",
+  "complexity": "medium",
+  "timestamp": "2026-08-02T20:33:25.515858",
+  "success": true,
+  "meets_all_criteria": true,
+  "overall_success": true,
+  "elapsed_time": 30.213128089904785,
+  "mutations_applied": 1,
+  "total_tokens": 47791,
+  "error": null,
+  "criteria_check": {
+    "min_mutations": {
+      "required": 1,
+      "actual": 1,
+      "met": true
+    },
+    "token_budget": {
+      "budget": 65000,
+      "actual": 47791,
+      "met": true
+    },
+    "time_budget": {
+      "budget": 70,
+      "actual": 30.213128089904785,
+      "met": true
+    }
+  }
+}

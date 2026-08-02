@@ -1,0 +1,384 @@
+{
+  "status": "blocked",
+  "tool": "unity_asset_search",
+  "guard": "workflow_phase_or_budget",
+  "message": "unity_asset_search is unavailable after the candidate frontier is locked.",
+  "execution_protocol": {
+    "pending": null,
+    "completed_transactions": 0,
+    "blocked_actions": 1,
+    "tool_exposure": {
+      "profile": "inspect",
+      "tool_names": [
+        "artifact_read",
+        "candidate_read",
+        "code_file_read",
+        "code_find_references",
+        "unity_ref_search"
+      ],
+      "reason": "The frontier is locked; consume or expand a concrete candidate.",
+      "validation_locked": false
+    },
+    "workflow": {
+      "phase": "inspect",
+      "plan": {
+        "objective": "Fix the game not entering countdown state after player presses interact key on start screen; ensure tutorial UI closes and countdown UI appears.",
+        "hypotheses": [
+          "Interaction input is not correctly detected or routed to state machine",
+          "Game state transition from StartScreen to Countdown is not triggered",
+          "OnStateChanged event is not published or observed correctly",
+          "UI observers for StartScreen and Countdown states are not refreshing properly"
+        ],
+        "required_evidence": [
+          "Location of interaction input handling logic (e.g., InputManager, PlayerInput, or GameStateController)",
+          "State transition logic between StartScreen and Countdown states",
+          "OnStateChanged event definition and subscription points",
+          "UI components responsible for showing/hiding tutorial and countdown UIs"
+        ],
+        "success_criteria": [
+          "Pressing interact key on start screen triggers transition to Countdown state",
+          "Tutorial UI is hidden",
+          "Countdown UI is shown",
+          "No unintended side effects on other states or UIs"
+        ],
+        "validation_plan": [
+          "compile",
+          "editmode",
+          "playmode"
+        ]
+      },
+      "search_budget": {
+        "enabled": true,
+        "global_limit": 2,
+        "global_used": 2,
+        "graph_expansion_limit": 3,
+        "graph_expansion_used": 0
+      },
+      "candidate_frontier": [],
+      "diagnosis": null,
+      "diagnosis_versions": 0,
+      "progress": {
+        "version": 0,
+        "events": []
+      },
+      "authorized_candidate_ids": [],
+      "authorized_paths": [],
+      "missing_evidence_candidate_ids": [],
+      "required_causal_roles": [
+        "controller",
+        "event_source",
+        "ui"
+      ],
+      "read_causal_roles": [],
+      "missing_causal_roles": [
+        "controller",
+        "event_source",
+        "ui"
+      ],
+      "causal_fact_matrix": {
+        "graph_revision": "graph:6b10fbb9c1f6653e",
+        "scope_paths": [],
+        "slots": {
+          "event_declaration": {
+            "status": "present",
+            "facts": [
+              {
+                "fact_id": "fact:2b1af55fc7515d71",
+                "slot": "event_declaration",
+                "subject": "KitchenGameManager",
+                "predicate": "DECLARES_EVENT",
+                "object": "KitchenGameManager.OnStateChanged",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/KitchenGameManager.cs"
+                ],
+                "ast_anchor": "",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              },
+              {
+                "fact_id": "fact:7fc6b96b6e320c36",
+                "slot": "event_declaration",
+                "subject": "GameInput",
+                "predicate": "DECLARES_EVENT",
+                "object": "GameInput.OnInteractAction",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/GameInput.cs"
+                ],
+                "ast_anchor": "",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              }
+            ]
+          },
+          "trigger_subscription": {
+            "status": "present",
+            "facts": [
+              {
+                "fact_id": "fact:3d969225925f9eba",
+                "slot": "trigger_subscription",
+                "subject": "KitchenGameManager.GameInput_OnInteraction",
+                "predicate": "SUBSCRIBES_TO",
+                "object": "GameInput.OnInteractAction",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/KitchenGameManager.cs:42",
+                  "Assets/Scripts/GameInput.cs"
+                ],
+                "ast_anchor": "",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              }
+            ]
+          },
+          "state_write": {
+            "status": "present",
+            "facts": [
+              {
+                "fact_id": "fact:8dc0af68120fc18b",
+                "slot": "state_write",
+                "subject": "KitchenGameManager.GameInput_OnInteraction",
+                "predicate": "WRITES_STATE",
+                "object": "KitchenGameManager.state",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/KitchenGameManager.cs:42",
+                  "Assets/Scripts/KitchenGameManager.cs"
+                ],
+                "ast_anchor": "state = State.CountdownToStart",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              }
+            ]
+          },
+          "event_publication": {
+            "status": "absent",
+            "facts": [
+              {
+                "fact_id": "fact:59a6f83628b0ce00",
+                "slot": "event_publication",
+                "subject": "KitchenGameManager.GameInput_OnInteraction",
+                "predicate": "PUBLISHES_EVENT",
+                "object": "KitchenGameManager.OnStateChanged",
+                "polarity": "absent",
+                "locations": [
+                  "Assets/Scripts/KitchenGameManager.cs:42",
+                  "Assets/Scripts/KitchenGameManager.cs"
+                ],
+                "ast_anchor": "state = State.CountdownToStart",
+                "repair_exemplar": "OnStateChanged?.Invoke(this, EventArgs.Empty)",
+                "negative_evidence": {
+                  "scope": "KitchenGameManager.GameInput_OnInteraction",
+                  "edge_kind": "PUBLISHES_EVENT",
+                  "graph_revision": "graph:6b10fbb9c1f6653e",
+                  "observed_matches": 0,
+                  "complete": true
+                }
+              },
+              {
+                "fact_id": "fact:3992fad895abf53d",
+                "slot": "event_publication",
+                "subject": "KitchenGameManager.Update",
+                "predicate": "PUBLISHES_EVENT",
+                "object": "KitchenGameManager.OnStateChanged",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/KitchenGameManager.cs:56",
+                  "Assets/Scripts/KitchenGameManager.cs"
+                ],
+                "ast_anchor": "state = State.GameOver",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              }
+            ]
+          },
+          "observer_subscription": {
+            "status": "present",
+            "facts": [
+              {
+                "fact_id": "fact:c9b120fd8ae391d8",
+                "slot": "observer_subscription",
+                "subject": "GameStartCountdownUI.KitchenGameManager_OnStateChanged",
+                "predicate": "SUBSCRIBES_TO",
+                "object": "KitchenGameManager.OnStateChanged",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/UI/GameStartCountdownUI.cs:26",
+                  "Assets/Scripts/KitchenGameManager.cs"
+                ],
+                "ast_anchor": "",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              },
+              {
+                "fact_id": "fact:ed3adc00f81cf0e4",
+                "slot": "observer_subscription",
+                "subject": "TutorialUI.KitchenGameManager_OnStateChanged",
+                "predicate": "SUBSCRIBES_TO",
+                "object": "KitchenGameManager.OnStateChanged",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/UI/TutorialUI.cs:29",
+                  "Assets/Scripts/KitchenGameManager.cs"
+                ],
+                "ast_anchor": "",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              },
+              {
+                "fact_id": "fact:e2288d04a22f51ce",
+                "slot": "observer_subscription",
+                "subject": "GameOverUI.KitchenGameManager_OnStateChanged",
+                "predicate": "SUBSCRIBES_TO",
+                "object": "KitchenGameManager.OnStateChanged",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/UI/GameOverUI.cs:16",
+                  "Assets/Scripts/KitchenGameManager.cs"
+                ],
+                "ast_anchor": "",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              }
+            ]
+          },
+          "observer_effect": {
+            "status": "present",
+            "facts": [
+              {
+                "fact_id": "fact:4746aadf08fbe730",
+                "slot": "observer_effect",
+                "subject": "GameStartCountdownUI.KitchenGameManager_OnStateChanged",
+                "predicate": "OBSERVER_EFFECT",
+                "object": "GameStartCountdownUI.Show",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/UI/GameStartCountdownUI.cs:26",
+                  "Assets/Scripts/UI/GameStartCountdownUI.cs:51"
+                ],
+                "ast_anchor": "Show",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              },
+              {
+                "fact_id": "fact:5298d64f962c4ea2",
+                "slot": "observer_effect",
+                "subject": "GameStartCountdownUI.KitchenGameManager_OnStateChanged",
+                "predicate": "OBSERVER_EFFECT",
+                "object": "GameStartCountdownUI.Hide",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/UI/GameStartCountdownUI.cs:26",
+                  "Assets/Scripts/UI/GameStartCountdownUI.cs:56"
+                ],
+                "ast_anchor": "Hide",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              },
+              {
+                "fact_id": "fact:bc143b21e9ee3cb3",
+                "slot": "observer_effect",
+                "subject": "TutorialUI.KitchenGameManager_OnStateChanged",
+                "predicate": "OBSERVER_EFFECT",
+                "object": "TutorialUI.Hide",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/UI/TutorialUI.cs:29",
+                  "Assets/Scripts/UI/TutorialUI.cs:61"
+                ],
+                "ast_anchor": "Hide",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              },
+              {
+                "fact_id": "fact:33ee8b6007b798a0",
+                "slot": "observer_effect",
+                "subject": "GameOverUI.KitchenGameManager_OnStateChanged",
+                "predicate": "OBSERVER_EFFECT",
+                "object": "GameOverUI.Hide",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/UI/GameOverUI.cs:16",
+                  "Assets/Scripts/UI/GameOverUI.cs:34"
+                ],
+                "ast_anchor": "Hide",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              },
+              {
+                "fact_id": "fact:12ad9c761a6f27bb",
+                "slot": "observer_effect",
+                "subject": "GameOverUI.KitchenGameManager_OnStateChanged",
+                "predicate": "OBSERVER_EFFECT",
+                "object": "GameOverUI.Show",
+                "polarity": "present",
+                "locations": [
+                  "Assets/Scripts/UI/GameOverUI.cs:16",
+                  "Assets/Scripts/UI/GameOverUI.cs:29"
+                ],
+                "ast_anchor": "Show",
+                "repair_exemplar": "",
+                "negative_evidence": null
+              }
+            ]
+          }
+        }
+      },
+      "patch_status": "not_prepared",
+      "patch_gaps": [],
+      "compile_repair_attempts": 0,
+      "prepared_mutations": [],
+      "prepared_patch_token": "",
+      "stage_directive": "",
+      "submission_contract": {
+        "plan_accepted": true,
+        "diagnosis_accepted": false,
+        "mutation_required": true,
+        "mutation_count": 0,
+        "no_change_diagnosis_accepted": false,
+        "changed_paths_authorized": false,
+        "diagnostics_passed": false,
+        "compile_passed": false,
+        "required_tests_passed": false,
+        "critical_uncertainties_resolved": false,
+        "validation_complete": false,
+        "final_review_passed": false
+      },
+      "reviews": [],
+      "required_next_actions": [
+        "Expand graph references to find candidates for missing causal roles: controller, event_source, ui"
+      ],
+      "forbidden": [
+        "global_search",
+        "mutation",
+        "submit",
+        "powershell"
+      ]
+    },
+    "completed_actions": [],
+    "disabled_actions": [],
+    "unresolved_slots": [
+      {
+        "id": "localized_target",
+        "description": "Identify at least one graph-backed target relevant to the task.",
+        "status": "open",
+        "evidence_ids": []
+      },
+      {
+        "id": "implementation_source",
+        "description": "Read at least one non-test implementation source for the root-cause path.",
+        "status": "open",
+        "evidence_ids": []
+      }
+    ],
+    "replan_count": 0,
+    "admissible_action_signatures": [],
+    "typed_mutation_calls": 0,
+    "escape_hatch_calls": 0,
+    "escape_hatch_ratio": 0.0,
+    "checkpoints_created": 0,
+    "mutation_transactions": 0,
+    "unauthorized_transactions": 0
+  }
+}

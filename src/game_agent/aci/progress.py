@@ -9,6 +9,7 @@ class ProgressEventType(StrEnum):
     FRONTIER_IMPROVED = "frontier_improved"
     IMPLEMENTATION_READ = "implementation_read"
     DIAGNOSIS_ACCEPTED = "diagnosis_accepted"
+    PATCH_PREPARED = "patch_prepared"
     MUTATION_APPLIED = "mutation_applied"
     MUTATION_FAILED = "mutation_failed"
     COMPILE_PASSED = "compile_passed"

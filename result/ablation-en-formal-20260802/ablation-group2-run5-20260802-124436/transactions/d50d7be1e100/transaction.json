@@ -1,0 +1,17 @@
+{
+  "transaction_id": "d50d7be1e100",
+  "operation": "unity_script_patch",
+  "authorized_paths": [
+    "assets/scripts/kitchengamemanager.cs"
+  ],
+  "checkpoint_id": "1785645923-c3ce1115",
+  "checkpoint_manifest": "checkpoints/1785645923-c3ce1115/manifest.json",
+  "actual_changed_paths": [
+    "Assets/Scripts/KitchenGameManager.cs"
+  ],
+  "unauthorized_paths": [],
+  "diff_ref": "transactions/d50d7be1e100/diff.patch",
+  "status": "applied",
+  "rolled_back": false,
+  "created_at": 1785645923.7761269
+}

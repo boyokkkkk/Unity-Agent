@@ -1,0 +1,11 @@
+{
+  "status": "ok",
+  "path": "Assets/Scripts/KitchenGameManager.cs",
+  "before_sha256": "077ee23e87c18e622057850ab7b339caee599e11f4a9ca69669bd74107e1b13d",
+  "after_sha256": "2a3950ed66607b82a06e2297f5fed27a98cdef50d0ecb5464656571cceec2a67",
+  "replacement_count": 1,
+  "refresh_required": true,
+  "recompile_required": true,
+  "evidence_sha256": "689316bf6e40439721040b98882d9174634dbf5b534302794488f018290d7644",
+  "evidence_artifact_used": true
+}

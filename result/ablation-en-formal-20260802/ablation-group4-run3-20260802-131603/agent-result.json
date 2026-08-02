@@ -1,0 +1,15 @@
+{
+  "exit_status": "TotalTokenLimitExceeded",
+  "submission": "",
+  "input_tokens": 17823,
+  "total_tokens": 69510,
+  "max_total_tokens": 81920,
+  "token_usage": {
+    "prompt_tokens": 68255,
+    "completion_tokens": 1255,
+    "total_tokens": 69510,
+    "last_input_tokens": 17823,
+    "max_input_tokens": 32768,
+    "max_total_tokens": 81920
+  }
+}

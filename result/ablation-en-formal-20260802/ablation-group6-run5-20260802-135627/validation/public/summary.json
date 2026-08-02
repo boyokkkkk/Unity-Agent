@@ -1,0 +1,750 @@
+{
+  "schema_version": "game-agent-unity-validation-v1",
+  "project_path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\game-agent-baselines\\ablation-group6-run5-20260802-135627",
+  "unity_editor": "D:\\unity\\unity editor\\2021.3.45f1c1\\Editor\\Unity.exe",
+  "status": "passed",
+  "duration_ms": 104619,
+  "checks": [
+    {
+      "name": "asset_integrity",
+      "status": "passed",
+      "errors": [],
+      "warnings": [
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/UniversalRenderPipelineGlobalSettings.asset",
+          "guid": "2ec995e51a6e251468d2a3fd8a686257"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/ProgressBarUI.prefab",
+          "guid": "0cd44c1031e13a943bb63640046fad76"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/ProgressBarUI.prefab",
+          "guid": "dc42784cf147c0c48a680349fa168899"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/ProgressBarUI.prefab",
+          "guid": "e19747de3f5aca642ab2be37e372fb86"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/ProgressBarUI.prefab",
+          "guid": "fe87c0e1cc204ed48ad3b37840f39efc"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "0000000000000000e000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "0000000000000000f000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "01614664b831546d2ae94a42149d80ac"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "0cd44c1031e13a943bb63640046fad76"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "172515602e62fb746b5d573b38a5fe58"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "30649d3a9faa99c48a7b1166b86bf2a0"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "45e653bab7fb20e499bda25e1b646fea"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "474bcb49853aa07438625e644c072ee6"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "4e29b1a8efbd4b44bb3f3716e73f07ff"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "59f8146938fff824cb5fd77236b75775"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "72ece51f2901e7445ab60da3685d6b5f"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "76c392e42b5098c458856cdf6ecaaaa1"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "a79441f348de89743a2939f4d699eac1"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "a86470a33a6bf42c4b3595704624658b"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "ac0b09e7857660247b1477e93731de29"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "be76e5f14cfee674cb30b491fb72b09b"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "ca9f5fa95ffab41fb9a615ab714db018"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "cfabb0440166ab443bba8876756fdfa9"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "dc42784cf147c0c48a680349fa168899"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "e19747de3f5aca642ab2be37e372fb86"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "f4044717213e31446939f7bd49c896ea"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "f4688fdb7df04437aeb418b961361dc5"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "fa7155796051b734daa718462081dc5f"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene.unity",
+          "guid": "fe87c0e1cc204ed48ad3b37840f39efc"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "0000000000000000e000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "0000000000000000f000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "0cd44c1031e13a943bb63640046fad76"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "474bcb49853aa07438625e644c072ee6"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "4f231c4fb786f3946a6b90b886c48677"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "76c392e42b5098c458856cdf6ecaaaa1"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "a79441f348de89743a2939f4d699eac1"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "dc42784cf147c0c48a680349fa168899"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/LoadingScene.unity",
+          "guid": "f4688fdb7df04437aeb418b961361dc5"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "0000000000000000e000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "0000000000000000f000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "01614664b831546d2ae94a42149d80ac"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "0cd44c1031e13a943bb63640046fad76"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "172515602e62fb746b5d573b38a5fe58"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "45e653bab7fb20e499bda25e1b646fea"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "46965f9cbaf525742a6da4c2172a99cd"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "474bcb49853aa07438625e644c072ee6"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "4e29b1a8efbd4b44bb3f3716e73f07ff"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "68bb026fafb42b14791938953eaace77"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "72ece51f2901e7445ab60da3685d6b5f"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "76c392e42b5098c458856cdf6ecaaaa1"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "ac0b09e7857660247b1477e93731de29"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "ca9f5fa95ffab41fb9a615ab714db018"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "cfabb0440166ab443bba8876756fdfa9"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "dc42784cf147c0c48a680349fa168899"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "e19747de3f5aca642ab2be37e372fb86"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "f4044717213e31446939f7bd49c896ea"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "f4688fdb7df04437aeb418b961361dc5"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "fa7155796051b734daa718462081dc5f"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/MainMenuScene.unity",
+          "guid": "fe87c0e1cc204ed48ad3b37840f39efc"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "04c410c9937594faa893a11dceb85f7e"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "0849e84e3d62649e8882e9d6f056a017"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "0f854b35a0cf61a429bd5dcfea30eddd"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "41439944d30ece34e96484bdb6645b55"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "5fd9a8feb75a4b5894c241777f519d4e"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "60e1133243b97e347b653163a8c01b64"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "7b3ede40266cd49a395def176e1bc486"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "93446b5c5339d4f00b85c159e1159b7c"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "c17132b1f77d20942aa75f8429c0f8bc"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "c56b7e0d4c7cb484e959caeeedae9bbf"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "cf852408f2e174538bcd9b7fda1c5ae7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "d104b2fc1ca6445babb8e90b0758136b"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "d6dae50ee9e1bfa4db75f19f99355220"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "de640fe3d0db1804a85f9fc8f5cadab6"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "e6e9a19c3678ded42a3bc431ebef7dbd"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "e9155b26e1bc55942a41e518703fe304"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRenderer.asset",
+          "guid": "f62c9c65cf3354c93be831c8bc075510"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Settings/UniversalRP-HighQuality.asset",
+          "guid": "bf2edee5c58d82540a51f03df9d42094"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/Black.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/Black.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/CounterSelected.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/CounterSelected.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/DeliveryArrow.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/Floor.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/Floor.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerBody.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerBody.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerBody_Blue.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerBody_Blue.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerBody_Green.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerBody_Green.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerBody_Red.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerBody_Red.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerMovingParticles.mat",
+          "guid": "0000000000000000f000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerMovingParticles.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/PlayerMovingParticles.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/StoveRedGlow.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/StoveRedGlow.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/StoveSizzlingParticles.mat",
+          "guid": "0000000000000000f000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/StoveSizzlingParticles.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/StoveSizzlingParticles.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/Trail.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/Trail.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/Wall.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Materials/Wall.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Meshes/Cabbage.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Meshes/Cabbage.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Meshes/Kitchen Counter_Blue.mat",
+          "guid": "933532a4fcc9baf4fa0491de14d08ed7"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/Meshes/Kitchen Counter_Blue.mat",
+          "guid": "d0353a89b1f911e48b9e16bdc9f2e058"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/PrefabsVisuals/PlayerMovingParticles.prefab",
+          "guid": "0000000000000000e000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/PrefabsVisuals/PlayerVisual.prefab",
+          "guid": "0000000000000000e000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/PrefabsVisuals/CountersVisuals/ContainerCounter_Visual.prefab",
+          "guid": "0000000000000000e000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/PrefabsVisuals/CountersVisuals/PlatesCounter_Visual.prefab",
+          "guid": "0000000000000000f000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/_Assets/PrefabsVisuals/CountersVisuals/StoveCounter_Visual.prefab",
+          "guid": "0000000000000000e000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/TextMesh Pro/Resources/TMP Settings.asset",
+          "guid": "2705215ac5b84b70bacc50632be6e391"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset",
+          "guid": "71c1514a6bd24e1e882cebbe1904ce04"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset",
+          "guid": "71c1514a6bd24e1e882cebbe1904ce04"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/TextMesh Pro/Resources/Sprite Assets/EmojiOne.asset",
+          "guid": "84a92b25f83d49b9bc132d206b370281"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/TextMesh Pro/Resources/Style Sheets/Default Style Sheet.asset",
+          "guid": "ab2114bdc8544297b417dfefe9f1e410"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene/Post-process Volume Profile.asset",
+          "guid": "0b2db86121404754db890f4c8dfe81b2"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene/Post-process Volume Profile.asset",
+          "guid": "66f335fb1ffd8684294ad653bf1c7564"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene/Post-process Volume Profile.asset",
+          "guid": "899c54efeace73346a0a16faa3afe726"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene/Post-process Volume Profile.asset",
+          "guid": "97c23e3b12dc18c42a140437e53d3951"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Scenes/GameScene/Post-process Volume Profile.asset",
+          "guid": "d7fd9488000d3734a9e00ee676215985"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/ContainerCounter.prefab",
+          "guid": "0000000000000000f000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/DeliveryCounter.prefab",
+          "guid": "0000000000000000e000000000000000"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/DeliveryCounter.prefab",
+          "guid": "0cd44c1031e13a943bb63640046fad76"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/DeliveryCounter.prefab",
+          "guid": "cfabb0440166ab443bba8876756fdfa9"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/DeliveryCounter.prefab",
+          "guid": "dc42784cf147c0c48a680349fa168899"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/DeliveryCounter.prefab",
+          "guid": "e19747de3f5aca642ab2be37e372fb86"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/DeliveryCounter.prefab",
+          "guid": "f4688fdb7df04437aeb418b961361dc5"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/DeliveryCounter.prefab",
+          "guid": "fe87c0e1cc204ed48ad3b37840f39efc"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/StoveCounter.prefab",
+          "guid": "0cd44c1031e13a943bb63640046fad76"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/StoveCounter.prefab",
+          "guid": "dc42784cf147c0c48a680349fa168899"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/Counters/StoveCounter.prefab",
+          "guid": "fe87c0e1cc204ed48ad3b37840f39efc"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/KitchenObjects/Plate.prefab",
+          "guid": "0cd44c1031e13a943bb63640046fad76"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/KitchenObjects/Plate.prefab",
+          "guid": "8a8695521f0d02e499659fee002a26c2"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/KitchenObjects/Plate.prefab",
+          "guid": "dc42784cf147c0c48a680349fa168899"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/KitchenObjects/Plate.prefab",
+          "guid": "ebe73ca9363db456bacf42c025bb4847"
+        },
+        {
+          "code": "unresolved_guid",
+          "path": "Assets/Prefabs/KitchenObjects/Plate.prefab",
+          "guid": "fe87c0e1cc204ed48ad3b37840f39efc"
+        }
+      ],
+      "stats": {
+        "assets": 350,
+        "meta_files": 350,
+        "yaml_files": 116
+      }
+    },
+    {
+      "name": "compile",
+      "status": "passed",
+      "returncode": 0,
+      "duration_ms": 70318,
+      "log": "compile.log",
+      "pid": 21112
+    },
+    {
+      "name": "editmode",
+      "status": "passed",
+      "returncode": 0,
+      "duration_ms": 16373,
+      "log": "editmode.log",
+      "pid": 27000,
+      "results": "editmode-results.xml",
+      "total_tests": 1,
+      "passed_tests": 1,
+      "failed_tests": 0,
+      "skipped_tests": 0
+    },
+    {
+      "name": "playmode",
+      "status": "passed",
+      "returncode": 0,
+      "duration_ms": 17679,
+      "log": "playmode.log",
+      "pid": 12768,
+      "results": "playmode-results.xml",
+      "total_tests": 1,
+      "passed_tests": 1,
+      "failed_tests": 0,
+      "skipped_tests": 0
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "task_id": "B1",
+  "task_name": "Simple Feature - 添加交互距离常量",
+  "task_type": "feature_addition",
+  "priority": "P0",
+  "complexity": "simple",
+  "timestamp": "2026-08-02T19:49:43.752886",
+  "success": true,
+  "meets_all_criteria": false,
+  "overall_success": false,
+  "elapsed_time": 37.04386591911316,
+  "mutations_applied": 1,
+  "total_tokens": 0,
+  "error": null,
+  "criteria_check": {
+    "min_mutations": {
+      "required": 1,
+      "actual": 1,
+      "met": true
+    },
+    "token_budget": {
+      "budget": 8000,
+      "actual": 0,
+      "met": true
+    },
+    "time_budget": {
+      "budget": 30,
+      "actual": 37.04386591911316,
+      "met": false
+    }
+  }
+}

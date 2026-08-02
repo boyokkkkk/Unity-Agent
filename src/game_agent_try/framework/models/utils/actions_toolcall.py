@@ -66,6 +66,10 @@ def validate_tool_arguments(tool_name: str, args: object) -> str:
     """Return a compact validation error for a locally executed function call."""
     schema = TOOL_SCHEMAS.get(tool_name)
     if schema is None:
+        # Debug: print available tool names
+        import logging
+        logger = logging.getLogger("validate_tool")
+        logger.warning(f"Unknown tool '{tool_name}'. Available tools: {list(TOOL_SCHEMAS.keys())[:5]}...")
         return f"Unknown tool '{tool_name}'."
     if not isinstance(args, dict):
         return f"Arguments for '{tool_name}' must be an object."
@@ -122,9 +126,24 @@ def parse_toolcall_actions(
             args = json.loads(tool_call.function.arguments)
         except Exception as e:
             error_msg = f"Error parsing tool call arguments: {e}."
+
         tool_name = tool_call.function.name
-        error_msg += validate_tool_arguments(tool_name, args)
+
+        # Only validate if parsing succeeded
+        if not error_msg:
+            validation_error = validate_tool_arguments(tool_name, args)
+            if validation_error:
+                error_msg = validation_error
+
         if error_msg:
+            # Log detailed error info before raising
+            import logging
+            logger = logging.getLogger("parse_toolcall")
+            logger.error(f"Tool call validation failed:")
+            logger.error(f"  Tool: {tool_name}")
+            logger.error(f"  Args: {args}")
+            logger.error(f"  Error: {error_msg}")
+
             raise FormatError(
                 {
                     "role": "user",

@@ -1,0 +1,155 @@
+{
+  "schema_version": "game-agent-state-event-baseline-v1",
+  "run_id": "ablation-group9-run3-20260802-144448",
+  "variant": "innovation",
+  "ablation_group": "group9-no-validation",
+  "experiment_valid": true,
+  "infrastructure_errors": [],
+  "source_project_unchanged": true,
+  "hidden_oracle_cleaned": true,
+  "no_skill_evidence": false,
+  "innovation_config_evidence": true,
+  "condition_evidence": true,
+  "agent": {
+    "submitted": false,
+    "exit_status": "TotalTokenLimitExceeded",
+    "submission": "",
+    "error": ""
+  },
+  "oracle_match": false,
+  "public_validation_passed": true,
+  "hidden_validation_passed": false,
+  "verified_success": false,
+  "metrics": {
+    "schema_version": "game-agent-stage-metrics-v2",
+    "milestones_ms": {
+      "T0_task_submitted": 1,
+      "T1_first_tool": 25909,
+      "T2_first_relevant_file": 39267,
+      "T3_root_cause_file": 39267,
+      "T4_first_edit": null,
+      "T5_first_correct_patch": null,
+      "T6_first_validation": 84949,
+      "T7_agent_stopped": 84806,
+      "T8_public_validation_end": 195308,
+      "T9_hidden_validation_end": 241500
+    },
+    "stage_duration_ms": {
+      "task_understanding": 25908,
+      "source_localization": 13358,
+      "diagnosis": 45539,
+      "editing": 45682,
+      "self_validation": 0,
+      "public_validation": 110502,
+      "hidden_validation": 46192
+    },
+    "phase_reentry": {
+      "editing_after_validation": 0
+    },
+    "outcome": {
+      "agent_submitted": false,
+      "exit_status": "TotalTokenLimitExceeded",
+      "missing_final_answer": true
+    },
+    "navigation": {
+      "files_accessed": [
+        "Assets/Scripts/KitchenGameManager.cs",
+        "Assets/Scripts/UI/TutorialUI.cs",
+        "Assets/Scripts/GameInput.cs",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//public//compile.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//public//editmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//public//editmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//public//playmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//public//playmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//hidden//editmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//hidden//editmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//hidden//playmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group9-run3-20260802-144448//validation//hidden//playmode-results.xml"
+      ],
+      "root_cause_rank": 1,
+      "relevant_recall": 0.6666666666666666,
+      "navigation_precision": 0.16666666666666666,
+      "unrelated_file_ratio": 0.8333333333333334
+    },
+    "context": {
+      "prompt_tokens": 72267,
+      "completion_tokens": 3465,
+      "total_tokens": 75732,
+      "peak_context_usage_percent": 36.151123046875,
+      "raw_output_chars": 61667,
+      "retained_output_chars": 41873,
+      "truncated_tool_calls": 0,
+      "repeated_observation_ratio": 0.0
+    },
+    "behavior": {
+      "model_calls": 9,
+      "tool_calls": 9,
+      "failed_tool_calls": 3,
+      "repeated_commands": 0
+    },
+    "research": {
+      "retrieval": {
+        "k": 4,
+        "candidate_paths_at_k": 4,
+        "distinct_paths_at_k": 3,
+        "distinct_path_ratio_at_k": 0.75,
+        "test_node_ratio_at_k": 0.0,
+        "root_cause_mrr": 1.0,
+        "causal_edge_coverage": 0.0,
+        "causal_edges_total": 0
+      },
+      "memory": {
+        "evidence_write_recall": 1.0,
+        "evidence_read_recall": 1.0,
+        "evidence_utilization": 0.0,
+        "stale_evidence_rate": 0.0,
+        "unique_evidence": 3,
+        "expected_evidence_writes": 5,
+        "evidence_read_transitions": 4,
+        "evidence_utilization_opportunities": 0,
+        "referenced_evidence_nodes": 0
+      },
+      "control": {
+        "duplicate_action_ratio": 0.1111111111111111,
+        "blocked_action_recovery_rate": 1.0,
+        "admissible_action_acceptance": 0.3333333333333333,
+        "phase_regression_count": 0,
+        "protocol_gate_completion": 0.0,
+        "blocked_actions": 3,
+        "admissible_action_opportunities": 3,
+        "mutation_calls": 0
+      },
+      "tools_and_cost": {
+        "aci_tool_calls": 9,
+        "tool_schema_tokens_per_call": 1003.4444444444445,
+        "unique_evidence_per_1k_tokens": 0.039613373474885125,
+        "typed_mutation_ratio": 0.0,
+        "escape_hatch_ratio": 0.0,
+        "tool_schema_measurements": 9,
+        "tool_profile_calls": {
+          "plan": 2,
+          "diagnose": 3,
+          "inspect": 4
+        },
+        "tool_schema_tokens_by_profile": {
+          "plan": 526,
+          "diagnose": 4037,
+          "inspect": 4468
+        }
+      }
+    }
+  },
+  "recommended_innovation": {
+    "innovation": "unity_project_graph",
+    "reason": "相关文件导航精度低，优先用 Scene/Component/C# 依赖图约束检索范围。"
+  },
+  "artifacts": {
+    "events": "events.jsonl",
+    "conversation": "conversation.jsonl",
+    "trajectory": "trajectory.json",
+    "diff": "diff.patch",
+    "public_validation": "validation/public/summary.json",
+    "hidden_validation": "validation/hidden/summary.json",
+    "stage_metrics": "stage-metrics.json"
+  }
+}

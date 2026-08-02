@@ -1,0 +1,32 @@
+{
+  "task_id": "A1",
+  "task_name": "Simple Bug - 玩家移动速度调整",
+  "task_type": "bug_fix",
+  "priority": "P0",
+  "complexity": "simple",
+  "timestamp": "2026-08-02T20:15:02.847186",
+  "success": true,
+  "meets_all_criteria": true,
+  "overall_success": true,
+  "elapsed_time": 24.50709080696106,
+  "mutations_applied": 1,
+  "total_tokens": 0,
+  "error": null,
+  "criteria_check": {
+    "min_mutations": {
+      "required": 1,
+      "actual": 1,
+      "met": true
+    },
+    "token_budget": {
+      "budget": 5000,
+      "actual": 0,
+      "met": true
+    },
+    "time_budget": {
+      "budget": 65,
+      "actual": 24.50709080696106,
+      "met": true
+    }
+  }
+}

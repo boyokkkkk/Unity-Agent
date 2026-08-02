@@ -1,0 +1,217 @@
+{
+  "A1": {
+    "name": "Simple Bug - 明确定位",
+    "type": "bug_fix",
+    "priority": "P0",
+    "expected_complexity": "simple",
+    "description": "在 Assets/Scripts/Player/Player.cs 的 HandleMovement() 方法中，玩家移动速度计算有误，应该是 moveSpeed * Time.deltaTime * 2f，但当前只有 moveSpeed * Time.deltaTime。请修复这个系数错误。",
+    "success_criteria": {
+      "files_changed": 1,
+      "lines_changed_min": 1,
+      "lines_changed_max": 3,
+      "token_budget": 5000,
+      "time_budget_seconds": 20,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/Player/Player.cs"]
+  },
+
+  "A2": {
+    "name": "Medium Bug - 需要推理",
+    "type": "bug_fix",
+    "priority": "P0",
+    "expected_complexity": "medium",
+    "description": "玩家按下暂停键后，游戏暂停了，但音乐还在播放。应该暂停时音乐也停止，恢复时音乐继续。目前暂停功能位于 KitchenGameManager 中。",
+    "success_criteria": {
+      "files_changed": 2,
+      "token_budget": 30000,
+      "time_budget_seconds": 60,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/KitchenGameManager.cs"]
+  },
+
+  "A3": {
+    "name": "Complex Bug - 状态同步",
+    "type": "bug_fix",
+    "priority": "P1",
+    "expected_complexity": "complex",
+    "description": "在多人游戏模式下，当玩家1拾取食材后，玩家2的屏幕上该食材仍然显示在原位置。这是一个网络同步问题。请定位并修复这个状态同步bug。",
+    "success_criteria": {
+      "token_budget": 60000,
+      "time_budget_seconds": 120,
+      "min_mutations": 1
+    },
+    "expected_files": []
+  },
+
+  "A4": {
+    "name": "Bug修复 - 误导性信息",
+    "type": "bug_fix",
+    "priority": "P1",
+    "expected_complexity": "medium",
+    "description": "玩家报告说计时器有问题，时间走得太快了。我怀疑是 CountdownTimer.cs 的 Update() 方法中 Time.deltaTime 被乘了两次导致的。请检查并修复。",
+    "success_criteria": {
+      "token_budget": 40000,
+      "time_budget_seconds": 90,
+      "min_mutations": 1
+    },
+    "expected_files": []
+  },
+
+  "A5": {
+    "name": "Null Reference Bug",
+    "type": "bug_fix",
+    "priority": "P0",
+    "expected_complexity": "medium",
+    "description": "游戏运行时控制台报错：\nNullReferenceException: Object reference not set to an instance of an object\nat DeliveryManager.SpawnNewRecipe()\n\n请找到并修复这个空引用问题。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 30000,
+      "time_budget_seconds": 60,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/DeliveryManager.cs"]
+  },
+
+  "B1": {
+    "name": "Simple Feature - 添加常量",
+    "type": "feature_addition",
+    "priority": "P0",
+    "expected_complexity": "simple",
+    "description": "在 Assets/Scripts/Player/Player.cs 中添加一个公共常量：\npublic const float MAX_INTERACTION_DISTANCE = 2f;\n\n然后在 HandleInteractions() 方法中使用这个常量替代硬编码的 2f 值。",
+    "success_criteria": {
+      "files_changed": 1,
+      "lines_changed_min": 2,
+      "token_budget": 5000,
+      "time_budget_seconds": 20,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/Player/Player.cs"]
+  },
+
+  "B2": {
+    "name": "Medium Feature - 添加计数器",
+    "type": "feature_addition",
+    "priority": "P0",
+    "expected_complexity": "medium",
+    "description": "需要在UI上显示玩家成功交付的订单数量。当前DeliveryManager负责处理订单交付，但没有记录总数。请添加这个功能。",
+    "success_criteria": {
+      "token_budget": 30000,
+      "time_budget_seconds": 60,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/DeliveryManager.cs"]
+  },
+
+  "B3": {
+    "name": "Complex Feature - 连击系统",
+    "type": "feature_addition",
+    "priority": "P2",
+    "expected_complexity": "complex",
+    "description": "添加"连击"系统：玩家连续成功交付订单（中间间隔<5秒）时获得连击加分。连击数显示在UI上，断连后重置。\n\n需要：\n1. 记录上次交付时间\n2. 计算连击数\n3. 应用分数加成\n4. UI显示连击状态",
+    "success_criteria": {
+      "token_budget": 70000,
+      "time_budget_seconds": 120,
+      "min_mutations": 2
+    },
+    "expected_files": []
+  },
+
+  "B4": {
+    "name": "Feature - 配置化",
+    "type": "feature_addition",
+    "priority": "P1",
+    "expected_complexity": "medium",
+    "description": "将游戏难度相关的硬编码值提取到ScriptableObject配置中：\n- 游戏时长\n- 倒计时时长\n- 订单生成间隔\n\n创建 GameDifficultyConfig.cs 和相应的asset。",
+    "success_criteria": {
+      "token_budget": 35000,
+      "time_budget_seconds": 70,
+      "min_mutations": 1
+    },
+    "expected_files": []
+  },
+
+  "B5": {
+    "name": "Feature - 音效系统",
+    "type": "feature_addition",
+    "priority": "P2",
+    "expected_complexity": "complex",
+    "description": "游戏缺少音效反馈。需要在以下操作时播放音效：\n- 拾取食材\n- 切菜\n- 放置食材\n- 交付订单成功/失败\n\n请设计并实现音效系统。",
+    "success_criteria": {
+      "token_budget": 70000,
+      "time_budget_seconds": 120,
+      "min_mutations": 1
+    },
+    "expected_files": []
+  },
+
+  "C1": {
+    "name": "Simple Refactor - 提取方法",
+    "type": "refactoring",
+    "priority": "P1",
+    "expected_complexity": "simple",
+    "description": "在 Player.cs 的 Update() 方法中，输入处理代码太长。请将输入处理逻辑提取到单独的 HandleInput() 方法中。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 8000,
+      "time_budget_seconds": 25,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/Player/Player.cs"]
+  },
+
+  "C2": {
+    "name": "Medium Refactor - 魔法数字",
+    "type": "refactoring",
+    "priority": "P1",
+    "expected_complexity": "medium",
+    "description": "代码中有很多魔法数字（hardcoded values），特别是在 KitchenGameManager 和 DeliveryManager 中。请找到并重构这些魔法数字为命名常量。",
+    "success_criteria": {
+      "token_budget": 40000,
+      "time_budget_seconds": 90,
+      "min_mutations": 2
+    },
+    "expected_files": []
+  },
+
+  "C3": {
+    "name": "Complex Refactor - 状态机模式",
+    "type": "refactoring",
+    "priority": "P2",
+    "expected_complexity": "complex",
+    "description": "KitchenGameManager 中的状态管理使用了大量的 if-else。建议重构为状态机模式，使代码更清晰和可扩展。\n\n当前状态：WaitingToStart, CountdownToStart, GamePlaying, GameOver",
+    "success_criteria": {
+      "token_budget": 80000,
+      "time_budget_seconds": 150,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/KitchenGameManager.cs"]
+  },
+
+  "D1": {
+    "name": "边界 - 空项目",
+    "type": "edge_case",
+    "priority": "P2",
+    "expected_complexity": "unknown",
+    "description": "在一个空的Unity项目中添加基础的Player移动脚本。",
+    "success_criteria": {
+      "token_budget": 20000,
+      "time_budget_seconds": 60
+    },
+    "expected_files": []
+  },
+
+  "D2": {
+    "name": "边界 - 超出能力范围",
+    "type": "edge_case",
+    "priority": "P2",
+    "expected_complexity": "very_complex",
+    "description": "重新设计整个游戏架构，将单人模式改为多人联机模式，包括网络同步、服务器权威逻辑、延迟补偿等。",
+    "success_criteria": {
+      "token_budget": 100000,
+      "time_budget_seconds": 300
+    },
+    "expected_files": []
+  }
+}

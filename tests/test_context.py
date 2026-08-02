@@ -19,6 +19,22 @@ from game_agent.framework.agents.default import DefaultAgent
 from game_agent.framework.environments.local import LocalEnvironment
 from game_agent.project_graph.schema import Edge, EdgeKind, Node, NodeKind, ProjectGraph
 from game_agent.project_graph.retrieval import LocalizationResult
+from game_agent.context.project_store import is_causal_query
+
+
+def test_causal_query_detection_does_not_treat_every_ui_task_as_event_chain() -> None:
+    assert is_causal_query(
+        "The countdown state changes but the tutorial UI does not refresh."
+    )
+    assert is_causal_query(
+        "The delivery result popup has a broken event subscription chain."
+    )
+    assert not is_causal_query(
+        "The sound-effects button in OptionUI does nothing while other buttons work."
+    )
+    assert not is_causal_query(
+        "The stove visual state and particles never update because a component is missing."
+    )
 
 
 def context_graph(project: Path) -> ProjectGraph:
@@ -98,7 +114,7 @@ class ProjectContextStoreTest(unittest.TestCase):
 
             store._retriever.retrieve = retrieve
             entries = store.locate(
-                "causal", "Interaction input state event UI observer failure",
+                "causal", "Kitchen countdown interaction input state event Tutorial UI observer failure",
                 limit=3, causal_query_decomposition=True, causal_role_retention=True,
             )
 

@@ -255,8 +255,10 @@ class UnityMutationExecutor:
             artifact_file = self.artifact_root / evidence_artifact_path
             if artifact_file.exists() and artifact_file.is_file():
                 try:
-                    evidence_text = artifact_file.read_text(encoding="utf-8")
-                    evidence_sha = hashlib.sha256(evidence_text.encode("utf-8")).hexdigest()
+                    # Read as bytes to preserve line endings
+                    evidence_bytes = artifact_file.read_bytes()
+                    evidence_text = evidence_bytes.decode("utf-8")
+                    evidence_sha = hashlib.sha256(evidence_bytes).hexdigest()
                 except Exception:
                     evidence_text = None
                     evidence_sha = None
@@ -267,8 +269,13 @@ class UnityMutationExecutor:
             evidence_sha = current_sha
 
         expected = self._required(args, "expected_sha256").casefold()
-        old = str(args.get("old_text", ""))
-        new = str(args.get("new_text", ""))
+        old_original = str(args.get("old_text", ""))
+        new_original = str(args.get("new_text", ""))
+
+        # Intelligent line ending matching - try all variants
+        old, new, line_ending_normalized = self._normalize_line_endings(
+            old_original, new_original, evidence_text
+        )
 
         # Check old_text in evidence content
         occurrences_in_evidence = evidence_text.count(old)
@@ -567,6 +574,58 @@ class UnityMutationExecutor:
         if not allow_missing and not target.is_file():
             raise ValueError(f"Target does not exist: {relative}")
         return target
+
+    @staticmethod
+    def _normalize_line_endings(
+        old_text: str,
+        new_text: str,
+        evidence_text: str,
+    ) -> tuple[str, str, bool]:
+        """Intelligently normalize line endings to match evidence.
+
+        Tries multiple line ending variants to find a match in evidence_text.
+
+        Args:
+            old_text: Original old_text from LLM (may have wrong line endings)
+            new_text: Original new_text from LLM (may have wrong line endings)
+            evidence_text: Evidence file content with correct line endings
+
+        Returns:
+            (normalized_old, normalized_new, was_normalized)
+        """
+        # If old_text already matches, no normalization needed
+        if old_text in evidence_text:
+            return old_text, new_text, False
+
+        # Try different line ending conversions
+        variants = [
+            # LF → CRLF (most common: LLM generates \n, Windows file has \r\n)
+            (
+                old_text.replace('\n', '\r\n'),
+                new_text.replace('\n', '\r\n'),
+                'LF→CRLF'
+            ),
+            # CRLF → LF (reverse case)
+            (
+                old_text.replace('\r\n', '\n'),
+                new_text.replace('\r\n', '\n'),
+                'CRLF→LF'
+            ),
+            # Double CR removal (rare but happens)
+            (
+                old_text.replace('\r\r\n', '\n').replace('\r\n', '\n').replace('\r', '\n'),
+                new_text.replace('\r\r\n', '\n').replace('\r\n', '\n').replace('\r', '\n'),
+                'normalize-to-LF'
+            ),
+        ]
+
+        for variant_old, variant_new, label in variants:
+            if variant_old in evidence_text:
+                # Found a match!
+                return variant_old, variant_new, True
+
+        # No variant matched, return original
+        return old_text, new_text, False
 
     @staticmethod
     def _normalize_relative(value: str) -> str:

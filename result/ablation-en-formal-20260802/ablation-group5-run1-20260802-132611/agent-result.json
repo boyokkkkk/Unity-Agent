@@ -1,0 +1,13 @@
+{
+  "exit_status": "NoProgressExceeded",
+  "submission": "",
+  "explanation": "No semantic progress remained during plan.",
+  "token_usage": {
+    "prompt_tokens": 10905,
+    "completion_tokens": 888,
+    "total_tokens": 11793,
+    "last_input_tokens": 7511,
+    "max_input_tokens": 32768,
+    "max_total_tokens": 81920
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "status": "ok",
+  "node": {
+    "id": "fs-cs:2162934f9087d19ab740",
+    "kind": "CSHARP_FILE",
+    "name": "KitchenGameManager",
+    "path": "Assets/Scripts/KitchenGameManager.cs",
+    "attributes": {}
+  },
+  "path": "Assets/Scripts/KitchenGameManager.cs",
+  "sha256": "077ee23e87c18e622057850ab7b339caee599e11f4a9ca69669bd74107e1b13d",
+  "start_line": 1,
+  "end_line": 125,
+  "total_lines": 125,
+  "truncated": false,
+  "content": "using System;\nusing System.Collections;\nusing System.Collections.Generic;\nusing System.Diagnostics.Eventing.Reader;\nusing UnityEngine;\nusing UnityEngine.UIElements;\n\npublic class KitchenGameManager : MonoBehaviour\n{\n    public static KitchenGameManager Instance { get; private set; }\n\n    public event EventHandler OnStateChanged;\n    public event EventHandler OnGamePaused;\n    public event EventHandler OnGameUnpaused;\n\n    private enum State\n    {\n        WaitingToStart,\n        CountdownToStart,\n        GamePlaying,\n        GameOver,\n    }\n\n    private State state;\n    private float countdownToStartTimer = 3f;\n    private float gamePlayingTimer;\n    private float gamePlayingTimerMax = 30f;\n    private bool isGamePaused = false;\n\n    private void Awake()\n    {\n        Instance = this;\n        state = State.WaitingToStart;\n    }\n\n    private void Start()\n    {\n        GameInput.Instance.OnPauseAction += GameInput_OnPauseAction;\n        GameInput.Instance.OnInteractAction += GameInput_OnInteraction;\n    }\n\n    private void GameInput_OnInteraction(object sender, EventArgs e)\n    {\n        if (state == State.WaitingToStart)\n        {\n            state = State.CountdownToStart;\n            \n        }    \n    }\n\n    private void GameInput_OnPauseAction(object sender, EventArgs e)\n    {\n        TogglePauseGame();\n    }\n\n    private void Update()\n    {\n        switch (state)\n        {\n            case State.WaitingToStart:\n                break;\n            case State.CountdownToStart:\n                countdownToStartTimer -= Time.deltaTime;\n                if (countdownToStartTimer < 0f)\n                {\n                    state = State.GamePlaying;\n                    gamePlayingTimer = gamePlayingTimerMax;\n                    OnStateChanged?.Invoke(this, EventArgs.Empty);\n                }\n                break;\n            case State.GamePlaying:\n                gamePlayingTimer -= Time.deltaTime;\n                if (gamePlayingTimer < 0f)\n                {\n                    state = State.GameOver;\n                    OnStateChanged?.Invoke(this, EventArgs.Empty);\n                }\n                break;\n            case State.GameOver:\n                break;\n        }\n        // Debug.Log(state);\n    }\n\n    public bool IsGamePlaying()\n    {\n        return state == State.GamePlaying;\n    }\n\n    public bool IsCountdownToStartActive()\n    {\n        return state == State.CountdownToStart;\n    }\n\n    public float GetCountdownToStartTimer()\n    {\n        return countdownToStartTimer;\n    }\n\n    public bool IsGameOver()\n    {\n        return state == State.GameOver;\n    }\n\n    public float GetGamePlayingTimerNormalized()\n    {\n        return 1 - (gamePlayingTimer / gamePlayingTimerMax);\n    }\n\n    public void TogglePauseGame()\n    {\n        isGamePaused = !isGamePaused;\n        if (isGamePaused)\n        {\n            Time.timeScale = 0f;\n            OnGamePaused?.Invoke(this, EventArgs.Empty);\n        }\n        else\n        {\n            Time.timeScale = 1f;\n            OnGameUnpaused?.Invoke(this, EventArgs.Empty);\n        }\n        \n    }\n}",
+  "evidence_artifact": "evidence-artifacts/evidence_b77fe266ba1e03f1.txt"
+}

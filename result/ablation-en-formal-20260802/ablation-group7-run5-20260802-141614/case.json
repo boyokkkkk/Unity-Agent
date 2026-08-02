@@ -1,0 +1,16 @@
+{
+  "schema_version": "game-agent-state-event-baseline-v1",
+  "run_id": "ablation-group7-run5-20260802-141614",
+  "variant": "innovation",
+  "ablation_group": "group7-no-contract",
+  "task": "After the player presses the interact key on the start screen, the game should enter the countdown state. Currently the tutorial UI does not close and the countdown UI does not appear. The defect is likely in the interaction input, game-state transition, OnStateChanged event publication, or UI observer refresh chain. Locate the root cause, make the smallest possible repair, and validate it with the relevant Unity tests.",
+  "source_project": "E:\\Unity_project\\Kitchen_Chaos\\Kitchen_Chaos",
+  "project_path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\game-agent-baselines\\ablation-group7-run5-20260802-141614",
+  "isolation": "copy",
+  "skills_enabled": true,
+  "context_virtualization_enabled": true,
+  "structured_query_tools_enabled": true,
+  "typed_mutation_tools_enabled": true,
+  "graph_path": "E:\\sysu-course\\GameAgent\\artifacts\\project-graph\\kitchen-chaos-causal-full\\project-graph.json",
+  "editor_path": "D:\\unity\\unity editor\\2021.3.45f1c1\\Editor\\Unity.exe"
+}

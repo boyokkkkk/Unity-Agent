@@ -45,6 +45,7 @@ class ContextConfig(BaseModel):
 
     enabled: bool = True
     graph_path: str = ""
+    graph_sha256: str = ""
     state_path: str = ""
     auto_locate: bool = True
     retrieval_strategy: Literal[
@@ -53,6 +54,9 @@ class ContextConfig(BaseModel):
     max_test_candidates: int = Field(default=1, ge=0)
     retrieval_mmr_lambda: float = Field(default=0.82, ge=0.0, le=1.0)
     semantic_search_enabled: bool = False
+    graph_retrieval_enabled: bool = True
+    causal_edges_enabled: bool = True
+    context_assembly_enabled: bool = True
     semantic_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     semantic_weight: float = Field(default=0.35, ge=0.0, le=1.0)
     semantic_cache_path: str = ""
@@ -108,6 +112,9 @@ class ContextAssembler:
         self.structured_query_nodes_mapped = 0
         self.structured_query_evidence_count = 0
         self.control_state: dict[str, Any] = {}
+        self.assembly_opportunities = 0
+        self.assembly_injections = 0
+        self.assembly_bypasses = 0
 
     @property
     def working_set(self) -> TaskWorkingSet:
@@ -144,6 +151,9 @@ class ContextAssembler:
         self.structured_query_nodes_mapped = 0
         self.structured_query_evidence_count = 0
         self.control_state = {}
+        self.assembly_opportunities = 0
+        self.assembly_injections = 0
+        self.assembly_bypasses = 0
         if hasattr(self, "_standalone_working_set"):
             del self._standalone_working_set
         if self.project_store is not None:
@@ -165,6 +175,8 @@ class ContextAssembler:
                         semantic_cache_path=self._semantic_cache_path(),
                         causal_query_decomposition=self.config.causal_query_decomposition_enabled,
                         causal_role_retention=self.config.causal_role_retention_enabled,
+                        graph_retrieval_enabled=self.config.graph_retrieval_enabled,
+                        causal_edges_enabled=self.config.causal_edges_enabled,
                     )
                 except (OSError, ValueError):
                     entries = []
@@ -185,6 +197,10 @@ class ContextAssembler:
                         entry.evidence_ids.append(evidence.id)
                         # Auto-label working set entries with evidence as relevant
                         self.working_set.label(entry.node_id, True, evidence_id=evidence.id)
+                self._emit(
+                    "context_retrieval_treatment",
+                    treatment=self.metrics().get("treatment", {}),
+                )
 
     def begin_turn(self, task: str) -> None:
         if not self.task_id:
@@ -262,7 +278,17 @@ class ContextAssembler:
     ) -> list[dict]:
         if not self.config.enabled or not messages:
             return list(messages)
+        self.assembly_opportunities += 1
+        if not self.config.context_assembly_enabled:
+            self.assembly_bypasses += 1
+            self._emit(
+                "context_assembly_bypassed",
+                raw_message_count=len(messages),
+                direct_tool_results_preserved=True,
+            )
+            return list(messages)
         self.build_count += 1
+        self.assembly_injections += 1
         self.raw_input_tokens = raw_input_tokens
         compression_reasons: list[str] = []
         if self.project_store is not None:
@@ -300,6 +326,7 @@ class ContextAssembler:
             phase=self.phase,
             compression_reasons=compression_reasons,
             working_set_metrics=self.working_set.metrics(),
+            treatment=self.metrics().get("treatment", {}),
         )
         return [system, {"role": "user", "content": view, "extra": {"virtual_context": True}}]
 
@@ -489,6 +516,26 @@ class ContextAssembler:
             "structured_query_nodes_mapped": self.structured_query_nodes_mapped,
             "structured_query_evidence": self.structured_query_evidence_count,
             "control_state": self.control_state,
+            "treatment": {
+                "configured": {
+                    "graph_retrieval_enabled": self.config.graph_retrieval_enabled,
+                    "semantic_search_enabled": self.config.semantic_search_enabled,
+                    "causal_edges_enabled": self.config.causal_edges_enabled,
+                    "context_assembly_enabled": self.config.context_assembly_enabled,
+                },
+                "retrieval": (
+                    self.project_store.metrics().get("retrieval_treatment", {})
+                    if self.project_store is not None else {}
+                ),
+                "retrieval_last": (
+                    self.project_store.metrics().get("last_retrieval_treatment", {})
+                    if self.project_store is not None else {}
+                ),
+                "assembly_opportunities": self.assembly_opportunities,
+                "assembly_injections": self.assembly_injections,
+                "assembly_bypasses": self.assembly_bypasses,
+                "direct_tool_results_preserved": self.assembly_bypasses,
+            },
         }
 
     def _semantic_cache_path(self) -> Path | None:

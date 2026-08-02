@@ -1,0 +1,13 @@
+{
+  "exit_status": "Submitted",
+  "submission": "Controller verified the complete submission contract. Diagnosis: After the player presses the interact key on the start screen, the tutorial UI does not close and the countdown UI does not appear.. Changed paths: Assets/Scripts/KitchenGameManager.cs. Validation passed: diagnostics, compile, required tests.",
+  "automatic_submission": true,
+  "token_usage": {
+    "prompt_tokens": 40466,
+    "completion_tokens": 1125,
+    "total_tokens": 41591,
+    "last_input_tokens": 10685,
+    "max_input_tokens": 32768,
+    "max_total_tokens": 81920
+  }
+}

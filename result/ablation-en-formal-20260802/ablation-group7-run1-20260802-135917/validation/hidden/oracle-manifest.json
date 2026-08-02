@@ -1,0 +1,11 @@
+{
+  "schema_version": "game-agent-state-event-baseline-v1",
+  "root": "Assets/Tests/BaselineOracle",
+  "files": {
+    "Assets/Tests/BaselineOracle/EditMode/KitchenChaos.BaselineOracle.EditMode.asmdef": "43c94e6ff158f0406e9f374b52df63ca4f10822bfadb58923d522a3dd75471a7",
+    "Assets/Tests/BaselineOracle/EditMode/StateEventBaselineEditModeOracle.cs": "587da59dac8599affab47ce6940fff5ad81b5e3de0707942c9ca0bfcec93408e",
+    "Assets/Tests/BaselineOracle/PlayMode/KitchenChaos.BaselineOracle.PlayMode.asmdef": "fbe851d4dacdcb3de321267eb07557d48298d93e38b7e310d7b4725632268331",
+    "Assets/Tests/BaselineOracle/PlayMode/StateEventBaselinePlayModeOracle.cs": "9b3e3100ee7f74552bcdcdba186b8c226a02638a23185a6eac54f64b8c02e356"
+  },
+  "visible_to_agent": false
+}

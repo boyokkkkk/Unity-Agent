@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-08-02 20:44:44",
+  "total_tasks": 14,
+  "success": 10,
+  "partial": 4,
+  "failed": 0,
+  "success_rate": 0.7142857142857143,
+  "token_stats": {
+    "total": 691792,
+    "average": 49413.71428571428,
+    "min": 40001,
+    "max": 60960,
+    "median": 47791
+  },
+  "time_stats": {
+    "total": 517.4488587379456,
+    "average": 36.96063276699611,
+    "min": 24.099944353103638,
+    "max": 55.8034827709198
+  },
+  "mutation_stats": {
+    "total": 8,
+    "average": 0.5714285714285714
+  }
+}

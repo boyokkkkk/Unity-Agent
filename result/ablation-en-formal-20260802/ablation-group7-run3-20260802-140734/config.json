@@ -1,0 +1,133 @@
+{
+  "experiment": {
+    "config_id": "state-event-v1-group7-no-contract",
+    "backend": "skill-game-agent-framework-2.4.6-local",
+    "target_project": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\game-agent-baselines\\ablation-group7-run3-20260802-140734",
+    "tool": "powershell",
+    "max_input_tokens": 32768,
+    "max_output_tokens": 2048,
+    "max_total_tokens": 81920,
+    "max_rounds": 40,
+    "cost_limit": 3.0,
+    "seed": 42,
+    "task_language": "en"
+  },
+  "model": {
+    "model_name": "openai/qwen-plus",
+    "model_class": "litellm",
+    "model_kwargs": {
+      "drop_params": true,
+      "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "temperature": 0.0,
+      "max_tokens": 2048,
+      "seed": 42
+    },
+    "cost_tracking": "ignore_errors",
+    "structured_query_tools_enabled": true
+  },
+  "environment": {
+    "cwd": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\game-agent-baselines\\ablation-group7-run3-20260802-140734",
+    "timeout": 120,
+    "observation_max_chars": 12000,
+    "observation_max_lines": 200,
+    "observation_head_lines": 120,
+    "observation_tail_lines": 40,
+    "env": {
+      "PAGER": "cat",
+      "MANPAGER": "cat",
+      "PIP_PROGRESS_BAR": "off",
+      "TQDM_DISABLE": "1"
+    }
+  },
+  "agent": {
+    "system_template": "You are a software engineering agent working inside a Unity project on Windows. Follow the controller workflow: submit a structured plan, use graph-backed queries, inspect candidates, submit an evidence-linked diagnosis, mutate only authorized targets, validate, run workflow_review, then submit. General PowerShell is unavailable. Use typed Unity/code mutation tools; unity_execute_csharp is only an escape hatch when no typed mutation can express the authorized change.",
+    "instance_template": "Solve this task in the Unity project:\n\n{{task}}\n\nBegin with task_plan_submit. Follow the workflow-state required_next_actions exactly. Do not attempt PowerShell. Scope all reads and mutations to the structured tools, modify only diagnosis-authorized paths, complete compile/EditMode/PlayMode validation, call workflow_review, and only then call submit.",
+    "step_limit": 40,
+    "cost_limit": 3.0,
+    "wall_time_limit_seconds": 1800,
+    "max_consecutive_format_errors": 3,
+    "max_repeated_actions": 2,
+    "max_no_progress_rounds": 2,
+    "max_consecutive_tool_failures": 3
+  },
+  "skills": {
+    "enabled": true,
+    "max_prompt_chars": 8000,
+    "paths": []
+  },
+  "context": {
+    "enabled": true,
+    "graph_path": "E:\\sysu-course\\GameAgent\\artifacts\\project-graph\\kitchen-chaos-causal-full\\project-graph.json",
+    "state_path": "project-context-state.json",
+    "auto_locate": true,
+    "retrieval_strategy": "role_mmr",
+    "max_test_candidates": 1,
+    "retrieval_mmr_lambda": 0.82,
+    "semantic_search_enabled": true,
+    "semantic_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "semantic_weight": 0.45,
+    "causal_query_decomposition_enabled": true,
+    "causal_role_retention_enabled": true,
+    "max_working_set_entries": 4,
+    "max_candidate_details": 1,
+    "max_recent_tool_results": 1,
+    "max_recent_messages": 1,
+    "detail_char_limit": 800,
+    "tool_summary_char_limit": 600,
+    "compression_trigger_ratio": 0.55,
+    "working_set_detail_keep": 2,
+    "max_evidence_items": 4,
+    "max_memory_items_per_field": 12,
+    "max_durable_instruction_chars": 4000,
+    "graph_sha256": "7940dc3958cd880b7421101ec2083a5f9676a69718a5da9c6b0aba6ae848fdbd"
+  },
+  "aci": {
+    "enabled": true,
+    "typed_mutations_enabled": true,
+    "dynamic_tool_exposure_enabled": true,
+    "workflow_enabled": true,
+    "global_search_limit": 2,
+    "graph_expansion_limit": 3,
+    "candidate_frontier_size": 5,
+    "mutation_required": true,
+    "allow_no_change_submission": false,
+    "editor_path": "D:\\unity\\unity editor\\2021.3.45f1c1\\Editor\\Unity.exe",
+    "timeout_seconds": 1200,
+    "require_location_evidence": true,
+    "require_target_read": true,
+    "require_causal_role_evidence": true,
+    "require_structured_causal_claims": true,
+    "automatic_validation_enabled": true,
+    "required_validation_modes": [
+      "editmode",
+      "playmode"
+    ],
+    "evidence_artifact_enabled": true,
+    "evidence_recovery_enabled": true,
+    "bounded_search_enabled": true,
+    "project_graph_enabled": true,
+    "submission_contract_enabled": false,
+    "validation_gates_enabled": true
+  },
+  "workspace": {
+    "isolation": "auto",
+    "root": ""
+  },
+  "validation": {
+    "enabled": false,
+    "editor_path": "D:\\unity\\unity editor\\2021.3.45f1c1\\Editor\\Unity.exe",
+    "modes": [
+      "compile",
+      "editmode",
+      "playmode"
+    ],
+    "timeout_seconds": 1200
+  },
+  "logging": {
+    "events_path": "E:\\sysu-course\\GameAgent\\artifacts\\baselines\\ablation-en-formal-20260802\\ablation-group7-run3-20260802-140734\\events.jsonl",
+    "trajectory_path": "E:\\sysu-course\\GameAgent\\artifacts\\baselines\\ablation-en-formal-20260802\\ablation-group7-run3-20260802-140734\\trajectory.json"
+  },
+  "ablation_group": "group7-no-contract",
+  "ablation_factor": "submission_contract",
+  "ablation_treatment": "disabled"
+}

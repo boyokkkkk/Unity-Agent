@@ -974,7 +974,7 @@ class DefaultAgent:
             "tool": tool,
             "tool_call_id": str(action.get("tool_call_id", "") or ""),
             "tool_class": (
-                "mutation" if tool in MUTATION_TOOL_NAMES
+                "mutation" if tool in MUTATION_TOOL_NAMES or tool == "patch_apply"
                 else "validation" if tool in CONTROL_TOOL_NAMES
                 else "query"
             ),

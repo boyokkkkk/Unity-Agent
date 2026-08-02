@@ -1,0 +1,207 @@
+{
+  "status": "ok",
+  "query": "OnInteractAction",
+  "total": 20,
+  "results": [
+    {
+      "id": "fs-cs:2cb6593cb4a5224fb2ab",
+      "kind": "CSHARP_FILE",
+      "name": "PlayerInputActions",
+      "path": "Assets/PlayerInputActions.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 7.0
+    },
+    {
+      "id": "fs-cs:92761bf214f549b4b61a",
+      "kind": "CSHARP_FILE",
+      "name": "OptionUI",
+      "path": "Assets/Scripts/UI/OptionUI.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 5.0
+    },
+    {
+      "id": "fs-cs:584a76d7a979bc46ecfb",
+      "kind": "CSHARP_FILE",
+      "name": "ContainerCounter",
+      "path": "Assets/Scripts/Counters/ContainerCounter.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 4.0
+    },
+    {
+      "id": "fs-cs:108fc32ac050ef7a7b9b",
+      "kind": "CSHARP_FILE",
+      "name": "ContainerCounterVisual",
+      "path": "Assets/Scripts/Counters/ContainerCounterVisual.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 3.0
+    },
+    {
+      "id": "fs-cs:4e8b0b2442e95bf4e11d",
+      "kind": "CSHARP_FILE",
+      "name": "GameInput",
+      "path": "Assets/Scripts/GameInput.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 3.0
+    },
+    {
+      "id": "fs-cs:2162934f9087d19ab740",
+      "kind": "CSHARP_FILE",
+      "name": "KitchenGameManager",
+      "path": "Assets/Scripts/KitchenGameManager.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 3.0
+    },
+    {
+      "id": "fs-cs:4d6f64e02d2c2b221646",
+      "kind": "CSHARP_FILE",
+      "name": "Player",
+      "path": "Assets/Scripts/Player.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 3.0
+    },
+    {
+      "id": "fs-cs:11602005771489aa7989",
+      "kind": "CSHARP_FILE",
+      "name": "PlateIconSingleUI",
+      "path": "Assets/Scripts/UI/PlateIconSingleUI.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 3.0
+    },
+    {
+      "id": "fs-cs:5d2c69b0c089d9e24a2b",
+      "kind": "CSHARP_FILE",
+      "name": "PlateIconsUI",
+      "path": "Assets/Scripts/UI/PlateIconsUI.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 3.0
+    },
+    {
+      "id": "fs-cs:7f829bd9506e73b7fc38",
+      "kind": "CSHARP_FILE",
+      "name": "KitchenGameManagerContractTests",
+      "path": "Assets/Tests/EditMode/KitchenGameManagerContractTests.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 3.0
+    },
+    {
+      "id": "fs-cs:a3dab75a6165be645c28",
+      "kind": "CSHARP_FILE",
+      "name": "BaseCounter",
+      "path": "Assets/Scripts/Counters/BaseCounter.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 2.0
+    },
+    {
+      "id": "fs-cs:181c1eb80b9debca7399",
+      "kind": "CSHARP_FILE",
+      "name": "ClearCounter",
+      "path": "Assets/Scripts/Counters/ClearCounter.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 2.0
+    },
+    {
+      "id": "fs-cs:1f1d4dcbc62286f8359c",
+      "kind": "CSHARP_FILE",
+      "name": "CuttingCounter",
+      "path": "Assets/Scripts/Counters/CuttingCounter.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 2.0
+    },
+    {
+      "id": "fs-cs:00294800d78919b189fa",
+      "kind": "CSHARP_FILE",
+      "name": "DeliveryCounter",
+      "path": "Assets/Scripts/Counters/DeliveryCounter.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 2.0
+    },
+    {
+      "id": "fs-cs:1b3a6c4fe5293a50648b",
+      "kind": "CSHARP_FILE",
+      "name": "PlatesCounter",
+      "path": "Assets/Scripts/Counters/PlatesCounter.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 2.0
+    },
+    {
+      "id": "fs-cs:c11b3c6968b19cab9ab6",
+      "kind": "CSHARP_FILE",
+      "name": "StoveCounter",
+      "path": "Assets/Scripts/Counters/StoveCounter.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 2.0
+    },
+    {
+      "id": "fs-cs:2d34241655dfe2716976",
+      "kind": "CSHARP_FILE",
+      "name": "TrashCounter",
+      "path": "Assets/Scripts/Counters/TrashCounter.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 2.0
+    },
+    {
+      "id": "fs-cs:f489a562019d07c1f772",
+      "kind": "CSHARP_FILE",
+      "name": "TutorialUI",
+      "path": "Assets/Scripts/UI/TutorialUI.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 2.0
+    },
+    {
+      "id": "fs-cs:afd164348363dff6dbb1",
+      "kind": "CSHARP_FILE",
+      "name": "CuttingCounterVisual",
+      "path": "Assets/Scripts/Counters/CuttingCounterVisual.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 1.0
+    },
+    {
+      "id": "fs-cs:6e09170ce651a42abe21",
+      "kind": "CSHARP_FILE",
+      "name": "PlatesCounterVisual",
+      "path": "Assets/Scripts/Counters/PlatesCounterVisual.cs",
+      "attributes": {
+        "filesystem_fallback": true
+      },
+      "score": 1.0
+    }
+  ]
+}

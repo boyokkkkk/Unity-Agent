@@ -15,6 +15,7 @@ from game_agent.aci import (
     VALIDATION_TOOL_NAMES,
     UnityAciController,
     UnityMutationExecutor,
+    StructuredQueryExecutor,
     select_tool_exposure,
 )
 from game_agent.context import ContextAssembler, ContextConfig, WorkingSetEntry
@@ -72,6 +73,34 @@ class FakeMutationExecutor:
 
 
 class MutationExecutorTest(unittest.TestCase):
+    def test_script_patch_preserves_crlf_without_double_translation(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            source = project / "Assets" / "Test.cs"
+            source.parent.mkdir(parents=True)
+            original = b"class Test {\r\n    int Value = 1;\r\n}\r\n"
+            source.write_bytes(original)
+            executor = UnityMutationExecutor(
+                project_root=project,
+                artifact_root=project / "artifacts",
+            )
+
+            output = executor.execute({
+                "tool": "unity_script_patch",
+                "arguments": {
+                    "path": "Assets/Test.cs",
+                    "old_text": "Value = 1",
+                    "new_text": "Value = 2",
+                    "expected_sha256": hashlib.sha256(original).hexdigest(),
+                    "evidence_node_ids": ["file"],
+                },
+            })
+
+            self.assertEqual(0, output["returncode"])
+            changed = source.read_bytes()
+            self.assertNotIn(b"\r\r\n", changed)
+            self.assertEqual(original.count(b"\r\n"), changed.count(b"\r\n"))
+
     def test_script_patch_is_hash_guarded_checkpointed_and_measured(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
             project = Path(directory)
@@ -118,6 +147,29 @@ class MutationExecutorTest(unittest.TestCase):
             })
             self.assertNotEqual(0, stale["returncode"])
             self.assertIn("Source hash changed", stale["exception_info"])
+
+    def test_checkpoint_restore_supports_bounded_compile_repair(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            source = project / "Assets" / "Test.cs"
+            source.parent.mkdir(parents=True)
+            source.write_text("class Test { int Value = 1; }\n", encoding="utf-8")
+            executor = UnityMutationExecutor(
+                project_root=project,
+                artifact_root=project / "artifacts",
+            )
+            checkpoint = executor.create_checkpoint(
+                ["Assets/Test.cs"], operation="unity_script_patch"
+            )
+            source.write_text("class Test { BROKEN }\n", encoding="utf-8")
+
+            restored = executor.restore_checkpoint(checkpoint["checkpoint_id"])
+
+            self.assertEqual(["Assets/Test.cs"], restored)
+            self.assertEqual(
+                "class Test { int Value = 1; }\n",
+                source.read_text(encoding="utf-8"),
+            )
 
     def test_transaction_rolls_back_authorized_and_unauthorized_delta_atomically(self):
         class EscapingExecutor(UnityMutationExecutor):
@@ -197,6 +249,119 @@ class MutationExecutorTest(unittest.TestCase):
 
 
 class ExecutionProtocolTest(unittest.TestCase):
+    def test_filesystem_query_fallback_and_artifact_ablation_are_real(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            source = project / "Assets/Scripts/KitchenGameManager.cs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "class KitchenGameManager { void GameInput_OnInteraction() {} }",
+                encoding="utf-8",
+            )
+            context = ContextAssembler(ContextConfig(enabled=False), project_root=project)
+            context.reset("find state interaction", task_id="filesystem-fallback")
+            executor = StructuredQueryExecutor(
+                context,
+                project_root=project,
+                artifact_root=project / "artifacts",
+                evidence_artifact_enabled=False,
+            )
+
+            search = executor.execute({
+                "tool": "code_symbol_search",
+                "arguments": {"query": "KitchenGameManager interaction"},
+            })
+            rows = search["extra"]["structured"]["results"]
+            self.assertEqual("Assets/Scripts/KitchenGameManager.cs", rows[0]["path"])
+            read = executor.execute({
+                "tool": "code_file_read",
+                "arguments": {"node_id": rows[0]["id"]},
+            })
+            self.assertEqual(0, read["returncode"])
+            self.assertNotIn("evidence_artifact_path", read["extra"])
+            self.assertFalse((project / "artifacts/evidence-artifacts").exists())
+
+    def test_submission_contract_ablation_exposes_early_submit(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            context = ContextAssembler(ContextConfig(enabled=True), project_root=project)
+            context.reset("repair", task_id="no-contract")
+            controller = UnityAciController(
+                context,
+                project_root=project,
+                config=AciConfig(workflow_enabled=True, submission_contract_enabled=False),
+                query_executor=FakeQueryExecutor(),
+                mutation_executor=FakeMutationExecutor(),
+            )
+
+            self.assertIn("submit", controller.tool_exposure().tool_names)
+            self.assertIsNone(controller.guard_submission())
+
+    def test_typed_mutation_ablation_routes_prepared_patch_to_escape_hatch(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            source = project / "Assets/Test.cs"
+            source.parent.mkdir(parents=True)
+            source.write_text("class Test { int Value = 1; }", encoding="utf-8")
+            context = ContextAssembler(ContextConfig(enabled=True), project_root=project)
+            context.reset("repair", task_id="no-typed")
+            controller = UnityAciController(
+                context,
+                project_root=project,
+                config=AciConfig(typed_mutations_enabled=False),
+                query_executor=FakeQueryExecutor(),
+                mutation_executor=FakeMutationExecutor(),
+            )
+            action = controller._escape_hatch_patch_action({
+                "tool": "unity_script_patch",
+                "arguments": {
+                    "path": "Assets/Test.cs",
+                    "old_text": "Value = 1",
+                    "new_text": "Value = 2",
+                    "expected_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                    "evidence_node_ids": ["file"],
+                },
+            })
+
+            self.assertEqual("unity_execute_csharp", action["tool"])
+            self.assertEqual(["Assets/Test.cs"], action["arguments"]["target_paths"])
+            self.assertIn("Value = 2", action["arguments"]["code"])
+
+    def test_validation_gate_ablation_completes_without_control_calls(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            context = ContextAssembler(ContextConfig(enabled=True), project_root=project)
+            context.reset("repair", task_id="no-validation")
+            mutation = FakeMutationExecutor()
+            controller = UnityAciController(
+                context,
+                project_root=project,
+                config=AciConfig(validation_gates_enabled=False),
+                query_executor=FakeQueryExecutor(),
+                mutation_executor=mutation,
+            )
+            context.record_verified_fact(
+                "Read source file Assets/Test.cs.",
+                sources=["source:Assets/Test.cs"],
+                node_ids=["file"],
+            )
+
+            output = controller.execute({
+                "tool": "unity_script_patch",
+                "arguments": {
+                    "path": "Assets/Test.cs",
+                    "old_text": "a",
+                    "new_text": "b",
+                    "expected_sha256": "0" * 64,
+                    "evidence_node_ids": ["file"],
+                },
+            })
+
+            self.assertEqual(0, output["returncode"])
+            self.assertIsNone(controller.pending)
+            self.assertTrue(controller.completed[0]["validation_skipped_by_ablation"])
+            self.assertEqual(["unity_script_patch"], mutation.calls)
+
     def test_evidence_action_compiler_distinguishes_range_sha_and_failed_reads(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
             project = Path(directory)
@@ -417,7 +582,7 @@ class ExecutionProtocolTest(unittest.TestCase):
             exposure = controller.tool_exposure()
             self.assertEqual("validation", exposure.profile)
             self.assertTrue(exposure.validation_locked)
-            self.assertEqual(VALIDATION_TOOL_NAMES, set(exposure.tool_names))
+            self.assertEqual({"code_diagnostics", "artifact_read"}, set(exposure.tool_names))
             self.assertEqual(
                 "previous_change_unverified",
                 controller.execute(action)["extra"]["guard"],
@@ -430,7 +595,7 @@ class ExecutionProtocolTest(unittest.TestCase):
             controller.execute({"tool": "code_diagnostics", "arguments": {}})
             self.assertEqual("recompile_or_hot_reload", controller.pending.stage)
             self.assertEqual(
-                VALIDATION_TOOL_NAMES,
+                {"unity_recompile"},
                 set(controller.tool_exposure().tool_names),
             )
             controller.execute({"tool": "unity_recompile", "arguments": {}})
@@ -453,6 +618,52 @@ class ExecutionProtocolTest(unittest.TestCase):
             self.assertIsNone(controller.guard_submission())
             self.assertEqual(1, len(controller.completed))
             self.assertTrue(context.evidence.verified())
+
+    def test_automatic_validation_advances_all_post_patch_gates(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TEMP")) as directory:
+            project = Path(directory)
+            context = ContextAssembler(ContextConfig(enabled=True), project_root=project)
+            context.reset("Patch Test.cs", task_id="automatic-validation")
+            mutation = FakeMutationExecutor()
+            controller = UnityAciController(
+                context,
+                project_root=project,
+                config=AciConfig(
+                    automatic_validation_enabled=True,
+                    required_validation_modes=["editmode", "playmode"],
+                ),
+                query_executor=FakeQueryExecutor(),
+                mutation_executor=mutation,
+            )
+            context.record_verified_fact(
+                "Read source file Assets/Test.cs.",
+                sources=["source:Assets/Test.cs"],
+                node_ids=["file"],
+            )
+            changed = controller.execute({
+                "tool": "unity_script_patch",
+                "arguments": {
+                    "path": "Assets/Test.cs",
+                    "old_text": "a",
+                    "new_text": "b",
+                    "expected_sha256": "0" * 64,
+                    "evidence_node_ids": ["file"],
+                },
+            })
+            self.assertEqual(0, changed["returncode"])
+
+            validation = controller._run_automatic_validation()
+
+            self.assertEqual("complete", validation["status"])
+            self.assertEqual(
+                ["code_diagnostics", "unity_recompile", "unity_validate"],
+                [step["tool"] for step in validation["steps"]],
+            )
+            self.assertIsNone(controller.pending)
+            self.assertEqual(
+                ["unity_script_patch", "unity_recompile", "unity_validate"],
+                mutation.calls,
+            )
 
     def test_dynamic_exposure_has_three_minimal_profiles(self):
         localization = select_tool_exposure(
@@ -479,7 +690,7 @@ class ExecutionProtocolTest(unittest.TestCase):
         self.assertNotIn("unity_component_add", implementation.tool_names)
         self.assertEqual("validation", validation.profile)
         self.assertTrue(validation.validation_locked)
-        self.assertEqual(VALIDATION_TOOL_NAMES, set(validation.tool_names))
+        self.assertEqual({"code_diagnostics", "artifact_read"}, set(validation.tool_names))
 
     def test_public_tool_set_covers_typed_mutation_and_control_surface(self):
         expected = {

@@ -1,0 +1,24 @@
+{
+  "status": "ok",
+  "node": {
+    "id": "cs-method:3a1f44b65b7321ba93b3",
+    "kind": "METHOD",
+    "name": "RebindBinding",
+    "path": "Assets/Scripts/GameInput.cs",
+    "attributes": {
+      "declaring_type": "GameInput",
+      "declaring_type_id": "cs-type:527984e5594c2776e848",
+      "arity": 2,
+      "return_type": "void",
+      "line": 117
+    }
+  },
+  "path": "Assets/Scripts/GameInput.cs",
+  "sha256": "459bdb8e235d56987bfa128945c73cce225674f1ac4a0342e386838f5329f811",
+  "start_line": 117,
+  "end_line": 183,
+  "total_lines": 183,
+  "truncated": false,
+  "content": "    public void RebindBinding(Binding binding, Action onActionRebound)\n    {\n        playerInputActions.Player.Disable();\n\n        InputAction inputAction;\n        int bindingIndex;\n        switch (binding)\n        {\n            default:\n            case Binding.Move_Up:\n                inputAction = playerInputActions.Player.Move;\n                bindingIndex = 1;\n                break;\n            case Binding.Move_Down:\n                inputAction = playerInputActions.Player.Move;\n                bindingIndex = 2;\n                break;\n            case Binding.Move_Left:\n                inputAction = playerInputActions.Player.Move;\n                bindingIndex = 3;\n                break;\n            case Binding.Move_Right:\n                inputAction = playerInputActions.Player.Move;\n                bindingIndex = 4;\n                break;\n            case Binding.Interact:\n                inputAction = playerInputActions.Player.Interact;\n                bindingIndex = 0;\n                break;\n            case Binding.InteractAlternate:\n                inputAction = playerInputActions.Player.InteractAlternate;\n                bindingIndex = 0;\n                break;\n            case Binding.Pause:\n                inputAction = playerInputActions.Player.Pause;\n                bindingIndex = 0;\n                break;\n            case Binding.Gamepad_Interact:\n                inputAction = playerInputActions.Player.Interact;\n                bindingIndex = 1;\n                break;\n            case Binding.Gamepad_InteractAlternate:\n                inputAction = playerInputActions.Player.InteractAlternate;\n                bindingIndex = 1;\n                break;\n            case Binding.Gamepad_Pause:\n                inputAction = playerInputActions.Player.Pause;\n                bindingIndex = 1;\n                break;\n        }\n        inputAction.PerformInteractiveRebinding(bindingIndex)\n            .OnComplete(callback =>\n            {\n                // Debug.Log(callback.action.bindings[1].path);\n                // Debug.Log(callback.action.bindings[1].overridePath);\n                callback.Dispose();\n                playerInputActions.Player.Enable();\n                onActionRebound();\n\n                PlayerPrefs.SetString(PLAYER_PREFS_BINDINGS, playerInputActions.SaveBindingOverridesAsJson());\n                PlayerPrefs.Save();\n\n                OnBindingRebind?.Invoke(this, EventArgs.Empty);\n            })\n            .Start();\n    }\n}",
+  "evidence_artifact": "evidence-artifacts/evidence_ea454dd6e8aff411.txt"
+}

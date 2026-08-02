@@ -1,0 +1,189 @@
+{
+  "version": {
+    "project_id": "project:479da178d0b7456e",
+    "project_path": "C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group5-run1-20260802-132611",
+    "schema_version": "game-agent-unity-project-graph-v1",
+    "graph_digest": "7940dc3958cd880b7421101ec2083a5f9676a69718a5da9c6b0aba6ae848fdbd",
+    "project_revision": "7940dc3958cd880b",
+    "loaded_at": 1785648379.6055586,
+    "generation": 1
+  },
+  "metrics": {
+    "context_hits": 0,
+    "context_misses": 2,
+    "context_hit_rate": 0.0,
+    "context_miss_rate": 1.0,
+    "dirty_nodes": 0,
+    "invalidations": 0,
+    "tasks": 1
+  },
+  "dirty_nodes": {},
+  "invalidations": [],
+  "working_sets": {
+    "bf501c6e67f2": {
+      "task_id": "bf501c6e67f2",
+      "max_entries": 4,
+      "entries": [
+        {
+          "node_id": "cs-method:3a1f44b65b7321ba93b3",
+          "kind": "METHOD",
+          "name": "RebindBinding",
+          "path": "Assets/Scripts/GameInput.cs",
+          "relevance": 0.5627645876093081,
+          "status": "verified",
+          "detail": null,
+          "evidence_ids": [
+            "evidence:f08a2ca3540decc0"
+          ],
+          "relevance_label": true,
+          "accesses": 0,
+          "last_accessed_at": 0.0,
+          "stale_reason": ""
+        },
+        {
+          "node_id": "cs-field:24bab7bcad31280885dd",
+          "kind": "FIELD",
+          "name": "OnStateChanged",
+          "path": "Assets/Scripts/KitchenGameManager.cs",
+          "relevance": 0.9853664530927565,
+          "status": "mapped",
+          "detail": {
+            "id": "cs-field:24bab7bcad31280885dd",
+            "kind": "FIELD",
+            "name": "OnStateChanged",
+            "path": "Assets/Scripts/KitchenGameManager.cs",
+            "attributes": {
+              "declaring_type": "KitchenGameManager",
+              "declaring_type_id": "cs-type:031f66a50518c84862bb",
+              "field_type": "EventHandler",
+              "serialized": false,
+              "is_event": true
+            }
+          },
+          "evidence_ids": [
+            "evidence:a90a1b5bd157fad2"
+          ],
+          "relevance_label": true,
+          "accesses": 1,
+          "last_accessed_at": 1785648391.7620192,
+          "stale_reason": ""
+        },
+        {
+          "node_id": "cs-method:451be85fc5d687131725",
+          "kind": "METHOD",
+          "name": "Hide",
+          "path": "Assets/Scripts/UI/TutorialUI.cs",
+          "relevance": 0.9367167681204829,
+          "status": "verified",
+          "detail": null,
+          "evidence_ids": [
+            "evidence:4e29da6528f8131a"
+          ],
+          "relevance_label": true,
+          "accesses": 0,
+          "last_accessed_at": 0.0,
+          "stale_reason": ""
+        },
+        {
+          "node_id": "cs-method:540d30b396e167874c45",
+          "kind": "METHOD",
+          "name": "Interact",
+          "path": "Assets/Scripts/Counters/StoveCounter.cs",
+          "relevance": 1.0,
+          "status": "mapped",
+          "detail": {
+            "id": "cs-method:540d30b396e167874c45",
+            "kind": "METHOD",
+            "name": "Interact",
+            "path": "Assets/Scripts/Counters/StoveCounter.cs",
+            "attributes": {
+              "declaring_type": "StoveCounter",
+              "declaring_type_id": "cs-type:2ebef8ac22a91e179ed3",
+              "arity": 1,
+              "return_type": "void",
+              "line": 105
+            },
+            "source_range": {
+              "start_line": 100,
+              "end_line": 112
+            },
+            "source_excerpt": [
+              {
+                "line": 100,
+                "text": "            }"
+              },
+              {
+                "line": 101,
+                "text": "            //Debug.Log(state);"
+              },
+              {
+                "line": 102,
+                "text": "        }"
+              },
+              {
+                "line": 103,
+                "text": "    }"
+              },
+              {
+                "line": 104,
+                "text": ""
+              },
+              {
+                "line": 105,
+                "text": "    public override void Interact(Player player)"
+              },
+              {
+                "line": 106,
+                "text": "    {"
+              },
+              {
+                "line": 107,
+                "text": "        if (!HasKitchenObject())"
+              },
+              {
+                "line": 108,
+                "text": "        {"
+              },
+              {
+                "line": 109,
+                "text": "            // There is no kitchen object on the counter"
+              },
+              {
+                "line": 110,
+                "text": "            if (player.HasKitchenObject())"
+              },
+              {
+                "line": 111,
+                "text": "            {"
+              },
+              {
+                "line": 112,
+                "text": "                // Player is carrying something"
+              }
+            ]
+          },
+          "evidence_ids": [
+            "evidence:ed65145304f97689"
+          ],
+          "relevance_label": true,
+          "accesses": 1,
+          "last_accessed_at": 1785648384.3663588,
+          "stale_reason": ""
+        }
+      ],
+      "metrics": {
+        "context_hits": 0,
+        "context_misses": 2,
+        "context_hit_rate": 0.0,
+        "context_miss_rate": 1.0,
+        "working_set_size": 4,
+        "working_set_precision": 1.0,
+        "working_set_judged_precision": 1.0,
+        "working_set_judgment_coverage": 1.0,
+        "judged_nodes": 4,
+        "evictions": 0,
+        "remaps": 0
+      }
+    }
+  }
+}

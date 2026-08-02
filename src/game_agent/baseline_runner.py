@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from game_agent.baseline import StageAnalyzer, project_conversation
+from game_agent.baseline_tasks import get_task
 from game_agent.logging import ExperimentLogger
 from game_agent.mini import load_config, run as run_agent
 from game_agent.services.worker import _capture_diff, capture_task_baseline
@@ -55,19 +56,30 @@ def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _project_fingerprint(project: Path) -> str:
-    digest = hashlib.sha256()
+def _project_snapshot(project: Path) -> dict[str, str]:
+    snapshot: dict[str, str] = {}
     roots = [project / "Assets", project / "Packages", project / "ProjectSettings"]
     for root in roots:
         if not root.exists():
             continue
         for path in sorted((item for item in root.rglob("*") if item.is_file()), key=lambda item: item.as_posix()):
             relative = path.relative_to(project).as_posix()
-            digest.update(relative.encode("utf-8"))
-            digest.update(b"\0")
-            digest.update(path.read_bytes())
-            digest.update(b"\0")
+            snapshot[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return snapshot
+
+
+def _snapshot_fingerprint(snapshot: dict[str, str]) -> str:
+    digest = hashlib.sha256()
+    for relative, file_digest in sorted(snapshot.items()):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(file_digest.encode("ascii"))
+        digest.update(b"\0")
     return digest.hexdigest()
+
+
+def _project_fingerprint(project: Path) -> str:
+    return _snapshot_fingerprint(_project_snapshot(project))
 
 
 def _interaction_method(text: str) -> re.Match[str] | None:
@@ -326,6 +338,8 @@ class BaselineCase:
     variant: str = "baseline"
     isolation: str = "copy"
     keep_workspace: bool = False
+    task_id: str = "state-event-publication"
+    workspace_root: Path | None = None
 
 
 class StateEventBaselineRunner:
@@ -339,40 +353,70 @@ class StateEventBaselineRunner:
         self.case = case
         self.agent_runner = agent_runner
         self.validator_factory = validator_factory
+        self.task_spec = get_task(case.task_id)
 
     def _prepare_config(self, project: Path, run_id: str) -> tuple[dict[str, Any], Path]:
         config = json.loads(json.dumps(load_config(self.case.config_path)))
         if self.case.variant not in {"baseline", "innovation"}:
             raise ValueError(f"Unsupported experiment variant: {self.case.variant}")
         innovation_enabled = self.case.variant == "innovation"
+        ablation_group = str(config.get("ablation_group", "")).strip()
         config["experiment"]["config_id"] = (
+            f"state-event-v1-{ablation_group}"
+            if innovation_enabled and ablation_group else
             "state-event-v1-innovation" if innovation_enabled else "state-event-v1-no-skill"
         )
         config["experiment"]["target_project"] = str(project)
         config["environment"]["cwd"] = str(project)
         config.setdefault("skills", {})
-        config["skills"].update(enabled=innovation_enabled, paths=[])
-        config.setdefault("context", {})
-        config["context"]["enabled"] = innovation_enabled
-        configured_graph = str(config["context"].get("graph_path", "")).strip()
         if innovation_enabled:
+            config["skills"].setdefault("enabled", True)
+        else:
+            config["skills"]["enabled"] = False
+        config["skills"]["paths"] = []
+        config.setdefault("context", {})
+        if innovation_enabled:
+            config["context"].setdefault("enabled", True)
+        else:
+            config["context"]["enabled"] = False
+        configured_graph = str(config["context"].get("graph_path", "")).strip()
+        configured_graph_sha = str(config["context"].get("graph_sha256", "")).strip().casefold()
+        resolved_graph: Path | None = None
+        if innovation_enabled and configured_graph:
+            resolved_graph = Path(configured_graph)
+            if not resolved_graph.is_absolute():
+                repository_root = Path(__file__).resolve().parents[2]
+                resolved_graph = repository_root / resolved_graph
+            resolved_graph = resolved_graph.resolve()
+            if not resolved_graph.is_file():
+                raise FileNotFoundError(f"Configured project graph does not exist: {resolved_graph}")
+            actual_graph_sha = hashlib.sha256(resolved_graph.read_bytes()).hexdigest()
+            if configured_graph_sha and actual_graph_sha.casefold() != configured_graph_sha:
+                raise ValueError(
+                    "Configured project graph SHA-256 does not match context.graph_sha256: "
+                    f"expected {configured_graph_sha}, observed {actual_graph_sha}"
+                )
+            config["context"]["graph_sha256"] = actual_graph_sha
+        if innovation_enabled and config["context"].get("enabled", False):
             if not configured_graph:
                 raise ValueError("Innovation variant requires context.graph_path")
-            graph_path = Path(configured_graph)
-            if not graph_path.is_absolute():
-                graph_path = self.case.config_path.resolve().parent.parent / graph_path
-            graph_path = graph_path.resolve()
-            if not graph_path.is_file():
-                raise FileNotFoundError(f"Configured project graph does not exist: {graph_path}")
-            config["context"]["graph_path"] = str(graph_path)
+            assert resolved_graph is not None
+            config["context"]["graph_path"] = str(resolved_graph)
         else:
             config["context"]["graph_path"] = ""
         config.setdefault("aci", {})
-        config["aci"]["enabled"] = innovation_enabled
-        config["aci"]["typed_mutations_enabled"] = innovation_enabled
+        if innovation_enabled:
+            config["aci"].setdefault("enabled", True)
+            config["aci"].setdefault("typed_mutations_enabled", True)
+        else:
+            config["aci"]["enabled"] = False
+            config["aci"]["typed_mutations_enabled"] = False
         config["aci"]["editor_path"] = str(self.case.editor_path.resolve())
         config.setdefault("model", {})
-        config["model"]["structured_query_tools_enabled"] = innovation_enabled
+        if innovation_enabled:
+            config["model"].setdefault("structured_query_tools_enabled", True)
+        else:
+            config["model"]["structured_query_tools_enabled"] = False
         config.setdefault("validation", {})
         config["validation"]["enabled"] = False
         config["validation"]["editor_path"] = str(self.case.editor_path.resolve())
@@ -386,19 +430,70 @@ class StateEventBaselineRunner:
                 "schema_version": BASELINE_SCHEMA_VERSION,
                 "run_id": run_id,
                 "variant": self.case.variant,
+                "ablation_group": ablation_group,
                 "task": self.case.task,
+                "task_id": self.task_spec.id,
+                "task_difficulty": self.task_spec.difficulty,
                 "source_project": str(self.case.source_project.resolve()),
                 "project_path": str(project),
                 "isolation": self.case.isolation,
-                "skills_enabled": innovation_enabled,
-                "context_virtualization_enabled": innovation_enabled,
-                "structured_query_tools_enabled": innovation_enabled,
-                "typed_mutation_tools_enabled": innovation_enabled,
+                "skills_enabled": bool(config["skills"].get("enabled")),
+                "context_virtualization_enabled": bool(config["context"].get("enabled")),
+                "structured_query_tools_enabled": bool(config["model"].get("structured_query_tools_enabled")),
+                "typed_mutation_tools_enabled": bool(config["aci"].get("typed_mutations_enabled")),
                 "graph_path": config["context"].get("graph_path", ""),
                 "editor_path": str(self.case.editor_path.resolve()),
             },
         )
         return config, destination
+
+    @staticmethod
+    def _treatment_activation(
+        config: dict[str, Any], events: list[dict[str, Any]]
+    ) -> tuple[bool, dict[str, Any]]:
+        condition = str(config.get("context_condition", "")).upper()
+        if condition not in {"C0", "C1", "C2", "C3", "C4"}:
+            return True, {"condition": condition or "legacy", "checked": False}
+        treatment_events = [
+            item for item in events
+            if item.get("event") in {"context_retrieval_treatment", "context_assembled"}
+            and isinstance(item.get("treatment"), dict)
+        ]
+        latest = treatment_events[-1]["treatment"] if treatment_events else {}
+        retrieval = latest.get("retrieval", {}) if isinstance(latest, dict) else {}
+        retrieval_last = latest.get("retrieval_last", {}) if isinstance(latest, dict) else {}
+        assembled = sum(1 for item in events if item.get("event") == "context_assembled")
+        bypassed = sum(1 for item in events if item.get("event") == "context_assembly_bypassed")
+        graph_scores = int(retrieval.get("graph_score_contributions", 0) or 0)
+        semantic_scores = int(retrieval.get("semantic_score_contributions", 0) or 0)
+        source_causal = int(retrieval.get("source_causal_edges", 0) or 0)
+        returned_causal = int(retrieval.get("returned_causal_edges", 0) or 0)
+        suppressed_causal = int(retrieval.get("suppressed_causal_edges", 0) or 0)
+        noncausal = int(retrieval.get("noncausal_graph_candidates", 0) or 0)
+        checks = {
+            "C0": graph_scores > 0 and semantic_scores > 0 and returned_causal > 0 and assembled > 0,
+            "C1": graph_scores == 0 and semantic_scores > 0 and assembled > 0,
+            "C2": graph_scores > 0 and semantic_scores == 0 and assembled > 0,
+            "C3": source_causal > 0 and returned_causal == 0 and suppressed_causal > 0 and noncausal > 0 and assembled > 0,
+            "C4": graph_scores > 0 and bypassed > 0 and assembled == 0,
+        }
+        evidence = {
+            "condition": condition,
+            "checked": True,
+            "activated": checks[condition],
+            "graph_score_contributions": graph_scores,
+            "semantic_score_contributions": semantic_scores,
+            "semantic_status": str(retrieval_last.get("semantic_status", "")),
+            "semantic_reason": str(retrieval_last.get("semantic_reason", "")),
+            "semantic_model": str(retrieval_last.get("semantic_model", "")),
+            "source_causal_edges": source_causal,
+            "returned_causal_edges": returned_causal,
+            "suppressed_causal_edges": suppressed_causal,
+            "noncausal_graph_candidates": noncausal,
+            "assembly_injections": assembled,
+            "assembly_bypasses": bypassed,
+        }
+        return checks[condition], evidence
 
     @staticmethod
     def _validation_passed(summary: dict[str, Any], modes: tuple[str, ...]) -> bool:
@@ -460,7 +555,8 @@ class StateEventBaselineRunner:
         artifact_dir.mkdir(parents=True, exist_ok=False)
         run_id = artifact_dir.name or uuid.uuid4().hex[:12]
         source = self.case.source_project.resolve()
-        source_before = _project_fingerprint(source)
+        source_snapshot_before = _project_snapshot(source)
+        source_before = _snapshot_fingerprint(source_snapshot_before)
         lease: WorkspaceLease | None = None
         project: Path | None = None
         baseline = None
@@ -472,11 +568,17 @@ class StateEventBaselineRunner:
 
         try:
             # Create workspace in temp directory, not in artifacts (avoid 1.6GB per experiment)
-            workspace_root = Path(tempfile.gettempdir()) / "game-agent-baselines" / run_id
+            workspace_parent = (
+                self.case.workspace_root.resolve()
+                if self.case.workspace_root is not None
+                else Path(tempfile.gettempdir()) / "game-agent-baselines"
+            )
+            workspace_root = workspace_parent / run_id
             lease = create_task_workspace(source, workspace_root, mode=self.case.isolation)
             project = lease.project_path
-            inject_state_event_defect(project, artifact_dir)
+            self.task_spec.inject(project, artifact_dir, self.case.editor_path)
             config, prepared_config = self._prepare_config(project, run_id)
+            ablation_group = str(config.get("ablation_group", "")).strip()
             baseline = capture_task_baseline(
                 project,
                 artifact_dir / "workspace-baseline.json",
@@ -502,7 +604,7 @@ class StateEventBaselineRunner:
                 run_id=run_id,
                 config_id=config["experiment"]["config_id"],
             )
-            oracle_match = patch_matches_oracle(project)
+            oracle_match = self.task_spec.oracle(project, self.case.editor_path)
             appender.emit(
                 "diff_snapshot",
                 component="environment",
@@ -518,19 +620,33 @@ class StateEventBaselineRunner:
                 appender.emit,
                 "public",
             )
-            inject_hidden_oracle(project, artifact_dir / "validation" / "hidden")
-            try:
-                hidden_validation = self._validate(
-                    project,
-                    artifact_dir / "validation" / "hidden",
-                    ("editmode", "playmode"),
-                    appender.emit,
-                    "hidden",
+            if self.task_spec.id == "state-event-publication":
+                inject_hidden_oracle(project, artifact_dir / "validation" / "hidden")
+                try:
+                    hidden_validation = self._validate(
+                        project,
+                        artifact_dir / "validation" / "hidden",
+                        ("editmode", "playmode"),
+                        appender.emit,
+                        "hidden",
+                    )
+                finally:
+                    oracle_cleanup = remove_hidden_oracle(project)
+                    if not oracle_cleanup:
+                        infrastructure_errors.append("hidden_oracle_cleanup_failed")
+            else:
+                hidden_validation = {
+                    "status": "passed" if oracle_match else "failed",
+                    "checks": [
+                        {"name": "task_oracle", "status": "passed" if oracle_match else "failed"}
+                    ],
+                    "task_id": self.task_spec.id,
+                    "oracle_kind": "task_specific",
+                }
+                _write_json(
+                    artifact_dir / "validation" / "hidden" / "summary.json",
+                    hidden_validation,
                 )
-            finally:
-                oracle_cleanup = remove_hidden_oracle(project)
-                if not oracle_cleanup:
-                    infrastructure_errors.append("hidden_oracle_cleanup_failed")
 
             events = [
                 json.loads(line)
@@ -543,8 +659,8 @@ class StateEventBaselineRunner:
                 else None
             )
             metrics = StageAnalyzer(
-                relevant_files=RELEVANT_FILES,
-                root_cause_file=TARGET_SCRIPT.as_posix(),
+                relevant_files=self.task_spec.relevant_files,
+                root_cause_file=self.task_spec.root_cause_file,
             ).analyze(events, trajectory=trajectory)
             _write_json(artifact_dir / "stage-metrics.json", metrics)
             conversation = project_conversation(events)
@@ -552,28 +668,38 @@ class StateEventBaselineRunner:
                 for message in conversation:
                     handle.write(json.dumps(message, ensure_ascii=False, sort_keys=True) + "\n")
 
-            source_after = _project_fingerprint(source)
+            source_snapshot_after = _project_snapshot(source)
+            source_after = _snapshot_fingerprint(source_snapshot_after)
             source_unchanged = source_before == source_after
+            source_changed_paths = sorted(
+                path for path in set(source_snapshot_before) | set(source_snapshot_after)
+                if source_snapshot_before.get(path) != source_snapshot_after.get(path)
+            )
             if not source_unchanged:
                 infrastructure_errors.append("source_project_changed")
             no_skill_evidence = config.get("skills", {}).get("enabled") is False and not any(
                 item.get("event") in {"skill_matched", "skill_apply_start", "skill_apply_end"} for item in events
             )
-            innovation_config_evidence = all(
-                (
-                    config.get("skills", {}).get("enabled") is True,
+            innovation_checks = [
+                config.get("skills", {}).get("enabled") is True,
+                config.get("model", {}).get("structured_query_tools_enabled") is True,
+                config.get("aci", {}).get("enabled") is True,
+            ]
+            if not ablation_group:
+                innovation_checks.extend((
                     config.get("context", {}).get("enabled") is True,
                     Path(str(config.get("context", {}).get("graph_path", ""))).is_file(),
-                    config.get("model", {}).get("structured_query_tools_enabled") is True,
-                    config.get("aci", {}).get("enabled") is True,
                     config.get("aci", {}).get("typed_mutations_enabled") is True,
-                )
-            )
+                ))
+            innovation_config_evidence = all(innovation_checks)
             condition_evidence = (
                 innovation_config_evidence if self.case.variant == "innovation" else no_skill_evidence
             )
             if not condition_evidence:
                 infrastructure_errors.append(f"{self.case.variant}_condition_violated")
+            treatment_activated, treatment_evidence = self._treatment_activation(config, events)
+            if not treatment_activated:
+                infrastructure_errors.append("treatment_not_activated")
             if not (artifact_dir / "events.jsonl").is_file():
                 infrastructure_errors.append("events_missing")
             if not public_validation or not hidden_validation:
@@ -582,7 +708,11 @@ class StateEventBaselineRunner:
             public_passed = self._validation_passed(
                 public_validation, ("compile", "editmode", "playmode")
             )
-            hidden_passed = self._validation_passed(hidden_validation, ("editmode", "playmode"))
+            hidden_modes = (
+                ("editmode", "playmode")
+                if self.task_spec.id == "state-event-publication" else ("task_oracle",)
+            )
+            hidden_passed = self._validation_passed(hidden_validation, hidden_modes)
             agent_submitted = agent_result.get("exit_status") == "Submitted"
             verified_success = bool(agent_submitted and oracle_match and public_passed and hidden_passed)
             experiment_valid = not infrastructure_errors
@@ -590,13 +720,18 @@ class StateEventBaselineRunner:
                 "schema_version": BASELINE_SCHEMA_VERSION,
                 "run_id": run_id,
                 "variant": self.case.variant,
+                "ablation_group": ablation_group,
+                "task_id": self.task_spec.id,
+                "task_difficulty": self.task_spec.difficulty,
                 "experiment_valid": experiment_valid,
                 "infrastructure_errors": infrastructure_errors,
                 "source_project_unchanged": source_unchanged,
+                "source_project_changed_paths": source_changed_paths,
                 "hidden_oracle_cleaned": oracle_cleanup,
                 "no_skill_evidence": no_skill_evidence,
                 "innovation_config_evidence": innovation_config_evidence,
                 "condition_evidence": condition_evidence,
+                "treatment_activation": treatment_evidence,
                 "agent": {
                     "submitted": agent_submitted,
                     "exit_status": agent_result.get("exit_status", ""),

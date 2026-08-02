@@ -1,0 +1,64 @@
+{
+  "tasks": [
+    {
+      "task_id": "A1",
+      "success": false,
+      "error": "'dict' object has no attribute 'success'",
+      "duration_seconds": 0.003002,
+      "timestamp": "2026-08-02T18:33:37.945101"
+    },
+    {
+      "task_id": "A4",
+      "success": false,
+      "error": "'dict' object has no attribute 'success'",
+      "duration_seconds": 40.555891,
+      "timestamp": "2026-08-02T18:33:37.950102"
+    },
+    {
+      "task_id": "B1",
+      "success": false,
+      "error": "'dict' object has no attribute 'success'",
+      "duration_seconds": 0.002999,
+      "timestamp": "2026-08-02T18:34:18.505993"
+    },
+    {
+      "task_id": "B2",
+      "success": false,
+      "error": "'dict' object has no attribute 'success'",
+      "duration_seconds": 0.290655,
+      "timestamp": "2026-08-02T18:34:18.508992"
+    },
+    {
+      "task_id": "C1",
+      "success": false,
+      "error": "'dict' object has no attribute 'success'",
+      "duration_seconds": 0.301999,
+      "timestamp": "2026-08-02T18:34:18.799647"
+    }
+  ],
+  "summary": {
+    "total_tasks": 5,
+    "passed": 0,
+    "failed": 5,
+    "pass_rate": 0.0,
+    "by_complexity": {
+      "simple": {
+        "total": 4,
+        "passed": 0
+      },
+      "medium": {
+        "total": 1,
+        "passed": 0
+      }
+    },
+    "avg_duration_seconds": 8.230909200000001,
+    "avg_tokens": 0.0,
+    "failed_tasks": [
+      "A1",
+      "A4",
+      "B1",
+      "B2",
+      "C1"
+    ]
+  }
+}

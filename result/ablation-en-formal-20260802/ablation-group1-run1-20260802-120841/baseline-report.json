@@ -1,0 +1,159 @@
+{
+  "schema_version": "game-agent-state-event-baseline-v1",
+  "run_id": "ablation-group1-run1-20260802-120841",
+  "variant": "innovation",
+  "ablation_group": "group1-full",
+  "experiment_valid": true,
+  "infrastructure_errors": [],
+  "source_project_unchanged": true,
+  "hidden_oracle_cleaned": true,
+  "no_skill_evidence": false,
+  "innovation_config_evidence": true,
+  "condition_evidence": true,
+  "agent": {
+    "submitted": true,
+    "exit_status": "Submitted",
+    "submission": "Controller verified the complete submission contract. Diagnosis: After the player presses the interact key on the start screen, the tutorial UI does not close and the countdown UI does not appear because the OnStateChanged event is not published when transitioning to State.CountdownToStart.. Changed paths: Assets/Scripts/KitchenGameManager.cs. Validation passed: diagnostics, compile, editmode, playmode.",
+    "error": ""
+  },
+  "oracle_match": true,
+  "public_validation_passed": true,
+  "hidden_validation_passed": true,
+  "verified_success": true,
+  "metrics": {
+    "schema_version": "game-agent-stage-metrics-v2",
+    "milestones_ms": {
+      "T0_task_submitted": 0,
+      "T1_first_tool": 18030,
+      "T2_first_relevant_file": 22648,
+      "T3_root_cause_file": 22648,
+      "T4_first_edit": null,
+      "T5_first_correct_patch": 141738,
+      "T6_first_validation": 141872,
+      "T7_agent_stopped": 141738,
+      "T8_public_validation_end": 189807,
+      "T9_hidden_validation_end": 225494
+    },
+    "stage_duration_ms": {
+      "task_understanding": 18030,
+      "source_localization": 4618,
+      "diagnosis": 119090,
+      "editing": 119224,
+      "self_validation": 0,
+      "public_validation": 48069,
+      "hidden_validation": 35687
+    },
+    "phase_reentry": {
+      "editing_after_validation": 0
+    },
+    "outcome": {
+      "agent_submitted": true,
+      "exit_status": "Submitted",
+      "missing_final_answer": false
+    },
+    "navigation": {
+      "files_accessed": [
+        "Assets/Scripts/KitchenGameManager.cs",
+        "Assets/Scripts/UI/TutorialUI.cs",
+        "Assets/Scripts/GameInput.cs",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//public//compile.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//public//editmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//public//editmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//public//playmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//public//playmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//hidden//editmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//hidden//editmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//hidden//playmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group1-run1-20260802-120841//validation//hidden//playmode-results.xml"
+      ],
+      "root_cause_rank": 1,
+      "relevant_recall": 0.6666666666666666,
+      "navigation_precision": 0.16666666666666666,
+      "unrelated_file_ratio": 0.8333333333333334
+    },
+    "context": {
+      "prompt_tokens": 40579,
+      "completion_tokens": 1195,
+      "total_tokens": 41774,
+      "peak_context_usage_percent": 35.51025390625,
+      "raw_output_chars": 47458,
+      "retained_output_chars": 33534,
+      "truncated_tool_calls": 0,
+      "repeated_observation_ratio": 0.0
+    },
+    "behavior": {
+      "model_calls": 5,
+      "tool_calls": 7,
+      "failed_tool_calls": 0,
+      "repeated_commands": 0
+    },
+    "research": {
+      "retrieval": {
+        "k": 4,
+        "candidate_paths_at_k": 3,
+        "distinct_paths_at_k": 3,
+        "distinct_path_ratio_at_k": 1.0,
+        "test_node_ratio_at_k": 0.0,
+        "root_cause_mrr": 1.0,
+        "causal_edge_coverage": 0.0,
+        "causal_edges_total": 0
+      },
+      "memory": {
+        "evidence_write_recall": 1.0,
+        "evidence_read_recall": 1.0,
+        "evidence_utilization": 0.0,
+        "stale_evidence_rate": 0.0,
+        "unique_evidence": 4,
+        "expected_evidence_writes": 4,
+        "evidence_read_transitions": 3,
+        "evidence_utilization_opportunities": 0,
+        "referenced_evidence_nodes": 0
+      },
+      "control": {
+        "duplicate_action_ratio": 0.0,
+        "blocked_action_recovery_rate": 0.0,
+        "admissible_action_acceptance": 0.0,
+        "phase_regression_count": 0,
+        "protocol_gate_completion": 1.0,
+        "blocked_actions": 0,
+        "admissible_action_opportunities": 0,
+        "mutation_calls": 1
+      },
+      "tools_and_cost": {
+        "aci_tool_calls": 7,
+        "tool_schema_tokens_per_call": 1226.0,
+        "unique_evidence_per_1k_tokens": 0.0957533393977115,
+        "typed_mutation_ratio": 1.0,
+        "escape_hatch_ratio": 0.0,
+        "tool_schema_measurements": 5,
+        "tool_profile_calls": {
+          "plan": 1,
+          "inspect": 1,
+          "diagnose": 1,
+          "prepare_edit": 1,
+          "edit": 1
+        },
+        "tool_schema_tokens_by_profile": {
+          "plan": 263,
+          "inspect": 1117,
+          "diagnose": 1347,
+          "prepare_edit": 1797,
+          "edit": 1606
+        }
+      }
+    }
+  },
+  "recommended_innovation": {
+    "innovation": "unity_project_graph",
+    "reason": "相关文件导航精度低，优先用 Scene/Component/C# 依赖图约束检索范围。"
+  },
+  "artifacts": {
+    "events": "events.jsonl",
+    "conversation": "conversation.jsonl",
+    "trajectory": "trajectory.json",
+    "diff": "diff.patch",
+    "public_validation": "validation/public/summary.json",
+    "hidden_validation": "validation/hidden/summary.json",
+    "stage_metrics": "stage-metrics.json"
+  }
+}

@@ -63,7 +63,7 @@ class ExplorerAgent:
         project_root: Path,
         artifact_root: Path | None = None,
         max_rounds: int = 10,
-        max_tokens: int = 40_000,
+        max_tokens: int = 60_000,  # Increased from 40k to 60k for better coverage
     ):
         """Initialize the Explorer agent.
 
@@ -73,7 +73,7 @@ class ExplorerAgent:
             project_root: Unity project root
             artifact_root: Artifact storage directory
             max_rounds: Maximum exploration rounds
-            max_tokens: Maximum token budget for exploration
+            max_tokens: Maximum token budget for exploration (default 60k)
         """
         self.model = model
         self.context = context
@@ -143,6 +143,13 @@ class ExplorerAgent:
                 if response is None:
                     break
 
+                # Debug: log response structure
+                self.logger.info(f"Response keys: {list(response.keys())}")
+                self.logger.info(f"Has tool_calls: {response.get('tool_calls') is not None}")
+                if response.get('tool_calls'):
+                    self.logger.info(f"Tool calls count: {len(response.get('tool_calls', []))}")
+                    self.logger.info(f"First tool call: {response.get('tool_calls', [{}])[0] if response.get('tool_calls') else 'None'}")
+
                 # Process tool calls
                 if not response.get("tool_calls"):
                     # No more exploration needed
@@ -211,7 +218,7 @@ class ExplorerAgent:
 
     def _build_system_prompt(self) -> str:
         """Build system prompt for Explorer."""
-        return """You are an Explorer agent. Your role is to search and collect evidence.
+        return """You are an Explorer agent. Your role is to search and collect evidence EFFICIENTLY.
 
 Your responsibilities:
 - Search the Unity project for relevant code and assets
@@ -224,21 +231,31 @@ What you CANNOT do:
 - Modify code (no mutations)
 - Make recommendations (just collect facts)
 
-Available tools:
-- unity_asset_search: Search for assets by name/path
-- unity_code_search: Search code by text/pattern
-- unity_ref_search: Find references/dependencies
-- unity_ref_chain: Trace reference chains
-- unity_node_read: Read node content
-- unity_hierarchy_read: Read GameObject hierarchy
+Available tools (USE EXACT NAMES):
+- code_symbol_search: Search for C# classes/methods/fields by name or pattern
+- code_find_references: Find what calls/uses a symbol
+- code_file_read: Read C# file content
+- unity_asset_search: Search for Unity assets (scenes, prefabs, etc.)
+- unity_ref_search: Find Unity asset references
+- unity_object_read: Read Unity object/component data
 
-Strategy:
-1. Start broad (search for relevant keywords)
-2. Then narrow (follow references, read candidates)
-3. Collect concrete evidence (file paths, code snippets, relationships)
-4. Stop when you have enough evidence (10-15 items)
+EFFICIENT STRATEGY (minimize token usage):
+1. Start with 2-3 PRECISE code searches (not broad searches)
+   - Use code_symbol_search for class/method names
+   - Example: search for "GameStateManager", "TutorialUI", "Hide"
 
-Focus on FACTS, not interpretations."""
+2. Use code_find_references on top results (cheap and effective)
+   - Find what calls the methods you found
+   - Example: who calls TutorialUI.Hide()?
+
+3. Read ONLY the most relevant 3-5 files with code_file_read
+   - Focus on files mentioned in the query
+   - Skip obvious framework code
+
+4. Stop early if you have 5-8 strong candidates (don't waste tokens)
+
+Focus on FACTS, not interpretations. Be EFFICIENT with token usage.
+USE EXACT TOOL NAMES from the list above."""
 
     def _build_exploration_prompt(self, task: ExplorationTask) -> str:
         """Build the exploration task prompt."""
@@ -246,10 +263,22 @@ Focus on FACTS, not interpretations."""
 
 {task.query}
 
-Find up to {task.max_results} relevant pieces of evidence.
-You have {task.max_rounds} rounds.
+TARGET: Find up to {task.max_results} relevant pieces of evidence.
+BUDGET: You have {task.max_rounds} rounds. Use them wisely.
 
-Start exploring now."""
+CRITICAL: Be EFFICIENT - minimize token usage:
+- Start with 2-3 PRECISE searches (specific class/method names)
+- Use ref_search on top results (cheap and effective)
+- Read ONLY the most relevant 3-5 files
+- STOP when you have 5-8 strong candidates
+
+Example efficient flow:
+1. unity_code_search for specific terms (e.g., "GameStateManager", "TutorialUI")
+2. unity_ref_search on the best results
+3. unity_node_read on 3-5 key files
+4. Done!
+
+Start exploring now - BE EFFICIENT!"""
 
     def _call_model(self) -> dict[str, Any] | None:
         """Call the LLM model and track tokens."""
@@ -278,6 +307,8 @@ Start exploring now."""
 
         except Exception as e:
             self.logger.error(f"Model call failed: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
     def _get_tool_schemas(self) -> list[dict[str, Any]]:
@@ -298,54 +329,102 @@ Start exploring now."""
         """Execute tool calls and collect evidence."""
         results = []
 
+        self.logger.info(f"Executing {len(tool_calls)} tool calls...")
+
         for tool_call in tool_calls:
             tool_name = tool_call.get("function", {}).get("name", "")
+            tool_call_id = tool_call.get("id", "")
+
+            self.logger.info(f"  Tool: {tool_name}, ID: {tool_call_id}")
 
             # Only allow Explorer tools
             if tool_name not in EXPLORER_TOOL_NAMES:
+                self.logger.warning(f"  Tool {tool_name} not allowed in Explorer")
                 results.append({
-                    "tool_call_id": tool_call.get("id", ""),
-                    "error": f"Tool {tool_name} not available in Explorer",
+                    "tool_call_id": tool_call_id,
+                    "output": json.dumps({
+                        "error": f"Tool {tool_name} not available in Explorer"
+                    }),
                 })
                 continue
+
+            # Parse arguments (might be string or dict)
+            arguments = tool_call.get("function", {}).get("arguments", {})
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                    self.logger.info(f"  Parsed arguments from string")
+                except json.JSONDecodeError as e:
+                    self.logger.error(f"  Failed to parse arguments: {e}")
+                    results.append({
+                        "tool_call_id": tool_call_id,
+                        "output": json.dumps({
+                            "error": f"Invalid arguments: {e}"
+                        }),
+                    })
+                    continue
+
+            self.logger.info(f"  Arguments: {arguments}")
 
             # Execute query tool
             action = {
                 "tool": tool_name,
-                "arguments": tool_call.get("function", {}).get("arguments", {}),
+                "arguments": arguments,
             }
 
-            result = self.query_executor.execute(action)
+            try:
+                result = self.query_executor.execute(action)
+                self.logger.info(f"  Result status: {result.get('status')}")
+                self.logger.info(f"  Result keys: {list(result.keys())}")
 
-            # Extract evidence from result
-            self._extract_evidence(tool_name, result)
+                # Debug: print first 200 chars of result
+                result_str = json.dumps(result, indent=2)[:200]
+                self.logger.info(f"  Result preview: {result_str}...")
 
-            results.append({
-                "tool_call_id": tool_call.get("id", ""),
-                "output": json.dumps(result),
-            })
+                # Extract evidence from result
+                self._extract_evidence(tool_name, result)
+                self.logger.info(f"  Evidence count: {len(self.evidence_items)}, Candidates: {len(self.candidate_nodes)}")
+
+                results.append({
+                    "tool_call_id": tool_call_id,
+                    "output": json.dumps(result),
+                })
+
+            except Exception as e:
+                self.logger.error(f"  Tool execution failed: {e}")
+                import traceback
+                traceback.print_exc()
+                results.append({
+                    "tool_call_id": tool_call_id,
+                    "output": json.dumps({
+                        "error": str(e)
+                    }),
+                })
 
         return results
 
     def _extract_evidence(self, tool_name: str, result: dict[str, Any]) -> None:
         """Extract evidence items from tool result.
 
-        Different tools return different structures:
-        - Search tools: return nodes array
-        - Read tools: return content
-        - Status tools: return metadata
+        Query tools return: {"output": json_string, "returncode": 0, "extra": {"structured": actual_result}}
+        The actual query result is in extra["structured"]
         """
-        if result.get("status") != "success":
+        # Get the structured result from extra
+        extra = result.get("extra", {})
+        structured = extra.get("structured", {})
+
+        if not structured or structured.get("status") == "error":
+            self.logger.warning(f"Tool {tool_name} returned error or empty result")
             return
 
         evidence_id = hashlib.md5(
-            f"{tool_name}:{json.dumps(result)}".encode()
+            f"{tool_name}:{json.dumps(structured)}".encode()
         ).hexdigest()[:12]
 
         # Extract based on tool type
         if tool_name in {"unity_asset_search", "code_symbol_search", "unity_object_search"}:
             # Search tools return nodes
-            nodes = result.get("nodes", [])
+            nodes = structured.get("nodes", []) or structured.get("results", [])
 
             if nodes:
                 # Create evidence for search results
@@ -376,35 +455,56 @@ Start exploring now."""
                     metadata={
                         "tool": tool_name,
                         "result_count": len(nodes),
-                        "query": result.get("query", ""),
+                        "query": structured.get("query", ""),
                     },
                 ))
 
         elif tool_name in {"code_file_read", "unity_asset_read", "unity_object_read"}:
-            # Read tools return content
-            content = result.get("content", "")
-            path = result.get("path", "") or result.get("asset_path", "")
+            # Read tools return content in output
+            output_str = result.get("output", "")
+
+            # Try to parse the output as JSON
+            try:
+                output_data = json.loads(output_str) if isinstance(output_str, str) else output_str
+                content = output_data.get("content", "") if isinstance(output_data, dict) else str(output_data)
+            except:
+                content = output_str
+
+            path = structured.get("path", "") or structured.get("asset_path", "")
+
+            # Extract artifact information from extra
+            extra = result.get("extra", {})
+            artifact_path = extra.get("evidence_artifact_path", "")
+            artifact_sha256 = extra.get("evidence_artifact_sha256", "")
 
             if content:
                 # Truncate long content for evidence
                 truncated_content = content[:500] + "..." if len(content) > 500 else content
+
+                metadata = {
+                    "tool": tool_name,
+                    "path": path,
+                    "full_length": len(content),
+                    "sha256": structured.get("sha256", ""),
+                }
+
+                # Add artifact info to metadata
+                if artifact_path:
+                    metadata["artifact_path"] = artifact_path
+                if artifact_sha256:
+                    metadata["artifact_sha256"] = artifact_sha256
 
                 self.evidence_items.append(Evidence(
                     evidence_id=evidence_id,
                     source=tool_name,
                     content=f"Read {path}:\n{truncated_content}",
                     relevance_score=0.85,
-                    metadata={
-                        "tool": tool_name,
-                        "path": path,
-                        "full_length": len(content),
-                        "sha256": result.get("sha256", ""),
-                    },
+                    metadata=metadata,
                 ))
 
         elif tool_name in {"unity_ref_search", "code_find_references"}:
             # Reference search returns relationships
-            rows = result.get("rows", [])
+            rows = structured.get("rows", [])
 
             if rows:
                 ref_summaries = []
@@ -431,8 +531,8 @@ Start exploring now."""
 
         elif tool_name == "unity_editor_status":
             # Status tool returns metadata
-            status = result.get("editor_state", "unknown")
-            capabilities = result.get("capabilities", {})
+            status = structured.get("editor_state", "unknown")
+            capabilities = structured.get("capabilities", {})
 
             self.evidence_items.append(Evidence(
                 evidence_id=evidence_id,
@@ -450,7 +550,7 @@ Start exploring now."""
             self.evidence_items.append(Evidence(
                 evidence_id=evidence_id,
                 source=tool_name,
-                content=json.dumps(result, indent=2)[:500],
+                content=json.dumps(structured, indent=2)[:500],
                 relevance_score=0.5,
                 metadata={"tool": tool_name},
             ))
@@ -506,11 +606,15 @@ Keep it factual and concrete. Focus on what exists, not interpretations."""
 
         try:
             # Call LLM to generate summary (no tools needed)
-            # Temporarily disable tools for summary generation
+            # Temporarily set available tools to None to prevent tools from being sent
             original_tools = None
+            original_available = None
             if hasattr(self.model, 'agent_tools'):
                 original_tools = self.model.agent_tools
-                self.model.agent_tools = []
+                self.model.agent_tools = None  # Set to None instead of []
+            if hasattr(self.model, 'available_tool_names'):
+                original_available = self.model.available_tool_names
+                self.model.available_tool_names = None
 
             response = self.model.query(
                 messages=[
@@ -522,6 +626,8 @@ Keep it factual and concrete. Focus on what exists, not interpretations."""
             # Restore original tools
             if original_tools is not None:
                 self.model.agent_tools = original_tools
+            if original_available is not None:
+                self.model.available_tool_names = original_available
 
             summary = response.get("content", "").strip()
 

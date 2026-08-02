@@ -1,0 +1,159 @@
+{
+  "schema_version": "game-agent-state-event-baseline-v1",
+  "run_id": "ablation-group8-run5-20260802-143350",
+  "variant": "innovation",
+  "ablation_group": "group8-no-typed-mutations",
+  "experiment_valid": true,
+  "infrastructure_errors": [],
+  "source_project_unchanged": true,
+  "hidden_oracle_cleaned": true,
+  "no_skill_evidence": false,
+  "innovation_config_evidence": true,
+  "condition_evidence": true,
+  "agent": {
+    "submitted": false,
+    "exit_status": "TotalTokenLimitExceeded",
+    "submission": "",
+    "error": ""
+  },
+  "oracle_match": false,
+  "public_validation_passed": true,
+  "hidden_validation_passed": false,
+  "verified_success": false,
+  "metrics": {
+    "schema_version": "game-agent-stage-metrics-v2",
+    "milestones_ms": {
+      "T0_task_submitted": 0,
+      "T1_first_tool": 17410,
+      "T2_first_relevant_file": 20543,
+      "T3_root_cause_file": 20543,
+      "T4_first_edit": null,
+      "T5_first_correct_patch": null,
+      "T6_first_validation": 100777,
+      "T7_agent_stopped": 100648,
+      "T8_public_validation_end": 172500,
+      "T9_hidden_validation_end": 208790
+    },
+    "stage_duration_ms": {
+      "task_understanding": 17410,
+      "source_localization": 3133,
+      "diagnosis": 80105,
+      "editing": 80234,
+      "self_validation": 0,
+      "public_validation": 71852,
+      "hidden_validation": 36290
+    },
+    "phase_reentry": {
+      "editing_after_validation": 0
+    },
+    "outcome": {
+      "agent_submitted": false,
+      "exit_status": "TotalTokenLimitExceeded",
+      "missing_final_answer": true
+    },
+    "navigation": {
+      "files_accessed": [
+        "Assets/Scripts/KitchenGameManager.cs",
+        "Assets/Scripts/UI/TutorialUI.cs",
+        "Assets/Scripts/GameInput.cs",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//public//compile.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//public//editmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//public//editmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//public//playmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//public//playmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//hidden//editmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//hidden//editmode-results.xml",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//hidden//playmode.log",
+        "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group8-run5-20260802-143350//validation//hidden//playmode-results.xml"
+      ],
+      "root_cause_rank": 1,
+      "relevant_recall": 0.6666666666666666,
+      "navigation_precision": 0.16666666666666666,
+      "unrelated_file_ratio": 0.8333333333333334
+    },
+    "context": {
+      "prompt_tokens": 66098,
+      "completion_tokens": 1749,
+      "total_tokens": 67847,
+      "peak_context_usage_percent": 46.3958740234375,
+      "raw_output_chars": 73073,
+      "retained_output_chars": 50191,
+      "truncated_tool_calls": 0,
+      "repeated_observation_ratio": 0.0
+    },
+    "behavior": {
+      "model_calls": 7,
+      "tool_calls": 9,
+      "failed_tool_calls": 2,
+      "repeated_commands": 0
+    },
+    "research": {
+      "retrieval": {
+        "k": 4,
+        "candidate_paths_at_k": 3,
+        "distinct_paths_at_k": 3,
+        "distinct_path_ratio_at_k": 1.0,
+        "test_node_ratio_at_k": 0.0,
+        "root_cause_mrr": 1.0,
+        "causal_edge_coverage": 0.0,
+        "causal_edges_total": 0
+      },
+      "memory": {
+        "evidence_write_recall": 1.0,
+        "evidence_read_recall": 1.0,
+        "evidence_utilization": 0.0,
+        "stale_evidence_rate": 0.0,
+        "unique_evidence": 3,
+        "expected_evidence_writes": 3,
+        "evidence_read_transitions": 3,
+        "evidence_utilization_opportunities": 0,
+        "referenced_evidence_nodes": 0
+      },
+      "control": {
+        "duplicate_action_ratio": 0.2222222222222222,
+        "blocked_action_recovery_rate": 0.0,
+        "admissible_action_acceptance": 0.0,
+        "phase_regression_count": 0,
+        "protocol_gate_completion": 0.0,
+        "blocked_actions": 0,
+        "admissible_action_opportunities": 0,
+        "mutation_calls": 2
+      },
+      "tools_and_cost": {
+        "aci_tool_calls": 9,
+        "tool_schema_tokens_per_call": 1361.857142857143,
+        "unique_evidence_per_1k_tokens": 0.044217135613954926,
+        "typed_mutation_ratio": 0.0,
+        "escape_hatch_ratio": 1.0,
+        "tool_schema_measurements": 7,
+        "tool_profile_calls": {
+          "plan": 1,
+          "inspect": 1,
+          "diagnose": 1,
+          "prepare_edit": 2,
+          "edit": 2
+        },
+        "tool_schema_tokens_by_profile": {
+          "plan": 263,
+          "inspect": 1117,
+          "diagnose": 1347,
+          "prepare_edit": 3594,
+          "edit": 3212
+        }
+      }
+    }
+  },
+  "recommended_innovation": {
+    "innovation": "unity_project_graph",
+    "reason": "相关文件导航精度低，优先用 Scene/Component/C# 依赖图约束检索范围。"
+  },
+  "artifacts": {
+    "events": "events.jsonl",
+    "conversation": "conversation.jsonl",
+    "trajectory": "trajectory.json",
+    "diff": "diff.patch",
+    "public_validation": "validation/public/summary.json",
+    "hidden_validation": "validation/hidden/summary.json",
+    "stage_metrics": "stage-metrics.json"
+  }
+}

@@ -74,12 +74,19 @@ class LitellmModel:
 
     def _query(self, messages: list[dict[str, str]], **kwargs):
         try:
-            return litellm.completion(
-                model=self.config.model_name,
-                messages=messages,
-                tools=self.agent_tools,
+            # Only pass tools if they exist and are not empty
+            # DashScope/deepseek-v3 rejects empty tools array
+            completion_kwargs = {
+                "model": self.config.model_name,
+                "messages": messages,
                 **(self.config.model_kwargs | kwargs),
-            )
+            }
+
+            # Only add tools if we have them
+            if self.agent_tools:  # Check if not None and not empty
+                completion_kwargs["tools"] = self.agent_tools
+
+            return litellm.completion(**completion_kwargs)
         except litellm.exceptions.AuthenticationError as e:
             e.message += " Configure the model provider API key in the environment."
             raise e

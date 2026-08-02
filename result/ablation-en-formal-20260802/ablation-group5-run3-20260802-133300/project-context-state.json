@@ -1,0 +1,260 @@
+{
+  "version": {
+    "project_id": "project:fa753580ae0c3103",
+    "project_path": "C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group5-run3-20260802-133300",
+    "schema_version": "game-agent-unity-project-graph-v1",
+    "graph_digest": "7940dc3958cd880b7421101ec2083a5f9676a69718a5da9c6b0aba6ae848fdbd",
+    "project_revision": "7940dc3958cd880b",
+    "loaded_at": 1785648788.9478595,
+    "generation": 2
+  },
+  "metrics": {
+    "context_hits": 1,
+    "context_misses": 4,
+    "context_hit_rate": 0.2,
+    "context_miss_rate": 0.8,
+    "dirty_nodes": 40,
+    "invalidations": 1,
+    "tasks": 1
+  },
+  "dirty_nodes": {
+    "cs-method:74186cbe792382493771": "typed_aci_mutation",
+    "cs-method:78dc467edcee8b983dee": "typed_aci_mutation",
+    "cs-field:7d9ee2acbce1e0d4d1b2": "typed_aci_mutation",
+    "cs-method:8d0d33d984f9d5675791": "typed_aci_mutation",
+    "cs-method:e0f4cea81c3d1cec1fae": "typed_aci_mutation",
+    "cs-method:f5c426819fbc023324d9": "typed_aci_mutation",
+    "cs-method:6e99005de55c854a50f8": "typed_aci_mutation",
+    "cs-method:fa345d527e57ced245a6": "typed_aci_mutation",
+    "cs-field:24bab7bcad31280885dd": "typed_aci_mutation",
+    "cs-field:1062cc043b51a042916a": "typed_aci_mutation",
+    "cs-method:3cf7926587071fe6fd0b": "typed_aci_mutation",
+    "cs-field:468f5dcd07c76dff6397": "typed_aci_mutation",
+    "cs-method:60f7105f5e630b9eaac9": "typed_aci_mutation",
+    "cs-field:8e0a82bb023f8332a080": "typed_aci_mutation",
+    "unity-object:GlobalObjectId_V1-2-d1c3109bdb54ad54c8a2b2838528e640-1777111538-0": "typed_aci_mutation",
+    "cs-method:89cb7628d465d138fdbf": "typed_aci_mutation",
+    "cs-method:8cdc1303b3a58598b849": "typed_aci_mutation",
+    "cs-method:905978aa9e3559c84758": "typed_aci_mutation",
+    "cs-method:d45bc1f58be4ccffdc31": "typed_aci_mutation",
+    "cs-method:d1bda6f934d73c86998a": "typed_aci_mutation",
+    "unity-object:GlobalObjectId_V1-2-d1c3109bdb54ad54c8a2b2838528e640-1777111539-0": "typed_aci_mutation",
+    "cs-method:6e47d19e33992dc65102": "typed_aci_mutation",
+    "cs-method:4c39c6035667140b933f": "typed_aci_mutation",
+    "cs-field:50f8acf017823639f4ff": "typed_aci_mutation",
+    "cs-method:ed681c564a765f12b68d": "typed_aci_mutation",
+    "cs-method:7d38a1e92c178325af00": "typed_aci_mutation",
+    "cs-field:938d5bc7b7120fc2732f": "typed_aci_mutation",
+    "cs-field:b3402931b3657c90f838": "typed_aci_mutation",
+    "cs-field:0d54c2076a0d033fe85d": "typed_aci_mutation",
+    "cs-method:ea1c68296e61746a4758": "typed_aci_mutation",
+    "cs-method:d28202e906f9ef9a7ad0": "typed_aci_mutation",
+    "cs-type:031f66a50518c84862bb": "typed_aci_mutation",
+    "cs-method:01f11b5f81ff3a4924d8": "typed_aci_mutation",
+    "cs-method:d0951b9975b778532948": "typed_aci_mutation",
+    "cs-method:2cb0490013131af15da4": "typed_aci_mutation",
+    "cs-field:94efacdd84398c6f3b5e": "typed_aci_mutation",
+    "cs-file:82431c0fae3cf24c0583": "typed_aci_mutation",
+    "cs-method:3a1f44b65b7321ba93b3": "typed_aci_mutation",
+    "cs-field:078c45a24675e3e2b46f": "typed_aci_mutation",
+    "cs-method:799f7609491949d21657": "typed_aci_mutation"
+  },
+  "invalidations": [
+    {
+      "generation": 2,
+      "paths": [
+        "assets/scripts/kitchengamemanager.cs"
+      ],
+      "node_ids": [
+        "cs-field:078c45a24675e3e2b46f",
+        "cs-field:0d54c2076a0d033fe85d",
+        "cs-field:1062cc043b51a042916a",
+        "cs-field:24bab7bcad31280885dd",
+        "cs-field:468f5dcd07c76dff6397",
+        "cs-field:50f8acf017823639f4ff",
+        "cs-field:7d9ee2acbce1e0d4d1b2",
+        "cs-field:8e0a82bb023f8332a080",
+        "cs-field:938d5bc7b7120fc2732f",
+        "cs-field:94efacdd84398c6f3b5e",
+        "cs-field:b3402931b3657c90f838",
+        "cs-file:82431c0fae3cf24c0583",
+        "cs-method:01f11b5f81ff3a4924d8",
+        "cs-method:2cb0490013131af15da4",
+        "cs-method:3a1f44b65b7321ba93b3",
+        "cs-method:3cf7926587071fe6fd0b",
+        "cs-method:4c39c6035667140b933f",
+        "cs-method:60f7105f5e630b9eaac9",
+        "cs-method:6e47d19e33992dc65102",
+        "cs-method:6e99005de55c854a50f8",
+        "cs-method:74186cbe792382493771",
+        "cs-method:78dc467edcee8b983dee",
+        "cs-method:799f7609491949d21657",
+        "cs-method:7d38a1e92c178325af00",
+        "cs-method:89cb7628d465d138fdbf",
+        "cs-method:8cdc1303b3a58598b849",
+        "cs-method:8d0d33d984f9d5675791",
+        "cs-method:905978aa9e3559c84758",
+        "cs-method:d0951b9975b778532948",
+        "cs-method:d1bda6f934d73c86998a",
+        "cs-method:d28202e906f9ef9a7ad0",
+        "cs-method:d45bc1f58be4ccffdc31",
+        "cs-method:e0f4cea81c3d1cec1fae",
+        "cs-method:ea1c68296e61746a4758",
+        "cs-method:ed681c564a765f12b68d",
+        "cs-method:f5c426819fbc023324d9",
+        "cs-method:fa345d527e57ced245a6",
+        "cs-type:031f66a50518c84862bb",
+        "unity-object:GlobalObjectId_V1-2-d1c3109bdb54ad54c8a2b2838528e640-1777111538-0",
+        "unity-object:GlobalObjectId_V1-2-d1c3109bdb54ad54c8a2b2838528e640-1777111539-0"
+      ],
+      "reason": "typed_aci_mutation",
+      "timestamp": 1785648933.941999
+    }
+  ],
+  "working_sets": {
+    "bbd1538ce3d5": {
+      "task_id": "bbd1538ce3d5",
+      "max_entries": 4,
+      "entries": [
+        {
+          "node_id": "cs-method:3a1f44b65b7321ba93b3",
+          "kind": "METHOD",
+          "name": "RebindBinding",
+          "path": "Assets/Scripts/GameInput.cs",
+          "relevance": 1.0,
+          "status": "stale",
+          "detail": null,
+          "evidence_ids": [
+            "evidence:f08a2ca3540decc0",
+            "evidence:b444e4fd20406726"
+          ],
+          "relevance_label": true,
+          "accesses": 1,
+          "last_accessed_at": 1785648806.1915786,
+          "stale_reason": "typed_aci_mutation"
+        },
+        {
+          "node_id": "cs-field:24bab7bcad31280885dd",
+          "kind": "FIELD",
+          "name": "OnStateChanged",
+          "path": "Assets/Scripts/KitchenGameManager.cs",
+          "relevance": 1.0,
+          "status": "stale",
+          "detail": null,
+          "evidence_ids": [
+            "evidence:a90a1b5bd157fad2",
+            "evidence:b77fe266ba1e03f1"
+          ],
+          "relevance_label": true,
+          "accesses": 1,
+          "last_accessed_at": 1785648802.121049,
+          "stale_reason": "typed_aci_mutation"
+        },
+        {
+          "node_id": "cs-method:451be85fc5d687131725",
+          "kind": "METHOD",
+          "name": "Hide",
+          "path": "Assets/Scripts/UI/TutorialUI.cs",
+          "relevance": 1.0,
+          "status": "mapped",
+          "detail": {
+            "id": "cs-method:451be85fc5d687131725",
+            "kind": "METHOD",
+            "name": "Hide",
+            "path": "Assets/Scripts/UI/TutorialUI.cs",
+            "attributes": {
+              "declaring_type": "TutorialUI",
+              "declaring_type_id": "cs-type:ca132a490000ef992b69",
+              "arity": 0,
+              "return_type": "void",
+              "line": 61
+            },
+            "source_range": {
+              "start_line": 56,
+              "end_line": 65
+            },
+            "source_excerpt": [
+              {
+                "line": 56,
+                "text": "    private void Show()"
+              },
+              {
+                "line": 57,
+                "text": "    {"
+              },
+              {
+                "line": 58,
+                "text": "        gameObject.SetActive(true);"
+              },
+              {
+                "line": 59,
+                "text": "    }"
+              },
+              {
+                "line": 60,
+                "text": ""
+              },
+              {
+                "line": 61,
+                "text": "    private void Hide()"
+              },
+              {
+                "line": 62,
+                "text": "    {"
+              },
+              {
+                "line": 63,
+                "text": "        gameObject.SetActive(false);"
+              },
+              {
+                "line": 64,
+                "text": "    }"
+              },
+              {
+                "line": 65,
+                "text": "}"
+              }
+            ]
+          },
+          "evidence_ids": [
+            "evidence:4e29da6528f8131a",
+            "evidence:d5ceb44877284d06"
+          ],
+          "relevance_label": true,
+          "accesses": 2,
+          "last_accessed_at": 1785648818.2297482,
+          "stale_reason": ""
+        },
+        {
+          "node_id": "cs-method:540d30b396e167874c45",
+          "kind": "METHOD",
+          "name": "Interact",
+          "path": "Assets/Scripts/Counters/StoveCounter.cs",
+          "relevance": 1.0,
+          "status": "mapped",
+          "detail": null,
+          "evidence_ids": [
+            "evidence:ed65145304f97689"
+          ],
+          "relevance_label": true,
+          "accesses": 1,
+          "last_accessed_at": 1785648794.2685955,
+          "stale_reason": ""
+        }
+      ],
+      "metrics": {
+        "context_hits": 1,
+        "context_misses": 4,
+        "context_hit_rate": 0.2,
+        "context_miss_rate": 0.8,
+        "working_set_size": 2,
+        "working_set_precision": 1.0,
+        "working_set_judged_precision": 1.0,
+        "working_set_judgment_coverage": 1.0,
+        "judged_nodes": 2,
+        "evictions": 2,
+        "remaps": 0
+      }
+    }
+  }
+}

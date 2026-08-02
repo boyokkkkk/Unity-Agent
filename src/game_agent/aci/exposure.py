@@ -181,7 +181,19 @@ def _workflow_exposure(
                 "already present in the bounded frontier."
             ),
         )
+    if phase == WorkflowPhase.PREPARE_EDIT:
+        return _exposure(
+            "prepare_edit",
+            {"patch_prepare", "diagnosis_revise", "artifact_read", "code_file_read"},
+            "The root cause is accepted. Prepare one AST-anchored patch without reopening diagnosis.",
+        )
     if phase == WorkflowPhase.EDIT:
+        if workflow.prepared_patch_token:
+            return _exposure(
+                "edit",
+                {"patch_apply", "diagnosis_revise", "artifact_read", "code_file_read"},
+                "A syntax-checked patch is prepared; apply it by token without copying patch text.",
+            )
         authorized_paths = [
             str(path).replace("\\", "/").casefold()
             for path in workflow.authorized_paths

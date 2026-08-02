@@ -1,0 +1,238 @@
+{
+  "version": {
+    "project_id": "project:11aa8b52ea2e6aa4",
+    "project_path": "C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group4-run3-20260802-131603",
+    "schema_version": "game-agent-unity-project-graph-v1",
+    "graph_digest": "7940dc3958cd880b7421101ec2083a5f9676a69718a5da9c6b0aba6ae848fdbd",
+    "project_revision": "7940dc3958cd880b",
+    "loaded_at": 1785647772.082225,
+    "generation": 1
+  },
+  "metrics": {
+    "context_hits": 2,
+    "context_misses": 4,
+    "context_hit_rate": 0.3333333333333333,
+    "context_miss_rate": 0.6666666666666666,
+    "dirty_nodes": 0,
+    "invalidations": 0,
+    "tasks": 1
+  },
+  "dirty_nodes": {},
+  "invalidations": [],
+  "working_sets": {
+    "a21af67c97c3": {
+      "task_id": "a21af67c97c3",
+      "max_entries": 4,
+      "entries": [
+        {
+          "node_id": "cs-method:3a1f44b65b7321ba93b3",
+          "kind": "METHOD",
+          "name": "RebindBinding",
+          "path": "Assets/Scripts/GameInput.cs",
+          "relevance": 1.0,
+          "status": "mapped",
+          "detail": {
+            "id": "cs-method:3a1f44b65b7321ba93b3",
+            "kind": "METHOD",
+            "name": "RebindBinding",
+            "path": "Assets/Scripts/GameInput.cs",
+            "attributes": {
+              "declaring_type": "GameInput",
+              "declaring_type_id": "cs-type:527984e5594c2776e848",
+              "arity": 2,
+              "return_type": "void",
+              "line": 117
+            },
+            "source_range": {
+              "start_line": 112,
+              "end_line": 124
+            },
+            "source_excerpt": [
+              {
+                "line": 112,
+                "text": "            case Binding.Gamepad_Pause:"
+              },
+              {
+                "line": 113,
+                "text": "                return playerInputActions.Player.Pause.bindings[1].ToDisplayString();"
+              },
+              {
+                "line": 114,
+                "text": "        }"
+              },
+              {
+                "line": 115,
+                "text": "    }"
+              },
+              {
+                "line": 116,
+                "text": ""
+              },
+              {
+                "line": 117,
+                "text": "    public void RebindBinding(Binding binding, Action onActionRebound)"
+              },
+              {
+                "line": 118,
+                "text": "    {"
+              },
+              {
+                "line": 119,
+                "text": "        playerInputActions.Player.Disable();"
+              },
+              {
+                "line": 120,
+                "text": ""
+              },
+              {
+                "line": 121,
+                "text": "        InputAction inputAction;"
+              },
+              {
+                "line": 122,
+                "text": "        int bindingIndex;"
+              },
+              {
+                "line": 123,
+                "text": "        switch (binding)"
+              },
+              {
+                "line": 124,
+                "text": "        {"
+              }
+            ]
+          },
+          "evidence_ids": [
+            "evidence:f08a2ca3540decc0",
+            "evidence:b444e4fd20406726"
+          ],
+          "relevance_label": true,
+          "accesses": 3,
+          "last_accessed_at": 1785647804.5615866,
+          "stale_reason": ""
+        },
+        {
+          "node_id": "cs-field:24bab7bcad31280885dd",
+          "kind": "FIELD",
+          "name": "OnStateChanged",
+          "path": "Assets/Scripts/KitchenGameManager.cs",
+          "relevance": 1.0,
+          "status": "mapped",
+          "detail": null,
+          "evidence_ids": [
+            "evidence:a90a1b5bd157fad2",
+            "evidence:b77fe266ba1e03f1"
+          ],
+          "relevance_label": true,
+          "accesses": 1,
+          "last_accessed_at": 1785647783.901646,
+          "stale_reason": ""
+        },
+        {
+          "node_id": "cs-method:451be85fc5d687131725",
+          "kind": "METHOD",
+          "name": "Hide",
+          "path": "Assets/Scripts/UI/TutorialUI.cs",
+          "relevance": 1.0,
+          "status": "mapped",
+          "detail": {
+            "id": "cs-method:451be85fc5d687131725",
+            "kind": "METHOD",
+            "name": "Hide",
+            "path": "Assets/Scripts/UI/TutorialUI.cs",
+            "attributes": {
+              "declaring_type": "TutorialUI",
+              "declaring_type_id": "cs-type:ca132a490000ef992b69",
+              "arity": 0,
+              "return_type": "void",
+              "line": 61
+            },
+            "source_range": {
+              "start_line": 56,
+              "end_line": 65
+            },
+            "source_excerpt": [
+              {
+                "line": 56,
+                "text": "    private void Show()"
+              },
+              {
+                "line": 57,
+                "text": "    {"
+              },
+              {
+                "line": 58,
+                "text": "        gameObject.SetActive(true);"
+              },
+              {
+                "line": 59,
+                "text": "    }"
+              },
+              {
+                "line": 60,
+                "text": ""
+              },
+              {
+                "line": 61,
+                "text": "    private void Hide()"
+              },
+              {
+                "line": 62,
+                "text": "    {"
+              },
+              {
+                "line": 63,
+                "text": "        gameObject.SetActive(false);"
+              },
+              {
+                "line": 64,
+                "text": "    }"
+              },
+              {
+                "line": 65,
+                "text": "}"
+              }
+            ]
+          },
+          "evidence_ids": [
+            "evidence:4e29da6528f8131a",
+            "evidence:d5ceb44877284d06"
+          ],
+          "relevance_label": true,
+          "accesses": 1,
+          "last_accessed_at": 1785647787.976169,
+          "stale_reason": ""
+        },
+        {
+          "node_id": "cs-method:540d30b396e167874c45",
+          "kind": "METHOD",
+          "name": "Interact",
+          "path": "Assets/Scripts/Counters/StoveCounter.cs",
+          "relevance": 1.0,
+          "status": "mapped",
+          "detail": null,
+          "evidence_ids": [
+            "evidence:ed65145304f97689"
+          ],
+          "relevance_label": true,
+          "accesses": 1,
+          "last_accessed_at": 1785647777.580794,
+          "stale_reason": ""
+        }
+      ],
+      "metrics": {
+        "context_hits": 2,
+        "context_misses": 4,
+        "context_hit_rate": 0.3333333333333333,
+        "context_miss_rate": 0.6666666666666666,
+        "working_set_size": 4,
+        "working_set_precision": 1.0,
+        "working_set_judged_precision": 1.0,
+        "working_set_judgment_coverage": 1.0,
+        "judged_nodes": 4,
+        "evictions": 2,
+        "remaps": 0
+      }
+    }
+  }
+}

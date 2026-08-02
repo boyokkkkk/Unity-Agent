@@ -1,0 +1,24 @@
+{
+  "status": "ok",
+  "node": {
+    "id": "cs-method:3a1f44b65b7321ba93b3",
+    "kind": "METHOD",
+    "name": "RebindBinding",
+    "path": "Assets/Scripts/GameInput.cs",
+    "attributes": {
+      "declaring_type": "GameInput",
+      "declaring_type_id": "cs-type:527984e5594c2776e848",
+      "arity": 2,
+      "return_type": "void",
+      "line": 117
+    }
+  },
+  "path": "Assets/Scripts/GameInput.cs",
+  "sha256": "459bdb8e235d56987bfa128945c73cce225674f1ac4a0342e386838f5329f811",
+  "start_line": 87,
+  "end_line": 177,
+  "total_lines": 183,
+  "truncated": false,
+  "content": "    }\n\n    public string GetBindingText(Binding binding)\n    {\n        switch (binding)\n        {\n            default:\n            case Binding.Move_Up:\n                return playerInputActions.Player.Move.bindings[1].ToDisplayString();\n            case Binding.Move_Down:\n                return playerInputActions.Player.Move.bindings[2].ToDisplayString();\n            case Binding.Move_Left:\n                return playerInputActions.Player.Move.bindings[3].ToDisplayString();\n            case Binding.Move_Right:\n                return playerInputActions.Player.Move.bindings[4].ToDisplayString();\n            case Binding.Interact:\n                return playerInputActions.Player.Interact.bindings[0].ToDisplayString();\n            case Binding.InteractAlternate:\n                return playerInputActions.Player.InteractAlternate.bindings[0].ToDisplayString();\n            case Binding.Pause:\n                return playerInputActions.Player.Pause.bindings[0].ToDisplayString();\n            case Binding.Gamepad_Interact:\n                return playerInputActions.Player.Interact.bindings[1].ToDisplayString();\n            case Binding.Gamepad_InteractAlternate:\n                return playerInputActions.Player.InteractAlternate.bindings[1].ToDisplayString();\n            case Binding.Gamepad_Pause:\n                return playerInputActions.Player.Pause.bindings[1].ToDisplayString();\n        }\n    }\n\n    public void RebindBinding(Binding binding, Action onActionRebound)\n    {\n        playerInputActions.Player.Disable();\n\n        InputAction inputAction;\n        int bindingIndex;\n        switch (binding)\n        {\n            default:\n            case Binding.Move_Up:\n                inputAction = playerInputActions.Player.Move;\n                bindingIndex = 1;\n                break;\n            case Binding.Move_Down:\n                inputAction = playerInputActions.Player.Move;\n                bindingIndex = 2;\n                break;\n            case Binding.Move_Left:\n                inputAction = playerInputActions.Player.Move;\n                bindingIndex = 3;\n                break;\n            case Binding.Move_Right:\n                inputAction = playerInputActions.Player.Move;\n                bindingIndex = 4;\n                break;\n            case Binding.Interact:\n                inputAction = playerInputActions.Player.Interact;\n                bindingIndex = 0;\n                break;\n            case Binding.InteractAlternate:\n                inputAction = playerInputActions.Player.InteractAlternate;\n                bindingIndex = 0;\n                break;\n            case Binding.Pause:\n                inputAction = playerInputActions.Player.Pause;\n                bindingIndex = 0;\n                break;\n            case Binding.Gamepad_Interact:\n                inputAction = playerInputActions.Player.Interact;\n                bindingIndex = 1;\n                break;\n            case Binding.Gamepad_InteractAlternate:\n                inputAction = playerInputActions.Player.InteractAlternate;\n                bindingIndex = 1;\n                break;\n            case Binding.Gamepad_Pause:\n                inputAction = playerInputActions.Player.Pause;\n                bindingIndex = 1;\n                break;\n        }\n        inputAction.PerformInteractiveRebinding(bindingIndex)\n            .OnComplete(callback =>\n            {\n                // Debug.Log(callback.action.bindings[1].path);\n                // Debug.Log(callback.action.bindings[1].overridePath);\n                callback.Dispose();\n                playerInputActions.Player.Enable();\n                onActionRebound();\n\n                PlayerPrefs.SetString(PLAYER_PREFS_BINDINGS, playerInputActions.SaveBindingOverridesAsJson());\n                PlayerPrefs.Save();",
+  "evidence_artifact": ""
+}

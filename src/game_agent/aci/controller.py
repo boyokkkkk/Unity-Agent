@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import time
 import uuid
@@ -11,9 +12,12 @@ from typing import Any
 
 from game_agent.context import ContextAssembler, EvidenceStatus
 from game_agent.context import EvidenceLedger
+from game_agent.project_graph.roslyn import RoslynCodeParser, RoslynParseError
+from game_agent.context.project_store import is_causal_query
 
 from .control import EvidenceActionCompiler
-from .diagnosis import DiagnosisRecord
+from .causal_facts import CausalClaimVerifier, build_causal_fact_matrix
+from .diagnosis import DiagnosisRecord, ProposedMutation
 from .exposure import ToolExposure, select_tool_exposure
 from .mutation import AciConfig, UnityMutationExecutor
 from .query import StructuredQueryExecutor
@@ -81,10 +85,15 @@ class UnityAciController:
         self.project_root = project_root.resolve()
         self.artifact_root = artifact_root.resolve() if artifact_root is not None else None
         self.config = config if isinstance(config, AciConfig) else AciConfig(**(config or {}))
+        self._causal_graph = (
+            context.project_store.graph if context.project_store is not None else None
+        )
+        self._causal_graph_error = ""
         self.query_executor = query_executor or StructuredQueryExecutor(
             context,
             project_root=project_root,
             artifact_root=artifact_root,
+            evidence_artifact_enabled=self.config.evidence_artifact_enabled,
         )
         self.mutation_executor = mutation_executor or UnityMutationExecutor(
             project_root=project_root,
@@ -103,20 +112,30 @@ class UnityAciController:
         self.pending: PendingChange | None = None
         self.completed: list[dict[str, Any]] = []
         self.blocked_actions = 0
+        self._prepared_patch_action: dict[str, Any] | None = None
+        self._applying_prepared_patch = False
 
     def reset(self) -> None:
         self.pending = None
         self.completed = []
         self.blocked_actions = 0
+        self._prepared_patch_action = None
+        self._applying_prepared_patch = False
         self.action_compiler.reset()
         self.workflow = self._new_workflow()
         self.resolver = GraphResolver(self.context, self.workflow.frontier) if self.workflow else None
         if self.workflow is not None:
+            self._refresh_current_causal_graph()
             self.workflow.seed_frontier(self.context.working_set.entries.values())
+            self._refresh_causal_fact_matrix()
 
     def execute(self, action: dict[str, Any]) -> dict[str, Any]:
         tool = str(action.get("tool", ""))
-        workflow_block = self._guard_workflow_action(tool, action.get("arguments", {}))
+        workflow_block = (
+            None
+            if self._applying_prepared_patch
+            else self._guard_workflow_action(tool, action.get("arguments", {}))
+        )
         if workflow_block is not None:
             return workflow_block
         if tool in CANDIDATE_TOOL_NAMES:
@@ -125,6 +144,10 @@ class UnityAciController:
             return self._execute_plan(action.get("arguments", {}))
         if tool in {"diagnosis_submit", "diagnosis_revise"}:
             return self._execute_diagnosis(tool, action.get("arguments", {}))
+        if tool == "patch_prepare":
+            return self._execute_patch_prepare(action.get("arguments", {}))
+        if tool == "patch_apply":
+            return self._execute_patch_apply(action.get("arguments", {}))
         if tool == "workflow_review":
             return self._execute_review()
         decision = self.action_compiler.before_action(action)
@@ -153,7 +176,8 @@ class UnityAciController:
                         evidence_ids=evidence_ids,
                         details={"tool": tool, "frontier_size": len(self.workflow.frontier)},
                     )
-                output.setdefault("extra", {})["workflow_state"] = self.workflow.public_state()
+                self._refresh_causal_fact_matrix()
+                output.setdefault("extra", {})["workflow_state"] = self.workflow.public_state(compact=True)
             return output
         if tool in MUTATION_TOOL_NAMES:
             blocked = self._guard_mutation(tool, action.get("arguments", {}))
@@ -173,7 +197,7 @@ class UnityAciController:
                         approved = next(
                             (
                                 mutation
-                                for mutation in self.workflow.diagnosis.proposed_mutations
+                                for mutation in self._approved_mutations()
                                 if self.workflow.frontier.get(mutation.target) is not None
                                 and self.workflow.frontier.get(mutation.target).node_id in requested_nodes
                             ),
@@ -182,7 +206,11 @@ class UnityAciController:
                         if approved is not None and approved.evidence_id:
                             arguments.setdefault("evidence_id", approved.evidence_id)
                         # Try to inject evidence_artifact_path if not already provided
-                        if "evidence_artifact_path" not in arguments and self.workflow.evidence_artifacts:
+                        if (
+                            self.config.evidence_artifact_enabled
+                            and "evidence_artifact_path" not in arguments
+                            and self.workflow.evidence_artifacts
+                        ):
                             # Match by evidence_id or by path
                             evidence_id = arguments.get("evidence_id", "")
                             if evidence_id and evidence_id in self.workflow.evidence_artifacts:
@@ -222,6 +250,9 @@ class UnityAciController:
                         details={"tool": tool, "changed_paths": self.pending.changed_paths},
                     )
                 output.setdefault("extra", {})["execution_protocol"] = self.protocol_state()
+                if not self.config.validation_gates_enabled:
+                    self._complete_without_validation()
+                    output["extra"]["execution_protocol"] = self.protocol_state()
             elif self.workflow is not None:
                 extra = output.setdefault("extra", {})
                 structured = extra.get("structured", {})
@@ -270,12 +301,15 @@ class UnityAciController:
             phase_before = self.workflow.phase if self.workflow is not None else None
             self._consume_control(tool, output)
             self.action_compiler.observe(action, output)
+            recovery = self._recover_compile_failure(tool, output)
             self._record_validation_progress(
                 tool,
                 output,
                 evidence_ids=evidence_ids,
                 phase_before=phase_before,
             )
+            if recovery is not None:
+                output.setdefault("extra", {})["compile_recovery"] = recovery
             output.setdefault("extra", {})["execution_protocol"] = self.protocol_state()
             return output
         return self._blocked(tool, "unknown_aci_tool", f"Unknown ACI tool: {tool}")
@@ -288,6 +322,8 @@ class UnityAciController:
         )
 
     def guard_submission(self) -> dict[str, Any] | None:
+        if not self.config.submission_contract_enabled:
+            return None
         if self.pending is not None:
             return self._blocked(
                 "submit",
@@ -344,7 +380,7 @@ class UnityAciController:
 
     def tool_exposure(self) -> ToolExposure:
         pending_stage = self.pending.stage if self.pending is not None else ""
-        return select_tool_exposure(
+        exposure = select_tool_exposure(
             phase=self.context.phase,
             unresolved_slot_ids=(
                 str(slot.get("id", ""))
@@ -357,10 +393,18 @@ class UnityAciController:
             enabled=self.config.dynamic_tool_exposure_enabled,
             workflow=self.workflow,
         )
+        if not self.config.submission_contract_enabled:
+            return ToolExposure(
+                profile=exposure.profile,
+                tool_names=tuple(sorted({*exposure.tool_names, "submit"})),
+                reason=exposure.reason + " Submission contract is disabled by ablation.",
+                validation_locked=exposure.validation_locked,
+            )
+        return exposure
 
     def protocol_state(self) -> dict[str, Any]:
         required_next_actions = self._required_next_actions()
-        workflow_state = self.workflow.public_state() if self.workflow is not None else {}
+        workflow_state = self.workflow.public_state(compact=True) if self.workflow is not None else {}
         if required_next_actions:
             workflow_state["required_next_actions"] = required_next_actions
         return {
@@ -444,7 +488,7 @@ class UnityAciController:
                 approved = next(
                     (
                         mutation
-                        for mutation in diagnosis.proposed_mutations
+                        for mutation in self._approved_mutations()
                         if self.workflow.frontier.get(mutation.target) is not None
                         and self.workflow.frontier.get(mutation.target).node_id in requested
                     ),
@@ -507,6 +551,13 @@ class UnityAciController:
                 f"Read the target with unity_object_read, unity_asset_read, or code_file_read first: {', '.join(missing)}.",
             )
         return None
+
+    def _approved_mutations(self) -> list[ProposedMutation]:
+        if self.workflow is None or self.workflow.diagnosis is None:
+            return []
+        if self.workflow.prepared_mutations:
+            return self.workflow.prepared_mutations
+        return self.workflow.diagnosis.proposed_mutations
 
     def _guard_control(self, tool: str, args: Any) -> dict[str, Any] | None:
         if self.pending is None:
@@ -584,6 +635,68 @@ class UnityAciController:
                 self.workflow.observe_validation_complete()
                 self._perform_review()
 
+    def _recover_compile_failure(
+        self,
+        tool: str,
+        output: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        if (
+            tool not in {"unity_recompile", "unity_hot_reload"}
+            or self.pending is None
+            or self._succeeded(output)
+            or self.workflow is None
+        ):
+            return None
+        structured = output.get("extra", {}).get("structured", {})
+        if isinstance(structured, dict) and structured.get("status") == "unavailable":
+            return None
+        checkpoint_id = self.pending.checkpoint_id
+        changed_paths = list(self.pending.changed_paths)
+        message = self._compile_failure_message(output)
+        try:
+            restored_paths = self.mutation_executor.restore_checkpoint(checkpoint_id)
+        except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
+            return {
+                "status": "restore_failed",
+                "checkpoint_id": checkpoint_id,
+                "message": str(exc),
+            }
+        retry_allowed = (
+            self.workflow.compile_repair_attempts + 1
+            < self.config.max_compile_repair_attempts
+        )
+        self.workflow.observe_compile_failure(message, retry_allowed=retry_allowed)
+        self.pending = None
+        return {
+            "status": "restored",
+            "checkpoint_id": checkpoint_id,
+            "restored_paths": restored_paths,
+            "discarded_changed_paths": changed_paths,
+            "compile_feedback": message,
+            "retry_allowed": retry_allowed,
+            "attempt": self.workflow.compile_repair_attempts,
+            "max_attempts": self.config.max_compile_repair_attempts,
+        }
+
+    @staticmethod
+    def _compile_failure_message(output: dict[str, Any]) -> str:
+        structured = output.get("extra", {}).get("structured", {})
+        details: list[str] = []
+        if isinstance(structured, dict):
+            for key in ("message", "error", "exception", "summary"):
+                value = structured.get(key)
+                if value:
+                    details.append(str(value))
+            diagnostics = structured.get("diagnostics", [])
+            if isinstance(diagnostics, list):
+                details.extend(
+                    str(item.get("message", item)) if isinstance(item, dict) else str(item)
+                    for item in diagnostics[:8]
+                )
+        fallback = str(output.get("exception_info", "")).strip()
+        text = "; ".join(value.strip() for value in details if value.strip()) or fallback
+        return text[:4000] or "Unity compilation failed without structured diagnostics."
+
     def _new_workflow(self) -> WorkflowState | None:
         if not self.config.workflow_enabled:
             return None
@@ -594,9 +707,64 @@ class UnityAciController:
             mutation_required=self.config.mutation_required,
             required_causal_roles=(
                 {"event_source", "controller", "ui"}
-                if self.config.require_causal_role_evidence else set()
+                if (
+                    self.config.require_causal_role_evidence
+                    and self.config.project_graph_enabled
+                    and is_causal_query(self.context.original_task)
+                ) else set()
             ),
+            bounded_search_enabled=self.config.bounded_search_enabled,
+            evidence_recovery_enabled=self.config.evidence_recovery_enabled,
         )
+
+    def _refresh_causal_fact_matrix(self) -> None:
+        if self.workflow is None:
+            return
+        if self._causal_graph is None:
+            self.workflow.causal_fact_matrix = {
+                "status": "unavailable",
+                "reason": self._causal_graph_error or "current Roslyn graph is unavailable",
+                "slots": {},
+            }
+            return
+        candidates = self._causal_candidates()
+        matrix = build_causal_fact_matrix(
+            self._causal_graph,
+            node_ids=(candidate.node_id for candidate in candidates),
+            paths=(candidate.path for candidate in candidates),
+            causal_edges_enabled=self._causal_edges_enabled(),
+        )
+        self.workflow.causal_fact_matrix = matrix.public_dict()
+
+    def _causal_candidates(self) -> list[Any]:
+        assert self.workflow is not None
+        candidates = self.workflow.frontier.candidates()
+        causal = [
+            candidate for candidate in candidates
+            if candidate.role in {"event_source", "controller", "ui"}
+        ]
+        return causal or candidates
+
+    def _refresh_current_causal_graph(self) -> None:
+        if not self.config.require_structured_causal_claims or not self.config.project_graph_enabled:
+            if not self.config.project_graph_enabled:
+                self._causal_graph = None
+                self._causal_graph_error = "project graph disabled by ablation"
+            return
+        if self.artifact_root is None:
+            self._causal_graph = None
+            self._causal_graph_error = "artifact_root is required for current Roslyn graph refresh"
+            return
+        try:
+            self._causal_graph = RoslynCodeParser().parse(
+                self.project_root,
+                output_path=self.artifact_root / "causal-facts" / "current-roslyn-code-graph.json",
+                timeout_seconds=min(self.config.timeout_seconds, 300),
+            )
+            self._causal_graph_error = ""
+        except (OSError, ValueError, RoslynParseError) as exc:
+            self._causal_graph = None
+            self._causal_graph_error = str(exc)
 
     def _guard_workflow_action(self, tool: str, arguments: Any = None) -> dict[str, Any] | None:
         if self.workflow is None:
@@ -664,7 +832,7 @@ class UnityAciController:
             resolved_entity=asdict(ref),
             resolved_tool=canonical["tool"],
             evidence_ids=list(dict.fromkeys(evidence_ids)),
-            workflow_state=self.workflow.public_state(),
+            workflow_state=self.workflow.public_state(compact=True),
         )
 
         # P0 Fix: 如果底层工具返回了artifact信息，传递给上层
@@ -707,7 +875,7 @@ class UnityAciController:
         payload = {
             "status": "accepted",
             "plan": asdict(plan),
-            "workflow_state": self.workflow.public_state(),
+            "workflow_state": self.workflow.public_state(compact=True),
         }
         return {
             "output": json.dumps(payload, ensure_ascii=False, indent=2),
@@ -718,7 +886,7 @@ class UnityAciController:
                 "aci_workflow": True,
                 "workflow_tool": "task_plan_submit",
                 "structured": payload,
-                "workflow_state": self.workflow.public_state(),
+                "workflow_state": self.workflow.public_state(compact=True),
             },
         }
 
@@ -731,7 +899,7 @@ class UnityAciController:
             "status": review.status,
             "review": asdict(review),
             "submission_contract": asdict(contract),
-            "workflow_state": self.workflow.public_state(),
+            "workflow_state": self.workflow.public_state(compact=True),
         }
         return {
             "output": json.dumps(payload, ensure_ascii=False, indent=2),
@@ -744,7 +912,7 @@ class UnityAciController:
                 "blocked": bool(gaps),
                 "guard": "" if not gaps else "review_failed",
                 "structured": payload,
-                "workflow_state": self.workflow.public_state(),
+                "workflow_state": self.workflow.public_state(compact=True),
             },
         }
 
@@ -790,6 +958,8 @@ class UnityAciController:
             return self._blocked(tool, "diagnosis_revision_required", "Use diagnosis_revise to preserve history.")
         if tool == "diagnosis_revise" and not self.workflow.diagnosis_history:
             return self._blocked(tool, "diagnosis_missing", "Use diagnosis_submit for the first diagnosis.")
+        self._refresh_causal_fact_matrix()
+        arguments = self._normalize_causal_claim_arguments(arguments)
         revision = self._project_revision()
         proposed = DiagnosisRecord.from_arguments(
             arguments,
@@ -797,7 +967,16 @@ class UnityAciController:
             repository_revision=revision,
             evidence_ledger=self.context.evidence,
         )
-        gaps, missing_candidates, authorized_targets, authorized_paths = self._diagnosis_gaps(proposed)
+        structured_causal = self._structured_causal_claims_enabled()
+        script_patch = any(
+            (candidate := self.workflow.frontier.get(candidate_id)) is not None
+            and candidate.path.casefold().endswith(".cs")
+            for candidate_id in proposed.root_targets
+        )
+        gaps, missing_candidates, authorized_targets, authorized_paths = self._diagnosis_gaps(
+            proposed,
+            validate_mutations=not script_patch,
+        )
         status = "rejected" if gaps else "accepted"
         diagnosis = proposed.with_decision(status=status, gaps=gaps)
         phase_before = self.workflow.phase
@@ -811,6 +990,7 @@ class UnityAciController:
                 diagnosis,
                 authorized_targets=authorized_targets,
                 authorized_paths=authorized_paths,
+                prepare_edit=script_patch,
             )
             self.workflow.progress.record(
                 ProgressEventType.DIAGNOSIS_ACCEPTED,
@@ -820,7 +1000,9 @@ class UnityAciController:
                 details={
                     "diagnosis_version": diagnosis.version,
                     "authorized_candidate_ids": sorted(
-                        mutation.target for mutation in diagnosis.proposed_mutations
+                        diagnosis.root_targets
+                        if script_patch
+                        else (mutation.target for mutation in diagnosis.proposed_mutations)
                     ),
                 },
             )
@@ -829,7 +1011,7 @@ class UnityAciController:
             "diagnosis": diagnosis.to_dict(),
             "gaps": gaps,
             "required_next_actions": self.workflow.required_next_actions(),
-            "workflow_state": self.workflow.public_state(),
+            "workflow_state": self.workflow.public_state(compact=True),
         }
         return {
             "output": json.dumps(payload, ensure_ascii=False, indent=2),
@@ -842,13 +1024,533 @@ class UnityAciController:
                 "blocked": bool(gaps),
                 "guard": "" if not gaps else "diagnosis_incomplete",
                 "structured": payload,
-                "workflow_state": self.workflow.public_state(),
+                "workflow_state": self.workflow.public_state(compact=True),
             },
         }
+
+    def _normalize_causal_claim_arguments(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Resolve redundant claim fields from controller-owned causal facts.
+
+        The model chooses fact IDs and supplies the tuple that it believes those
+        facts prove.  Statements, source evidence IDs, and absence proofs are
+        deterministic projections of those facts, so requiring the model to
+        copy them only creates format failures and gives hallucinated metadata a
+        chance to enter the protocol.  Tuple/fact agreement is still checked by
+        CausalClaimVerifier after this normalization.
+        """
+        if not self._structured_causal_claims_enabled():
+            return self._normalize_evidence_claim_arguments(arguments)
+        matrix = build_causal_fact_matrix(
+            self._causal_graph,
+            node_ids=(candidate.node_id for candidate in self._causal_candidates()),
+            paths=(candidate.path for candidate in self._causal_candidates()),
+            causal_edges_enabled=self._causal_edges_enabled(),
+        )
+        facts = matrix.by_id()
+        verified = self.context.evidence.verified()
+        normalized = dict(arguments)
+        chain: list[Any] = []
+        for raw in arguments.get("causal_chain", []):
+            if not isinstance(raw, dict):
+                chain.append(raw)
+                continue
+            item = dict(raw)
+            cited = [facts[value] for value in item.get("fact_ids", []) if value in facts]
+            if cited:
+                item["statement"] = "; ".join(
+                    f"{fact.subject} {fact.predicate} {fact.object} ({fact.polarity})"
+                    for fact in cited
+                )
+                derived_evidence = [
+                    evidence.id
+                    for evidence in verified
+                    if any(self._evidence_covers_causal_fact(evidence, fact) for fact in cited)
+                ]
+                if derived_evidence:
+                    item["evidence_ids"] = list(dict.fromkeys(derived_evidence))
+                absence_fact = next(
+                    (fact for fact in cited if fact.negative_evidence is not None),
+                    None,
+                )
+                if absence_fact is not None:
+                    item["negative_evidence"] = asdict(absence_fact.negative_evidence)
+                else:
+                    item.pop("negative_evidence", None)
+            chain.append(item)
+        normalized["causal_chain"] = chain
+        return normalized
+
+    def _normalize_evidence_claim_arguments(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Fill redundant prose/evidence fields for ordinary, non-causal fixes.
+
+        Non-causal tasks do not have graph fact IDs from which to project a claim,
+        but the controller still knows which candidates the model selected as root
+        targets and which verified reads cover those candidates.  Use that owned
+        state to prevent harmless schema omissions from trapping the model in the
+        diagnosis phase.  The normal revision, source-verification, root-read, and
+        patch-anchor gates still validate the resulting diagnosis.
+        """
+        normalized = dict(arguments)
+        root_ids = {
+            str(value).upper() for value in arguments.get("root_targets", []) if value
+        }
+        roots = [
+            candidate
+            for candidate_id in root_ids
+            if self.workflow is not None
+            and (candidate := self.workflow.frontier.get(candidate_id)) is not None
+        ]
+        verified = self.context.evidence.verified()
+        covering_evidence = [
+            evidence.id
+            for evidence in verified
+            if any(self._evidence_covers_candidate(evidence, candidate) for candidate in roots)
+        ]
+        chain: list[Any] = []
+        for raw in arguments.get("causal_chain", []):
+            if not isinstance(raw, dict):
+                chain.append(raw)
+                continue
+            item = dict(raw)
+            if not str(item.get("statement", "")).strip():
+                tuple_values = [
+                    str(item.get(key, "")).strip()
+                    for key in ("subject", "predicate", "object", "polarity")
+                    if str(item.get(key, "")).strip()
+                ]
+                if tuple_values:
+                    item["statement"] = " ".join(tuple_values)
+                elif roots:
+                    item["statement"] = (
+                        "Verified source evidence identifies the defect in "
+                        + ", ".join(dict.fromkeys(candidate.path for candidate in roots))
+                    )
+            if not item.get("evidence_ids") and covering_evidence:
+                item["evidence_ids"] = list(dict.fromkeys(covering_evidence))
+            chain.append(item)
+        normalized["causal_chain"] = chain
+        return normalized
+
+    def _evidence_covers_candidate(self, evidence: Any, candidate: Any) -> bool:
+        if candidate.node_id in evidence.node_ids:
+            return True
+        candidate_path = candidate.path.replace("\\", "/").casefold()
+        if any(candidate_path and candidate_path in str(source).replace("\\", "/").casefold()
+               for source in evidence.sources):
+            return True
+        if self._causal_graph is None:
+            return False
+        return any(
+            (node := self._causal_graph.nodes.get(node_id)) is not None
+            and node.path.replace("\\", "/").casefold() == candidate_path
+            for node_id in evidence.node_ids
+        )
+
+    def _evidence_covers_causal_fact(self, evidence: Any, fact: Any) -> bool:
+        fact_nodes = {value for value in (fact.subject_id, fact.object_id) if value}
+        if fact_nodes.intersection(evidence.node_ids):
+            return True
+        fact_paths: set[str] = set()
+        for location in fact.locations:
+            value = str(location).replace("\\", "/")
+            head, separator, tail = value.rpartition(":")
+            if separator and tail.isdigit():
+                value = head
+            fact_paths.add(value.casefold())
+        for source in evidence.sources:
+            normalized_source = str(source).replace("\\", "/").casefold()
+            if any(path and path in normalized_source for path in fact_paths):
+                return True
+        if self._causal_graph is not None:
+            evidence_paths = {
+                node.path.replace("\\", "/").casefold()
+                for node_id in evidence.node_ids
+                if (node := self._causal_graph.nodes.get(node_id)) is not None and node.path
+            }
+            if fact_paths.intersection(evidence_paths):
+                return True
+        return False
+
+    def _execute_patch_prepare(self, arguments: Any) -> dict[str, Any]:
+        if self.workflow is None or self.workflow.diagnosis is None:
+            return self._blocked(
+                "patch_prepare", "diagnosis_required",
+                "An accepted diagnosis is required before AST patch preparation.",
+            )
+        if self.workflow.diagnosis.status != "accepted":
+            return self._blocked(
+                "patch_prepare", "diagnosis_required",
+                "The current diagnosis has not been accepted.",
+            )
+        if (
+            self.workflow.patch_status == "compile_rejected"
+            and self.workflow.compile_repair_attempts >= self.config.max_compile_repair_attempts
+        ):
+            return self._blocked(
+                "patch_prepare",
+                "compile_repair_budget_exhausted",
+                "The bounded compile-repair budget is exhausted; call diagnosis_revise before another patch.",
+            )
+        if not isinstance(arguments, dict):
+            return self._blocked("patch_prepare", "invalid_arguments", "Arguments must be an object.")
+        target_id = str(arguments.get("target", "")).upper()
+        candidate = self.workflow.frontier.get(target_id)
+        gaps: list[str] = []
+        if candidate is None:
+            gaps.append(f"patch target {target_id or '<empty>'} is not in the candidate frontier")
+        elif target_id not in set(self.workflow.diagnosis.root_targets):
+            gaps.append(f"patch target {target_id} is not an accepted diagnosis root")
+        fact_id = str(arguments.get("causal_fact_id", "")).strip()
+        operation = str(arguments.get("operation", ""))
+        generic_replace = operation == "ast_replace_exact"
+        causal_candidates = self._causal_candidates()
+        matrix = build_causal_fact_matrix(
+            self._causal_graph,
+            node_ids=(item.node_id for item in causal_candidates),
+            paths=(item.path for item in causal_candidates),
+            causal_edges_enabled=self._causal_edges_enabled(),
+        ) if self._causal_graph is not None else None
+        fact = matrix.by_id().get(fact_id) if matrix is not None else None
+        if not generic_replace and fact is None:
+            gaps.append(f"causal fact {fact_id or '<empty>'} is unavailable in the current Roslyn graph")
+        elif not generic_replace and fact is not None and fact.polarity != "absent":
+            gaps.append("patch_prepare requires an absent causal fact")
+        elif not generic_replace and fact is not None and fact.predicate != "PUBLISHES_EVENT":
+            gaps.append("the selected causal fact does not describe a missing event publication")
+        elif not generic_replace and fact is not None and not fact.ast_anchor:
+            gaps.append("the selected causal fact has no Roslyn AST anchor")
+        if not generic_replace and candidate is not None and fact is not None:
+            subject = self._causal_graph.nodes.get(fact.subject_id) if self._causal_graph else None
+            if subject is None or subject.path.replace("\\", "/").casefold() != candidate.path.replace("\\", "/").casefold():
+                gaps.append("the causal fact AST scope is outside the diagnosed target file")
+        evidence_id = str(arguments.get("evidence_id", "")).strip()
+        evidence = self.context.evidence.items.get(evidence_id)
+        if evidence is None or evidence.status not in {
+            EvidenceStatus.SOURCE_VERIFIED, EvidenceStatus.RUNTIME_VERIFIED,
+        }:
+            gaps.append(f"patch evidence {evidence_id or '<empty>'} is not source/runtime verified")
+        elif (
+            candidate is not None
+            and candidate.node_id not in evidence.node_ids
+            and not self._evidence_covers_candidate_path(evidence, candidate.path)
+            and not (fact is not None and self._evidence_covers_causal_fact(evidence, fact))
+        ):
+            gaps.append("patch evidence does not cover the diagnosed target candidate")
+        if operation not in {"ast_insert_after", "ast_insert_before", "ast_replace_exact"}:
+            gaps.append("operation must be ast_insert_after, ast_insert_before, or ast_replace_exact")
+        insertion = str(arguments.get("insertion_text", "")).strip()
+        if not generic_replace and bool(arguments.get("use_repair_exemplar", True)):
+            insertion = fact.repair_exemplar.strip() if fact is not None else ""
+        if not generic_replace and not insertion:
+            gaps.append("no insertion_text or controller-generated repair_exemplar is available")
+        if generic_replace and not str(arguments.get("anchor_text", "")):
+            gaps.append("ast_replace_exact requires non-empty anchor_text")
+        if generic_replace and not str(arguments.get("replacement_text", "")):
+            gaps.append("ast_replace_exact requires non-empty replacement_text")
+        if gaps:
+            self.workflow.reject_patch(gaps)
+            return self._patch_prepare_result("rejected", gaps=gaps)
+
+        assert candidate is not None
+        try:
+            source_path = (self.project_root / candidate.path).resolve()
+            if source_path != self.project_root and self.project_root not in source_path.parents:
+                raise OSError("target source escapes the project root")
+            source = source_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            gaps.append(f"target source could not be read: {exc}")
+            self.workflow.reject_patch(gaps)
+            return self._patch_prepare_result("rejected", gaps=gaps)
+        anchor = (
+            str(arguments.get("anchor_text", ""))
+            if generic_replace else fact.ast_anchor.strip()  # type: ignore[union-attr]
+        )
+        if not generic_replace and not anchor.endswith(";") and source.count(anchor + ";") == 1:
+            anchor += ";"
+        if source.count(anchor) != 1:
+            gaps.append(f"AST anchor must occur exactly once in current source; found {source.count(anchor)}")
+        if generic_replace:
+            new_text = str(arguments.get("replacement_text", ""))
+        else:
+            insertion = self._normalize_ast_insertion(insertion)
+            indentation = self._source_indentation(source, anchor)
+            inserted_block = "\n".join(
+                indentation + line if line.strip() else line
+                for line in insertion.splitlines()
+            )
+            new_text = (
+                f"{anchor}\n{inserted_block}"
+                if operation == "ast_insert_after"
+                else f"{inserted_block}\n{anchor}"
+            )
+        patched = source.replace(anchor, new_text, 1) if not gaps else source
+        if not gaps:
+            gaps.extend(self._csharp_patch_preflight(source, anchor, new_text, patched))
+            gaps.extend(self._roslyn_syntax_gaps(patched))
+        if gaps:
+            self.workflow.reject_patch(gaps)
+            return self._patch_prepare_result("rejected", gaps=gaps)
+        mutation = ProposedMutation(
+            target=target_id,
+            operation=operation,
+            evidence_id=evidence_id,
+            old_text=anchor,
+            new_text=new_text,
+        )
+        patch_arguments = {
+            "path": candidate.path,
+            "old_text": anchor,
+            "new_text": new_text,
+            "expected_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
+            "evidence_node_ids": [candidate.node_id],
+        }
+        token_material = json.dumps(
+            {
+                "diagnosis_version": self.workflow.diagnosis.version,
+                "repository_revision": self.workflow.diagnosis.repository_revision,
+                "mutation": patch_arguments,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        patch_token = "patch:" + hashlib.sha256(token_material.encode("utf-8")).hexdigest()[:24]
+        self.workflow.accept_patch(
+            mutation,
+            authorized_target=candidate.node_id,
+            authorized_path=candidate.path,
+            patch_token=patch_token,
+        )
+        self._prepared_patch_action = {
+            "tool": "unity_script_patch",
+            "arguments": patch_arguments,
+        }
+        self.workflow.progress.record(
+            ProgressEventType.PATCH_PREPARED,
+            phase_before=WorkflowPhase.PREPARE_EDIT.value,
+            phase_after=self.workflow.phase.value,
+            evidence_ids=[evidence_id],
+            details={
+                "target": target_id,
+                "causal_fact_id": fact.fact_id if fact is not None else "",
+                "path": candidate.path,
+                "patch_token": patch_token,
+            },
+        )
+        payload = {
+            "status": "prepared",
+            "patch_token": patch_token,
+            "causal_fact_id": fact.fact_id if fact is not None else "",
+            "ast_scope": fact.subject if fact is not None else candidate.name,
+            "repair_exemplar": fact.repair_exemplar if fact is not None else "",
+            "mutation_preview": patch_arguments,
+            "required_next_action": {"tool": "patch_apply", "arguments": {"patch_token": patch_token}},
+            "workflow_state": self.workflow.public_state(compact=True),
+        }
+        return {
+            "output": json.dumps(payload, ensure_ascii=False, indent=2),
+            "returncode": 0,
+            "exception_info": "",
+            "extra": {
+                "aci": True,
+                "aci_workflow": True,
+                "workflow_tool": "patch_prepare",
+                "structured": payload,
+                "workflow_state": self.workflow.public_state(compact=True),
+            },
+        }
+
+    def _evidence_covers_candidate_path(self, evidence: Any, candidate_path: str) -> bool:
+        normalized = candidate_path.replace("\\", "/").casefold()
+        if not normalized:
+            return False
+        if self._causal_graph is not None:
+            for node_id in evidence.node_ids:
+                node = self._causal_graph.nodes.get(node_id)
+                if (
+                    node is not None
+                    and node.path.replace("\\", "/").casefold() == normalized
+                ):
+                    return True
+        return any(
+            normalized in str(source).replace("\\", "/").casefold()
+            for source in evidence.sources
+        )
+
+    def _execute_patch_apply(self, arguments: Any) -> dict[str, Any]:
+        if self.workflow is None or not isinstance(arguments, dict):
+            return self._blocked("patch_apply", "invalid_arguments", "Arguments must be an object.")
+        supplied = str(arguments.get("patch_token", "")).strip()
+        expected = self.workflow.prepared_patch_token
+        if not supplied or supplied != expected or self._prepared_patch_action is None:
+            return self._blocked(
+                "patch_apply",
+                "prepared_patch_token_mismatch",
+                "patch_token does not identify the current controller-prepared patch; call patch_prepare again.",
+            )
+        action = self._prepared_patch_action
+        escape_hatch = not self.config.typed_mutations_enabled
+        if escape_hatch:
+            action = self._escape_hatch_patch_action(action)
+        self._applying_prepared_patch = True
+        try:
+            output = self.execute(action)
+        finally:
+            self._applying_prepared_patch = False
+            self._prepared_patch_action = None
+        output.setdefault("extra", {})["workflow_tool"] = "patch_apply"
+        output["extra"]["patch_token"] = supplied
+        output["extra"]["escape_hatch"] = escape_hatch
+        if (
+            self._succeeded(output)
+            and self.config.automatic_validation_enabled
+            and self.config.validation_gates_enabled
+        ):
+            output["extra"]["automatic_validation"] = self._run_automatic_validation()
+            output["extra"]["execution_protocol"] = self.protocol_state()
+        return output
+
+    def _escape_hatch_patch_action(self, action: dict[str, Any]) -> dict[str, Any]:
+        """Express the prepared patch through the untyped C# escape hatch."""
+        args = action.get("arguments", {})
+        if not isinstance(args, dict):
+            raise ValueError("Prepared patch arguments are invalid")
+        relative = str(args.get("path", "")).replace("\\", "/")
+        old_text = str(args.get("old_text", ""))
+        new_text = str(args.get("new_text", ""))
+        expected_sha = str(args.get("expected_sha256", "")).casefold()
+        target = (self.project_root / relative).resolve()
+        if target != self.project_root and self.project_root not in target.parents:
+            raise ValueError("Prepared patch path escapes the project")
+        current_sha = hashlib.sha256(target.read_bytes()).hexdigest()
+        if not expected_sha or current_sha.casefold() != expected_sha:
+            raise ValueError("Prepared patch source hash changed before escape-hatch execution")
+        assets_prefix = "Assets/"
+        if not relative.casefold().startswith(assets_prefix.casefold()):
+            raise ValueError("Prepared patch target must be under Assets/")
+        asset_relative = relative[len(assets_prefix):]
+        path_literal = json.dumps(asset_relative, ensure_ascii=False)
+        old_literal = json.dumps(old_text, ensure_ascii=False)
+        new_literal = json.dumps(new_text, ensure_ascii=False)
+        code = (
+            f"var path = Path.Combine(Application.dataPath, {path_literal}); "
+            "var text = File.ReadAllText(path); "
+            f"var oldText = {old_literal}; var newText = {new_literal}; "
+            "var first = text.IndexOf(oldText, System.StringComparison.Ordinal); "
+            "if (first < 0 || text.IndexOf(oldText, first + oldText.Length, "
+            "System.StringComparison.Ordinal) >= 0) throw new System.Exception(\"Patch anchor must match once\"); "
+            "File.WriteAllText(path, text.Substring(0, first) + newText + "
+            "text.Substring(first + oldText.Length));"
+        )
+        return {
+            "tool": "unity_execute_csharp",
+            "arguments": {
+                "code": code,
+                "target_paths": [relative],
+                "evidence_node_ids": list(args.get("evidence_node_ids", [])),
+            },
+        }
+
+    def _run_automatic_validation(self) -> dict[str, Any]:
+        """Advance deterministic post-patch gates without spending model turns."""
+        steps: list[dict[str, Any]] = []
+
+        def run(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
+            result = self.execute({"tool": tool, "arguments": arguments})
+            structured = result.get("extra", {}).get("structured", {})
+            steps.append({
+                "tool": tool,
+                "returncode": int(result.get("returncode", -1)),
+                "status": structured.get("status", "") if isinstance(structured, dict) else "",
+                "exception_info": str(result.get("exception_info", ""))[:1000],
+            })
+            return result
+
+        if self.pending is not None and self.pending.stage == "static_diagnostics":
+            changed_file = next(
+                (path for path in self.pending.changed_paths if path.casefold().endswith(".cs")),
+                "",
+            )
+            result = run("code_diagnostics", {
+                "scope": "file",
+                "file_path": changed_file,
+                "min_severity": "error",
+            })
+            if not self._succeeded(result) or self.pending is None or self.pending.stage == "static_diagnostics":
+                return {"status": "stopped", "steps": steps}
+        if self.pending is not None and self.pending.stage == "recompile_or_hot_reload":
+            result = run("unity_recompile", {})
+            if not self._succeeded(result) or self.pending is None:
+                return {"status": "stopped", "steps": steps}
+        if self.pending is not None and self.pending.stage == "runtime_validation":
+            modes = sorted(
+                set(self.pending.required_validation_modes)
+                - set(self.pending.completed_validation_modes)
+            )
+            result = run("unity_validate", {"modes": modes})
+            if not self._succeeded(result):
+                return {"status": "stopped", "steps": steps}
+        complete = self.pending is None and (
+            self.workflow is None or not self.workflow.submission.unmet()
+        )
+        return {"status": "complete" if complete else "stopped", "steps": steps}
+
+    def _patch_prepare_result(self, status: str, *, gaps: list[str]) -> dict[str, Any]:
+        assert self.workflow is not None
+        payload = {
+            "status": status,
+            "gaps": gaps,
+            "workflow_state": self.workflow.public_state(compact=True),
+        }
+        return {
+            "output": json.dumps(payload, ensure_ascii=False, indent=2),
+            "returncode": -2,
+            "exception_info": "; ".join(gaps),
+            "extra": {
+                "aci": True,
+                "aci_workflow": True,
+                "workflow_tool": "patch_prepare",
+                "blocked": True,
+                "guard": "patch_preparation_failed",
+                "structured": payload,
+                "workflow_state": self.workflow.public_state(compact=True),
+            },
+        }
+
+    @staticmethod
+    def _source_indentation(source: str, anchor: str) -> str:
+        offset = source.index(anchor)
+        line_start = source.rfind("\n", 0, offset) + 1
+        prefix = source[line_start:offset]
+        return prefix if not prefix.strip() else ""
+
+    @staticmethod
+    def _normalize_ast_insertion(value: str) -> str:
+        text = value.strip()
+        if text and "\n" not in text and not text.endswith((";", "{", "}")):
+            text += ";"
+        return text
+
+    def _roslyn_syntax_gaps(self, source: str) -> list[str]:
+        try:
+            diagnostics = RoslynCodeParser().validate_syntax(
+                source,
+                timeout_seconds=min(self.config.timeout_seconds, 30),
+            )
+        except (OSError, ValueError, RoslynParseError) as exc:
+            return [f"Roslyn syntax validation is unavailable: {exc}"]
+        return [
+            "Roslyn syntax error "
+            f"{item.get('id', '<unknown>')} at {item.get('line', '?')}:{item.get('column', '?')}: "
+            f"{item.get('message', 'invalid C# syntax')}"
+            for item in diagnostics[:12]
+        ]
 
     def _diagnosis_gaps(
         self,
         diagnosis: DiagnosisRecord,
+        *,
+        validate_mutations: bool = True,
     ) -> tuple[list[str], set[str], set[str], set[str]]:
         assert self.workflow is not None
         gaps: list[str] = []
@@ -880,11 +1582,24 @@ class UnityAciController:
         current_revision = self._project_revision()
         evidence_by_id = {item.id: item for item in self.context.evidence.active()}
         verified_evidence = []
+        graph = self._causal_graph
+        claim_verifier = None
+        if self._structured_causal_claims_enabled() and graph is not None:
+            causal_candidates = self._causal_candidates()
+            matrix = build_causal_fact_matrix(
+                graph,
+                node_ids=(candidate.node_id for candidate in causal_candidates),
+                paths=(candidate.path for candidate in causal_candidates),
+                causal_edges_enabled=self._causal_edges_enabled(),
+            )
+            claim_verifier = CausalClaimVerifier(graph, matrix)
         for claim_index, claim in enumerate(diagnosis.causal_chain, start=1):
             if not claim.statement:
                 gaps.append(f"causal claim {claim_index} has no statement")
             if not claim.evidence_ids:
                 gaps.append(f"causal claim {claim_index} has no evidence_ids")
+            if claim_verifier is not None:
+                gaps.extend(claim_verifier.verify(claim, claim_index=claim_index))
             for evidence_id in claim.evidence_ids:
                 evidence = evidence_by_id.get(evidence_id)
                 if evidence is None:
@@ -903,7 +1618,6 @@ class UnityAciController:
                     gaps.append(f"evidence {evidence_id} references stale node(s): {', '.join(sorted(dirty))}")
                     continue
                 verified_evidence.append(evidence)
-        graph = self.context.project_store.graph if self.context.project_store is not None else None
         implementation_covered = False
         for evidence in verified_evidence:
             for node_id in evidence.node_ids:
@@ -913,12 +1627,18 @@ class UnityAciController:
                     break
         if not implementation_covered:
             gaps.append("causal evidence does not cover non-test implementation code")
-        if not diagnosis.proposed_mutations:
-            gaps.append("proposed_mutations must not be empty")
         authorized_targets: set[str] = set()
         authorized_paths: set[str] = set()
         root_ids = set(diagnosis.root_targets)
-        for mutation in diagnosis.proposed_mutations:
+        mutations = diagnosis.proposed_mutations if validate_mutations else []
+        if validate_mutations and not mutations:
+            gaps.append("proposed_mutations must not be empty")
+        if not validate_mutations:
+            for candidate in roots:
+                if candidate is not None:
+                    authorized_targets.add(candidate.node_id)
+                    authorized_paths.add(candidate.path)
+        for mutation in mutations:
             candidate = self.workflow.frontier.get(mutation.target)
             if candidate is None:
                 gaps.append(f"mutation target {mutation.target} is not in the candidate frontier")
@@ -953,6 +1673,42 @@ class UnityAciController:
         if diagnosis.remaining_uncertainty:
             gaps.append("remaining critical uncertainty: " + "; ".join(diagnosis.remaining_uncertainty))
         return list(dict.fromkeys(gaps)), missing_candidates, authorized_targets, authorized_paths
+
+    def _structured_causal_claims_enabled(self) -> bool:
+        return bool(
+            self.config.require_structured_causal_claims
+            and self.config.project_graph_enabled
+            and self._causal_edges_enabled()
+            and is_causal_query(self.context.original_task)
+            and self._causal_graph is not None
+        )
+
+    def _causal_edges_enabled(self) -> bool:
+        return bool(getattr(self.context.config, "causal_edges_enabled", True))
+
+    def _complete_without_validation(self) -> None:
+        """Complete controller state while deliberately skipping self-validation.
+
+        Public and hidden benchmark validation remain external and unchanged;
+        this only implements the Group 9 treatment seen by the agent.
+        """
+        if self.pending is None:
+            return
+        self.pending.diagnostics_complete = True
+        self.pending.reload_complete = True
+        self.pending.validation_complete = True
+        state = asdict(self.pending) | {
+            "stage": "complete",
+            "completed_at": time.time(),
+            "validation_skipped_by_ablation": True,
+        }
+        self.completed.append(state)
+        self.pending = None
+        if self.workflow is not None:
+            self.workflow.observe_diagnostics_passed()
+            self.workflow.observe_compile_passed()
+            self.workflow.observe_validation_complete()
+            self._perform_review()
 
     def _validate_script_mutation_anchor(
         self,

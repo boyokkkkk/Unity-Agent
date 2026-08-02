@@ -1,0 +1,32 @@
+{
+  "task_id": "C1",
+  "task_name": "Simple Refactor - 提取Player输入处理",
+  "task_type": "refactoring",
+  "priority": "P1",
+  "complexity": "simple",
+  "timestamp": "2026-08-02T19:51:46.188094",
+  "success": true,
+  "meets_all_criteria": false,
+  "overall_success": false,
+  "elapsed_time": 28.220268964767456,
+  "mutations_applied": 0,
+  "total_tokens": 0,
+  "error": null,
+  "criteria_check": {
+    "min_mutations": {
+      "required": 1,
+      "actual": 0,
+      "met": false
+    },
+    "token_budget": {
+      "budget": 12000,
+      "actual": 0,
+      "met": true
+    },
+    "time_budget": {
+      "budget": 40,
+      "actual": 28.220268964767456,
+      "met": true
+    }
+  }
+}

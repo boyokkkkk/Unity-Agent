@@ -5,9 +5,24 @@ from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
+class ClaimNegativeEvidence:
+    scope: str
+    edge_kind: str
+    graph_revision: str
+    observed_matches: int
+    complete: bool
+
+
+@dataclass(frozen=True, slots=True)
 class CausalClaim:
     statement: str
     evidence_ids: list[str]
+    subject: str = ""
+    predicate: str = ""
+    object: str = ""
+    polarity: str = ""
+    fact_ids: list[str] = field(default_factory=list)
+    negative_evidence: ClaimNegativeEvidence | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +64,12 @@ class DiagnosisRecord:
             CausalClaim(
                 statement=str(item.get("statement", "")).strip(),
                 evidence_ids=[str(value) for value in item.get("evidence_ids", []) if value],
+                subject=str(item.get("subject", "")).strip(),
+                predicate=str(item.get("predicate", "")).strip().upper(),
+                object=str(item.get("object", "")).strip(),
+                polarity=str(item.get("polarity", "")).strip().casefold(),
+                fact_ids=[str(value) for value in item.get("fact_ids", []) if value],
+                negative_evidence=_negative_evidence(item.get("negative_evidence")),
             )
             for item in arguments.get("causal_chain", [])
             if isinstance(item, dict)
@@ -101,7 +122,18 @@ class DiagnosisRecord:
     def with_decision(self, *, status: str, gaps: list[str]) -> "DiagnosisRecord":
         payload = asdict(self)
         payload.update(status=status, gaps=list(gaps))
-        payload["causal_chain"] = [CausalClaim(**item) for item in payload["causal_chain"]]
+        payload["causal_chain"] = [
+            CausalClaim(
+                **{
+                    **item,
+                    "negative_evidence": (
+                        ClaimNegativeEvidence(**item["negative_evidence"])
+                        if isinstance(item.get("negative_evidence"), dict) else None
+                    ),
+                }
+            )
+            for item in payload["causal_chain"]
+        ]
         payload["proposed_mutations"] = [ProposedMutation(**item) for item in payload["proposed_mutations"]]
         return DiagnosisRecord(**payload)
 
@@ -114,3 +146,15 @@ class DiagnosisRecord:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _negative_evidence(value: Any) -> ClaimNegativeEvidence | None:
+    if not isinstance(value, dict):
+        return None
+    return ClaimNegativeEvidence(
+        scope=str(value.get("scope", "")).strip(),
+        edge_kind=str(value.get("edge_kind", "")).strip().upper(),
+        graph_revision=str(value.get("graph_revision", "")).strip(),
+        observed_matches=int(value.get("observed_matches", -1)),
+        complete=bool(value.get("complete", False)),
+    )

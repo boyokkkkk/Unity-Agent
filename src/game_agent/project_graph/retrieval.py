@@ -9,7 +9,7 @@ from typing import Any, Iterable
 
 import networkx as nx
 
-from .schema import EdgeKind, Node, NodeKind, ProjectGraph
+from .schema import CAUSAL_EDGE_KINDS, EdgeKind, Node, NodeKind, ProjectGraph
 from .semantic import MultilingualSemanticIndex, SemanticSearchUnavailable
 
 
@@ -96,6 +96,7 @@ class LocalizationResult:
     ranked_nodes: list[dict[str, Any]]
     dependency_paths: list[dict[str, Any]]
     semantic: dict[str, Any] = field(default_factory=dict)
+    treatment: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -107,6 +108,7 @@ class LocalizationResult:
             "ranked_nodes": self.ranked_nodes,
             "dependency_paths": self.dependency_paths,
             "semantic": self.semantic,
+            "treatment": self.treatment,
         }
 
 
@@ -145,8 +147,13 @@ class LocalizationRetriever:
         semantic_model: str = "",
         semantic_weight: float = 0.35,
         semantic_cache_path: Path | None = None,
+        graph_retrieval_enabled: bool = True,
+        causal_edges_enabled: bool = True,
     ) -> LocalizationResult:
         variant = variant.upper()
+        requested_variant = variant
+        if not graph_retrieval_enabled:
+            variant = "A0"
         if strategy not in {"relevance", "path_collapse", "path_quota", "role_mmr"}:
             raise ValueError(
                 "strategy must be relevance, path_collapse, path_quota, or role_mmr"
@@ -159,7 +166,7 @@ class LocalizationRetriever:
         )
         semantic_metadata["weight"] = semantic_weight if semantic_model else 0.0
         if variant == "A0":
-            return self._a0(
+            result = self._a0(
                 query,
                 limit,
                 strategy=strategy,
@@ -169,9 +176,19 @@ class LocalizationRetriever:
                 semantic_metadata=semantic_metadata,
                 semantic_weight=semantic_weight,
             )
+            result.treatment = self._treatment_metadata(
+                requested_variant=requested_variant,
+                effective_variant=variant,
+                graph_retrieval_enabled=graph_retrieval_enabled,
+                causal_edges_enabled=causal_edges_enabled,
+                result=result,
+                semantic_model=semantic_model,
+                semantic_scores=semantic_scores,
+            )
+            return result
         if variant not in {"A1", "A2"}:
             raise ValueError("variant must be A0, A1, or A2")
-        return self._graph_variant(
+        result = self._graph_variant(
             query,
             variant,
             limit,
@@ -181,7 +198,18 @@ class LocalizationRetriever:
             semantic_scores=semantic_scores,
             semantic_metadata=semantic_metadata,
             semantic_weight=semantic_weight,
+            causal_edges_enabled=causal_edges_enabled,
         )
+        result.treatment = self._treatment_metadata(
+            requested_variant=requested_variant,
+            effective_variant=variant,
+            graph_retrieval_enabled=graph_retrieval_enabled,
+            causal_edges_enabled=causal_edges_enabled,
+            result=result,
+            semantic_model=semantic_model,
+            semantic_scores=semantic_scores,
+        )
+        return result
 
     def _load_file_documents(self) -> dict[str, str]:
         documents: dict[str, str] = {}
@@ -237,6 +265,7 @@ class LocalizationRetriever:
         semantic_scores: dict[str, float],
         semantic_metadata: dict[str, Any],
         semantic_weight: float,
+        causal_edges_enabled: bool,
     ) -> LocalizationResult:
         allowed_nodes = CODE_KINDS if variant == "A1" else set(NodeKind)
         allowed_edges = {
@@ -245,6 +274,8 @@ class LocalizationRetriever:
             EdgeKind.PUBLISHES_EVENT,
             EdgeKind.WRITES_STATE,
         } if variant == "A1" else set(EdgeKind)
+        if not causal_edges_enabled:
+            allowed_edges -= CAUSAL_EDGE_KINDS
         network = nx.DiGraph()
         for node in self.graph.nodes.values():
             if node.kind in allowed_nodes:
@@ -353,6 +384,40 @@ class LocalizationRetriever:
             dependency_paths=paths,
             semantic=semantic_metadata,
         )
+
+    def _treatment_metadata(
+        self,
+        *,
+        requested_variant: str,
+        effective_variant: str,
+        graph_retrieval_enabled: bool,
+        causal_edges_enabled: bool,
+        result: LocalizationResult,
+        semantic_model: str,
+        semantic_scores: dict[str, float],
+    ) -> dict[str, Any]:
+        source_causal_edges = sum(
+            1 for edge in self.graph.edges if edge.kind in CAUSAL_EDGE_KINDS
+        )
+        graph_active = graph_retrieval_enabled and effective_variant in {"A1", "A2"}
+        return {
+            "retrieval_opportunity": 1,
+            "requested_variant": requested_variant,
+            "effective_variant": effective_variant,
+            "graph_retrieval_enabled": graph_retrieval_enabled,
+            "graph_score_contributions": len(result.ranked_nodes) if graph_active else 0,
+            "graph_expansions": len(result.dependency_paths) if graph_active else 0,
+            "semantic_opportunity": 1,
+            "semantic_enabled": bool(semantic_model),
+            "semantic_score_contributions": len(semantic_scores) if semantic_model else 0,
+            "semantic_status": str(result.semantic.get("status", "disabled")),
+            "semantic_reason": str(result.semantic.get("reason", "")),
+            "semantic_model": str(result.semantic.get("model", semantic_model)),
+            "source_causal_edges": source_causal_edges,
+            "returned_causal_edges": source_causal_edges if graph_active and causal_edges_enabled else 0,
+            "suppressed_causal_edges": source_causal_edges if graph_active and not causal_edges_enabled else 0,
+            "noncausal_graph_candidates": len(result.ranked_nodes) if graph_active else 0,
+        }
 
     def _semantic_scores(
         self,

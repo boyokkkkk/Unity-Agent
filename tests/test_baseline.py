@@ -154,6 +154,31 @@ class SyntheticTrajectoryTest(unittest.TestCase):
             tools["tool_schema_tokens_by_profile"],
         )
 
+    def test_patch_apply_counts_as_typed_mutation_and_completed_protocol(self):
+        records = [
+            event(1, 0, "turn_start", request="repair"),
+            event(
+                2,
+                10,
+                "tool_end",
+                aci=True,
+                tool="patch_apply",
+                tool_class="mutation",
+                returncode=0,
+                action_signature="patch_apply:token",
+                escape_hatch=False,
+                execution_protocol={"completed_transactions": 1},
+            ),
+            event(3, 20, "turn_end", exit_status="Submitted", submission="fixed"),
+        ]
+
+        metrics = self.analyzer.analyze(records)
+
+        self.assertEqual(1, metrics["research"]["control"]["mutation_calls"])
+        self.assertEqual(1.0, metrics["research"]["control"]["protocol_gate_completion"])
+        self.assertEqual(1.0, metrics["research"]["tools_and_cost"]["typed_mutation_ratio"])
+        self.assertEqual(0.0, metrics["research"]["tools_and_cost"]["escape_hatch_ratio"])
+
     def test_irrelevant_searches_quantify_poor_navigation(self):
         records = [
             event(1, 0, "turn_start", request="repair"),

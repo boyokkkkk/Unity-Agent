@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Passed" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-02 05:39:51Z" end-time="2026-08-02 05:39:51Z" duration="0.0352985">
+  <test-suite type="TestSuite" id="1008" name="Kitchen_Chaos" fullname="Kitchen_Chaos" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 05:39:51Z" end-time="2026-08-02 05:39:51Z" duration="0.035299" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties />
+    <test-suite type="Assembly" id="1011" name="KitchenChaos.EditModeTests.dll" fullname="C:/Users/Administrator/AppData/Local/Temp/game-agent-baselines/ablation-group5-run4-20260802-133700/Library/ScriptAssemblies/KitchenChaos.EditModeTests.dll" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 05:39:51Z" end-time="2026-08-02 05:39:51Z" duration="0.019873" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="27404" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+      </properties>
+      <test-suite type="TestFixture" id="1009" name="KitchenGameManagerContractTests" fullname="KitchenGameManagerContractTests" classname="KitchenGameManagerContractTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-08-02 05:39:51Z" end-time="2026-08-02 05:39:51Z" duration="0.018726" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1010" name="ExistingStateManagementApi_IsAvailable" fullname="KitchenGameManagerContractTests.ExistingStateManagementApi_IsAvailable" methodname="ExistingStateManagementApi_IsAvailable" classname="KitchenGameManagerContractTests" runstate="Runnable" seed="260210782" result="Passed" start-time="2026-08-02 05:39:51Z" end-time="2026-08-02 05:39:51Z" duration="0.009168" asserts="0">
+          <properties />
+        </test-case>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

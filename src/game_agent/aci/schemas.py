@@ -207,9 +207,34 @@ _DIAGNOSIS_PROPERTIES = {
             "type": "object",
             "properties": {
                 "statement": {"type": "string", "minLength": 1},
+                "subject": {"type": "string", "minLength": 1},
+                "predicate": {
+                    "type": "string",
+                    "enum": [
+                        "DECLARES_EVENT", "SUBSCRIBES_TO", "WRITES_STATE",
+                        "PUBLISHES_EVENT", "OBSERVER_EFFECT",
+                    ],
+                },
+                "object": {"type": "string", "minLength": 1},
+                "polarity": {"type": "string", "enum": ["present", "absent", "unknown"]},
+                "fact_ids": {
+                    "type": "array", "items": {"type": "string", "pattern": "^fact:"}, "minItems": 1,
+                },
+                "negative_evidence": {
+                    "type": "object",
+                    "properties": {
+                        "scope": {"type": "string", "minLength": 1},
+                        "edge_kind": {"type": "string", "minLength": 1},
+                        "graph_revision": {"type": "string", "minLength": 1},
+                        "observed_matches": {"type": "integer", "minimum": 0},
+                        "complete": {"type": "boolean"},
+                    },
+                    "required": ["scope", "edge_kind", "graph_revision", "observed_matches", "complete"],
+                    "additionalProperties": False,
+                },
                 "evidence_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
             },
-            "required": ["statement", "evidence_ids"],
+            "required": ["subject", "predicate", "object", "polarity", "fact_ids"],
             "additionalProperties": False,
         },
         "minItems": 1,
@@ -275,37 +300,71 @@ _DIAGNOSIS_TOOLS = [
         description,
         _DIAGNOSIS_PROPERTIES,
         [
-            "symptom", "root_targets", "causal_chain", "proposed_mutations",
+            "symptom", "root_targets", "causal_chain",
             "validation_plan", "remaining_uncertainty",
         ],
     )
     for name, description in (
         ("diagnosis_submit", """Submit an evidence-linked root-cause diagnosis and request mutation authorization.
 
-REQUIRED FIELDS (all must be provided):
+FIELDS:
 - symptom: one-sentence user-facing problem description
 - root_targets: array of candidate IDs (e.g., ["C5"]) where the fix will be applied
-- causal_chain: array of objects, each with "statement" and "evidence_ids"
-- proposed_mutations: array of objects with "target" and "operation". For a C# target, also provide "evidence_id", exact "old_text" copied from that target, and "new_text". The controller rejects invented or ambiguous anchors before edit authorization.
+- causal_chain: choose structured atomic claims using subject, predicate, object, polarity, and fact_ids copied exactly from workflow.causal_fact_matrix. The controller derives statement, verified evidence_ids, and negative_evidence from the cited facts; do not copy those redundant fields.
+- proposed_mutations (optional): legacy combined-mode field. Omit when the workflow exposes patch_prepare; the accepted diagnosis will advance to a separate AST patch stage.
 - validation_plan: array from ["compile", "editmode", "playmode"]
 - remaining_uncertainty: array of strings (use empty array [] if no uncertainty)"""),
         ("diagnosis_revise", """Create a new diagnosis version after a rejected or outdated diagnosis.
 
-REQUIRED FIELDS (all must be provided):
+FIELDS:
 - symptom: one-sentence user-facing problem description
 - root_targets: array of candidate IDs (e.g., ["C5"]) where the fix will be applied
-- causal_chain: array of objects, each with "statement" and "evidence_ids"
-- proposed_mutations: array of objects with "target" and "operation". For a C# target, also provide "evidence_id", exact "old_text" copied from that target, and "new_text". The controller rejects invented or ambiguous anchors before edit authorization.
+- causal_chain: choose structured atomic claims using subject, predicate, object, polarity, and fact_ids copied exactly from workflow.causal_fact_matrix. The controller derives statement, verified evidence_ids, and negative_evidence from the cited facts; do not copy those redundant fields.
+- proposed_mutations (optional): legacy combined-mode field. Omit when the workflow exposes patch_prepare; the accepted diagnosis will advance to a separate AST patch stage.
 - validation_plan: array from ["compile", "editmode", "playmode"]
 - remaining_uncertainty: array of strings (use empty array [] if no uncertainty)"""),
     )
 ]
+_PATCH_PREPARE_TOOL = _tool(
+    "patch_prepare",
+    "Prepare an evidence-authorized C# patch after diagnosis acceptance. Use a controller causal fact for event-publication insertion, or ast_replace_exact with one unique inspected source anchor for other repairs.",
+    {
+        "target": {"type": "string", "pattern": "^C[1-9][0-9]*$"},
+        "causal_fact_id": {"type": "string", "pattern": "^fact:"},
+        "operation": {"type": "string", "enum": ["ast_insert_after", "ast_insert_before", "ast_replace_exact"]},
+        "evidence_id": {"type": "string", "minLength": 1},
+        "use_repair_exemplar": {"type": "boolean", "default": True},
+        "insertion_text": {
+            "type": "string",
+            "description": "Optional replacement for the fact's repair_exemplar. Prefer use_repair_exemplar=true when an exemplar exists.",
+        },
+        "anchor_text": {
+            "type": "string",
+            "description": "For ast_replace_exact, exact text observed in the diagnosed file; it must occur once.",
+        },
+        "replacement_text": {
+            "type": "string",
+            "description": "For ast_replace_exact, the complete replacement for anchor_text.",
+        },
+    },
+    ["target", "operation", "evidence_id"],
+)
+_PATCH_APPLY_TOOL = _tool(
+    "patch_apply",
+    "Apply the exact controller-prepared mutation identified by patch_token. Do not copy old_text/new_text.",
+    {
+        "patch_token": {"type": "string", "pattern": "^patch:"},
+    },
+    ["patch_token"],
+)
 _REVIEW_TOOL = _tool(
     "workflow_review",
     "Run the controller-owned final review of actual diff scope, authorization, and validation results.",
     {},
 )
-WORKFLOW_TOOLS = [_PLAN_TOOL, *_DIAGNOSIS_TOOLS, _REVIEW_TOOL]
+WORKFLOW_TOOLS = [
+    _PLAN_TOOL, *_DIAGNOSIS_TOOLS, _PATCH_PREPARE_TOOL, _PATCH_APPLY_TOOL, _REVIEW_TOOL,
+]
 WORKFLOW_TOOL_NAMES = frozenset(tool["function"]["name"] for tool in WORKFLOW_TOOLS)
 
 

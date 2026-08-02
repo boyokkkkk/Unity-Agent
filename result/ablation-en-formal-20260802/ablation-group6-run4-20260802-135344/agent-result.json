@@ -1,0 +1,12 @@
+{
+  "exit_status": "RepeatedFormatError",
+  "submission": "",
+  "token_usage": {
+    "prompt_tokens": 17184,
+    "completion_tokens": 612,
+    "total_tokens": 17796,
+    "last_input_tokens": 6962,
+    "max_input_tokens": 32768,
+    "max_total_tokens": 81920
+  }
+}

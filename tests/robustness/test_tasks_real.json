@@ -1,0 +1,220 @@
+{
+  "A1": {
+    "name": "Simple Bug - 玩家移动速度调整",
+    "type": "bug_fix",
+    "priority": "P0",
+    "expected_complexity": "simple",
+    "description": "在 Assets/Scripts/Player.cs 中，玩家的移动速度 moveSpeed 默认值是 5f，但这对于这个游戏来说太慢了。请将默认值改为 7f 以提供更好的游戏体验。",
+    "success_criteria": {
+      "files_changed": 1,
+      "lines_changed_min": 1,
+      "lines_changed_max": 1,
+      "token_budget": 70000,
+      "time_budget_seconds": 65,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/Player.cs"],
+    "validation": {
+      "check_value": "moveSpeed.*=.*7f",
+      "original_value": "moveSpeed.*=.*5f"
+    }
+  },
+
+  "A2": {
+    "name": "Medium Bug - 游戏暂停时音乐继续播放",
+    "type": "bug_fix",
+    "priority": "P0",
+    "expected_complexity": "medium",
+    "description": "玩家按下暂停键后，游戏暂停了，但音乐还在播放。应该暂停时音乐也停止，恢复时音乐继续。目前暂停功能位于 KitchenGameManager.cs 中，音乐由 MusicManager.cs 管理。请修复这个问题。",
+    "success_criteria": {
+      "files_changed": 2,
+      "token_budget": 65000,
+      "time_budget_seconds": 70,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/KitchenGameManager.cs", "Assets/Scripts/MusicManager.cs"]
+  },
+
+  "A3": {
+    "name": "Medium Bug - DeliveryManager空引用",
+    "type": "bug_fix",
+    "priority": "P0",
+    "expected_complexity": "medium",
+    "description": "游戏运行时偶尔会在 DeliveryManager.cs 中出现空引用错误。请检查 DeliveryManager.cs 中可能存在的空引用问题，并添加适当的空检查来防止崩溃。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 65000,
+      "time_budget_seconds": 65,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/DeliveryManager.cs"]
+  },
+
+  "A4": {
+    "name": "Simple Bug - UI更新问题（已知可修复）",
+    "type": "bug_fix",
+    "priority": "P0",
+    "expected_complexity": "simple",
+    "description": "玩家在开始界面按下交互键后，游戏应进入倒计时；目前教程界面没有关闭，倒计时界面也没有出现。问题可能位于游戏状态切换与 UI 刷新链路。请定位根因，进行最小修复。",
+    "success_criteria": {
+      "files_changed": 1,
+      "lines_changed_min": 2,
+      "lines_changed_max": 3,
+      "token_budget": 65000,
+      "time_budget_seconds": 70,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/KitchenGameManager.cs"],
+    "note": "这是我们已经成功修复的任务，用于验证一致性"
+  },
+
+  "B1": {
+    "name": "Simple Feature - 添加交互距离常量",
+    "type": "feature_addition",
+    "priority": "P0",
+    "expected_complexity": "simple",
+    "description": "在 Assets/Scripts/Player.cs 中，交互距离检测使用了硬编码的数值。请添加一个公共常量 INTERACTION_DISTANCE 来替代硬编码值，使代码更易于维护和调整。",
+    "success_criteria": {
+      "files_changed": 1,
+      "lines_changed_min": 2,
+      "token_budget": 45000,
+      "time_budget_seconds": 50,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/Player.cs"]
+  },
+
+  "B2": {
+    "name": "Medium Feature - 添加成功交付计数",
+    "type": "feature_addition",
+    "priority": "P0",
+    "expected_complexity": "medium",
+    "description": "需要在 DeliveryManager.cs 中添加一个功能来跟踪玩家成功交付的订单总数。添加一个公共属性 SuccessfulDeliveriesCount，并在每次成功交付时增加计数。这将用于统计和UI显示。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 60000,
+      "time_budget_seconds": 55,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/DeliveryManager.cs"]
+  },
+
+  "B3": {
+    "name": "Medium Feature - 添加游戏统计类",
+    "type": "feature_addition",
+    "priority": "P1",
+    "expected_complexity": "medium",
+    "description": "创建一个新的 GameStatistics.cs 类来跟踪游戏统计数据：成功交付数、失败交付数、游戏时长。使用单例模式，并在 KitchenGameManager 和 DeliveryManager 中集成。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 65000,
+      "time_budget_seconds": 70,
+      "min_mutations": 1
+    },
+    "expected_files": [],
+    "note": "这会创建新文件"
+  },
+
+  "C1": {
+    "name": "Simple Refactor - 提取Player输入处理",
+    "type": "refactoring",
+    "priority": "P1",
+    "expected_complexity": "simple",
+    "description": "在 Player.cs 的 Update() 方法中，移动和交互逻辑混在一起。请将移动逻辑提取到单独的 HandleMovement() 方法中，将交互逻辑提取到 HandleInteractions() 方法中，使代码更清晰。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 60000,
+      "time_budget_seconds": 55,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/Player.cs"]
+  },
+
+  "C2": {
+    "name": "Medium Refactor - 魔法数字重构",
+    "type": "refactoring",
+    "priority": "P1",
+    "expected_complexity": "medium",
+    "description": "KitchenGameManager.cs 中有多个魔法数字（如倒计时时间3f、游戏时长30f等）。请将这些魔法数字提取为私有常量，并使用有意义的名称（如COUNTDOWN_TIMER_MAX、GAME_PLAYING_TIMER_MAX）。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 65000,
+      "time_budget_seconds": 65,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/KitchenGameManager.cs"]
+  },
+
+  "C3": {
+    "name": "Medium Refactor - SoundManager代码整理",
+    "type": "refactoring",
+    "priority": "P2",
+    "expected_complexity": "medium",
+    "description": "SoundManager.cs 中如果有重复的音效播放代码模式，请提取为辅助方法来减少代码重复，提高可维护性。保持现有功能不变。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 65000,
+      "time_budget_seconds": 70,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/SoundManager.cs"]
+  },
+
+  "D1": {
+    "name": "Complex Feature - 连击系统",
+    "type": "feature_addition",
+    "priority": "P2",
+    "expected_complexity": "complex",
+    "description": "在 DeliveryManager.cs 中添加连击系统：当玩家在5秒内连续成功交付订单时，获得连击状态。连击数递增，每次连击提供额外分数加成。如果超过5秒未交付，连击重置。需要跟踪上次交付时间和当前连击数。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 70000,
+      "time_budget_seconds": 90,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/DeliveryManager.cs"]
+  },
+
+  "D2": {
+    "name": "边界情况 - 不存在的文件",
+    "type": "edge_case",
+    "priority": "P2",
+    "expected_complexity": "unknown",
+    "description": "请在 Assets/Scripts/Utilities/Helper.cs 中添加一个静态工具方法 Clamp(float value, float min, float max)。注意：这个文件不存在。",
+    "success_criteria": {
+      "token_budget": 60000,
+      "time_budget_seconds": 45
+    },
+    "expected_files": [],
+    "note": "测试系统对不存在文件的处理"
+  },
+
+  "D3": {
+    "name": "边界情况 - 模糊需求",
+    "type": "edge_case",
+    "priority": "P2",
+    "expected_complexity": "medium",
+    "description": "游戏感觉有点问题，玩家移动不太流畅。请优化一下。",
+    "success_criteria": {
+      "token_budget": 65000,
+      "time_budget_seconds": 70
+    },
+    "expected_files": [],
+    "note": "测试系统对模糊需求的处理"
+  },
+
+  "E1": {
+    "name": "Performance - 优化频繁调用",
+    "type": "performance",
+    "priority": "P2",
+    "expected_complexity": "medium",
+    "description": "Player.cs 的 Update() 方法中每帧都在执行射线检测。如果可以优化，请考虑减少不必要的检测频率或使用更高效的方法，同时保持功能正常。",
+    "success_criteria": {
+      "files_changed": 1,
+      "token_budget": 65000,
+      "time_budget_seconds": 70,
+      "min_mutations": 1
+    },
+    "expected_files": ["Assets/Scripts/Player.cs"]
+  }
+}

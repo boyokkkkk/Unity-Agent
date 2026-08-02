@@ -70,6 +70,8 @@ class ProjectContextStore:
         self._build_indexes()
         self._snapshot_files()
         self._retriever = LocalizationRetriever(self.graph, self.project_root)
+        self.retrieval_treatment_metrics: dict[str, int] = {}
+        self.last_retrieval_treatment: dict[str, Any] = {}
 
     @classmethod
     def open(
@@ -128,8 +130,11 @@ class ProjectContextStore:
         semantic_cache_path: Path | None = None,
         causal_query_decomposition: bool = False,
         causal_role_retention: bool = False,
+        graph_retrieval_enabled: bool = True,
+        causal_edges_enabled: bool = True,
     ) -> list[WorkingSetEntry]:
-        queries = _decompose_causal_query(query) if causal_query_decomposition else [query]
+        causal_task = is_causal_query(query)
+        queries = _decompose_causal_query(query) if causal_query_decomposition and causal_task else [query]
         results = [
             self._retriever.retrieve(
                 subquery,
@@ -141,9 +146,20 @@ class ProjectContextStore:
                 semantic_model=semantic_model,
                 semantic_weight=semantic_weight,
                 semantic_cache_path=semantic_cache_path,
+                graph_retrieval_enabled=graph_retrieval_enabled,
+                causal_edges_enabled=causal_edges_enabled,
             )
             for subquery in queries
         ]
+        for result in results:
+            self.last_retrieval_treatment = dict(result.treatment)
+            for key, value in result.treatment.items():
+                if isinstance(value, bool):
+                    continue
+                if isinstance(value, int):
+                    self.retrieval_treatment_metrics[key] = (
+                        self.retrieval_treatment_metrics.get(key, 0) + value
+                    )
         # Localization is consumed as a bounded *file* frontier.  Previously
         # ranked symbol IDs were sliced before paths were merged and before
         # file scores could affect ordering.  Aggregate every source by path,
@@ -218,8 +234,8 @@ class ProjectContextStore:
             maximum_rrf = max((float(item.get("rrf", 0.0)) for item in ordered), default=1.0)
             for item in ordered:
                 item["score"] = float(item.get("rrf", 0.0)) / max(maximum_rrf, 1e-12)
-        if causal_role_retention:
-            ordered = _retain_causal_roles(ordered, self.graph, limit)
+        if causal_role_retention and causal_task:
+            ordered = _retain_causal_roles(ordered, self.graph, limit, query=query)
         else:
             ordered = ordered[:limit]
         working_set = self.working_set(task_id)
@@ -389,6 +405,8 @@ class ProjectContextStore:
             "dirty_nodes": len(self.dirty_nodes),
             "invalidations": len(self.invalidations),
             "tasks": len(self.working_sets),
+            "retrieval_treatment": dict(self.retrieval_treatment_metrics),
+            "last_retrieval_treatment": dict(self.last_retrieval_treatment),
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -464,24 +482,73 @@ def _normalize_path(value: str) -> str:
 
 
 def _decompose_causal_query(query: str) -> list[str]:
-    """Split a bug report into trigger, transition, publication, and observer searches."""
-    lowered = query.casefold()
-    causal_markers = (
-        "interact", "input", "state", "transition", "event", "observer", "ui",
-        "触发", "输入", "状态", "事件", "界面", "订阅",
-    )
-    if not any(marker in lowered for marker in causal_markers):
+    """Split a causal report while retaining its task-specific domain anchors."""
+    if not is_causal_query(query):
         return [query]
-    identifiers = list(dict.fromkeys(re.findall(r"\b(?:On[A-Z]\w+|[A-Z][A-Za-z0-9_]*UI)\b", query)))
-    identifier_text = " ".join(identifiers)
+    anchors = _query_domain_anchors(query)
+    anchor_text = " ".join(anchors)
     parts = [
         query,
-        f"{identifier_text} interaction input action subscriber handler trigger",
-        f"{identifier_text} game state transition countdown manager controller writes state",
-        f"{identifier_text} OnStateChanged event publication invoke publisher",
-        f"{identifier_text} UI observer refresh OnStateChanged subscriber",
+        f"{anchor_text} trigger input action event source publisher",
+        f"{anchor_text} state transition manager controller",
+        f"{anchor_text} event publication invoke publisher",
+        f"{anchor_text} UI popup observer subscriber handler refresh",
     ]
     return list(dict.fromkeys(part.strip() for part in parts if part.strip()))
+
+
+_QUERY_STOPWORDS = {
+    "after", "appears", "broken", "does", "failure", "game", "locate", "make",
+    "neither", "other", "player", "presses", "repair", "screen", "smallest",
+    "the", "then", "while", "with", "work", "works", "validate", "root", "cause",
+    "event", "chain", "state", "changes", "refresh", "update", "missing", "behavior",
+}
+
+
+def _query_domain_anchors(query: str) -> list[str]:
+    """Return stable identifiers/nouns that distinguish this causal subsystem."""
+    anchors: list[str] = []
+    for token in _search_tokens(query):
+        if len(token) < 4 or token in _QUERY_STOPWORDS:
+            continue
+        if token.endswith("ies") and len(token) > 4:
+            token = token[:-3] + "y"
+        elif token.endswith("s") and len(token) > 5:
+            token = token[:-1]
+        if token not in anchors:
+            anchors.append(token)
+    return anchors[:12]
+
+
+def _search_tokens(text: str) -> list[str]:
+    expanded = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
+    return [
+        match.group(0).casefold()
+        for match in re.finditer(r"[A-Za-z][A-Za-z0-9_]*|[\u4e00-\u9fff]", expanded)
+    ]
+
+
+def is_causal_query(query: str) -> bool:
+    """Return whether a task describes a cross-component causal notification chain.
+
+    Generic words such as ``UI``, ``input``, and ``state`` are deliberately
+    insufficient: treating every UI defect as an event-chain task caused causal
+    role quotas to evict the actual OptionUI candidate.
+    """
+    lowered = query.casefold()
+    explicit = (
+        "event", "subscriber", "subscription", "publish", "observer", "notification",
+        "事件", "订阅", "发布", "观察者", "通知",
+    )
+    if any(marker in lowered for marker in explicit):
+        return True
+    transition = any(marker in lowered for marker in (
+        "state", "transition", "countdown", "状态", "切换", "倒计时",
+    ))
+    observer_symptom = any(marker in lowered for marker in (
+        "ui", "refresh", "notify", "tutorial", "界面", "刷新", "通知", "教程",
+    ))
+    return transition and observer_symptom
 
 
 def _causal_role(node: Node) -> str:
@@ -490,7 +557,7 @@ def _causal_role(node: Node) -> str:
         return "test"
     if any(token in value for token in ("manager", "controller", "state", "coordinator")):
         return "controller"
-    if any(token in value for token in ("input", "interaction", "event")):
+    if any(token in value for token in ("input", "interaction", "event", "counter")):
         return "event_source"
     if any(token in value for token in ("ui", "view", "panel", "canvas")):
         return "ui"
@@ -498,16 +565,26 @@ def _causal_role(node: Node) -> str:
 
 
 def _retain_causal_roles(
-    ordered: list[dict[str, Any]], graph: ProjectGraph, limit: int
+    ordered: list[dict[str, Any]], graph: ProjectGraph, limit: int, *, query: str = ""
 ) -> list[dict[str, Any]]:
-    """Reserve one bounded candidate for every causal role before truncation."""
+    """Reserve causal roles only from candidates tied to the task's domain."""
     selected: list[dict[str, Any]] = []
     selected_ids: set[str] = set()
+    anchors = set(_query_domain_anchors(query))
+
+    def domain_overlap(item: dict[str, Any]) -> bool:
+        if not anchors:
+            return True
+        node = graph.nodes[str(item["node_id"])]
+        node_text = " ".join((node.name, node.path, *(str(value) for value in node.attributes.values())))
+        return bool(anchors.intersection(_search_tokens(node_text)))
+
     for role in ("event_source", "controller", "ui"):
         match = next(
             (
                 item for item in ordered
                 if str(item["node_id"]) not in selected_ids
+                and domain_overlap(item)
                 and _causal_role(graph.nodes[str(item["node_id"])]) == role
             ),
             None,

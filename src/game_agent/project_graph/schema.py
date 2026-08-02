@@ -45,6 +45,12 @@ CORE_EDGE_KINDS = {
     EdgeKind.UNITY_EVENT_CALL,
 }
 
+CAUSAL_EDGE_KINDS = {
+    EdgeKind.SUBSCRIBES_TO,
+    EdgeKind.PUBLISHES_EVENT,
+    EdgeKind.WRITES_STATE,
+}
+
 
 def stable_id(namespace: str, *parts: str) -> str:
     normalized = "\x1f".join(str(part).replace("\\", "/") for part in parts)

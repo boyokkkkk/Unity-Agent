@@ -179,7 +179,7 @@ def replay_aci_tool_events(
                 "tool": tool,
                 "tool_call_id": str(action.get("tool_call_id", "") or ""),
                 "tool_class": (
-                    "mutation" if extra.get("aci_mutation")
+                    "mutation" if extra.get("aci_mutation") or tool == "patch_apply"
                     else "validation" if extra.get("aci_control")
                     else "query"
                 ),
@@ -502,7 +502,10 @@ class StageAnalyzer:
             str(event.get("action_signature", "")) in set(_values(event.get("admissible_action_signatures", [])))
             for event in admissible_events
         )
-        mutation_events = [event for event in aci_ends if event.get("tool_class") == "mutation"]
+        mutation_events = [
+            event for event in aci_ends
+            if event.get("tool_class") == "mutation" or event.get("tool") == "patch_apply"
+        ]
         typed_mutations = [event for event in mutation_events if not event.get("escape_hatch")]
         escape_hatches = [event for event in mutation_events if event.get("escape_hatch")]
         completed_transactions = max(

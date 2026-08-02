@@ -94,6 +94,8 @@
                 "require_location_evidence":  true,
                 "require_target_read":  true,
                 "require_causal_role_evidence":  true,
+                "require_structured_causal_claims":  true,
+                "automatic_validation_enabled":  true,
                 "required_validation_modes":  [
                                                   "editmode",
                                                   "playmode"

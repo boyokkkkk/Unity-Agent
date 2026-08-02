@@ -1,0 +1,64 @@
+{
+  "tasks": [
+    {
+      "task_id": "A1",
+      "success": false,
+      "error": "'ExecutionMetrics' object has no attribute 'get'",
+      "duration_seconds": 0.002998,
+      "timestamp": "2026-08-02T18:30:01.917138"
+    },
+    {
+      "task_id": "A4",
+      "success": false,
+      "error": "'ExecutionMetrics' object has no attribute 'get'",
+      "duration_seconds": 46.412854,
+      "timestamp": "2026-08-02T18:30:01.922005"
+    },
+    {
+      "task_id": "B1",
+      "success": false,
+      "error": "'ExecutionMetrics' object has no attribute 'get'",
+      "duration_seconds": 0.002999,
+      "timestamp": "2026-08-02T18:30:48.334859"
+    },
+    {
+      "task_id": "B2",
+      "success": false,
+      "error": "'ExecutionMetrics' object has no attribute 'get'",
+      "duration_seconds": 0.69562,
+      "timestamp": "2026-08-02T18:30:48.337858"
+    },
+    {
+      "task_id": "C1",
+      "success": false,
+      "error": "'ExecutionMetrics' object has no attribute 'get'",
+      "duration_seconds": 0.25,
+      "timestamp": "2026-08-02T18:30:49.034477"
+    }
+  ],
+  "summary": {
+    "total_tasks": 5,
+    "passed": 0,
+    "failed": 5,
+    "pass_rate": 0.0,
+    "by_complexity": {
+      "simple": {
+        "total": 4,
+        "passed": 0
+      },
+      "medium": {
+        "total": 1,
+        "passed": 0
+      }
+    },
+    "avg_duration_seconds": 9.4728942,
+    "avg_tokens": 0.0,
+    "failed_tasks": [
+      "A1",
+      "A4",
+      "B1",
+      "B2",
+      "C1"
+    ]
+  }
+}

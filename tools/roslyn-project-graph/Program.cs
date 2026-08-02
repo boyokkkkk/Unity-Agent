@@ -47,9 +47,39 @@ static string ExpressionName(ExpressionSyntax expression) => expression switch
     _ => expression.ToString().Split('.').LastOrDefault() ?? expression.ToString(),
 };
 
+if (args.Length == 1 && args[0] == "--validate-stdin")
+{
+    var source = Console.In.ReadToEnd();
+    var tree = CSharpSyntaxTree.ParseText(
+        source,
+        new CSharpParseOptions(LanguageVersion.Latest)
+    );
+    var diagnostics = tree.GetDiagnostics()
+        .Where(item => item.Severity == DiagnosticSeverity.Error)
+        .Select(item =>
+        {
+            var position = item.Location.GetLineSpan().StartLinePosition;
+            return new
+            {
+                id = item.Id,
+                severity = item.Severity.ToString().ToLowerInvariant(),
+                message = item.GetMessage(),
+                line = position.Line + 1,
+                column = position.Character + 1,
+            };
+        })
+        .ToList();
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        status = diagnostics.Count == 0 ? "valid" : "invalid",
+        diagnostics,
+    }));
+    return diagnostics.Count == 0 ? 0 : 4;
+}
+
 if (args.Length != 4 || args[0] != "--project" || args[2] != "--output")
 {
-    Console.Error.WriteLine("Usage: RoslynProjectGraph --project <UnityProject> --output <graph.json>");
+    Console.Error.WriteLine("Usage: RoslynProjectGraph --project <UnityProject> --output <graph.json> | --validate-stdin");
     return 2;
 }
 
@@ -256,7 +286,9 @@ foreach (var file in Directory.EnumerateFiles(assets, "*.cs", SearchOption.AllDi
                             methodId,
                             fullName,
                             eventName,
-                            call.ToString(),
+                            call.Parent is ConditionalAccessExpressionSyntax conditional
+                                ? conditional.ToString()
+                                : call.ToString(),
                             tree.GetLineSpan(call.Span).StartLinePosition.Line + 1
                         ));
                 }

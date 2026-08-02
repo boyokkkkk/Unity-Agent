@@ -1,0 +1,115 @@
+{
+  "schema_version": "game-agent-stage-metrics-v2",
+  "milestones_ms": {
+    "T0_task_submitted": 0,
+    "T1_first_tool": 16311,
+    "T2_first_relevant_file": 18197,
+    "T3_root_cause_file": 18197,
+    "T4_first_edit": null,
+    "T5_first_correct_patch": null,
+    "T6_first_validation": 28252,
+    "T7_agent_stopped": 28126,
+    "T8_public_validation_end": 136919,
+    "T9_hidden_validation_end": 183869
+  },
+  "stage_duration_ms": {
+    "task_understanding": 16311,
+    "source_localization": 1886,
+    "diagnosis": 9929,
+    "editing": 10055,
+    "self_validation": 0,
+    "public_validation": 108793,
+    "hidden_validation": 46950
+  },
+  "phase_reentry": {
+    "editing_after_validation": 0
+  },
+  "outcome": {
+    "agent_submitted": false,
+    "exit_status": "TotalTokenLimitExceeded",
+    "missing_final_answer": true
+  },
+  "navigation": {
+    "files_accessed": [
+      "Assets/Scripts/KitchenGameManager.cs",
+      "Assets/Scripts/UI/TutorialUI.cs",
+      "Assets/Scripts/GameInput.cs",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//public//compile.log",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//public//editmode.log",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//public//editmode-results.xml",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//public//playmode.log",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//public//playmode-results.xml",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//hidden//editmode.log",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//hidden//editmode-results.xml",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//hidden//playmode.log",
+      "E://sysu-course//GameAgent//artifacts//baselines//ablation-en-formal-20260802//ablation-group4-run1-20260802-130939//validation//hidden//playmode-results.xml"
+    ],
+    "root_cause_rank": 1,
+    "relevant_recall": 0.6666666666666666,
+    "navigation_precision": 0.16666666666666666,
+    "unrelated_file_ratio": 0.8333333333333334
+  },
+  "context": {
+    "prompt_tokens": 68038,
+    "completion_tokens": 788,
+    "total_tokens": 68826,
+    "peak_context_usage_percent": 57.9315185546875,
+    "raw_output_chars": 42394,
+    "retained_output_chars": 26297,
+    "truncated_tool_calls": 0,
+    "repeated_observation_ratio": 0.0
+  },
+  "behavior": {
+    "model_calls": 5,
+    "tool_calls": 5,
+    "failed_tool_calls": 1,
+    "repeated_commands": 0
+  },
+  "research": {
+    "retrieval": {
+      "k": 4,
+      "candidate_paths_at_k": 3,
+      "distinct_paths_at_k": 3,
+      "distinct_path_ratio_at_k": 1.0,
+      "test_node_ratio_at_k": 0.0,
+      "root_cause_mrr": 1.0,
+      "causal_edge_coverage": 0.0,
+      "causal_edges_total": 0
+    },
+    "memory": {
+      "evidence_write_recall": 1.0,
+      "evidence_read_recall": 1.0,
+      "evidence_utilization": 0.0,
+      "stale_evidence_rate": 0.0,
+      "unique_evidence": 3,
+      "expected_evidence_writes": 3,
+      "evidence_read_transitions": 3,
+      "evidence_utilization_opportunities": 0,
+      "referenced_evidence_nodes": 0
+    },
+    "control": {
+      "duplicate_action_ratio": 0.2,
+      "blocked_action_recovery_rate": 0.0,
+      "admissible_action_acceptance": 0.0,
+      "phase_regression_count": 0,
+      "protocol_gate_completion": 0.0,
+      "blocked_actions": 1,
+      "admissible_action_opportunities": 0,
+      "mutation_calls": 0
+    },
+    "tools_and_cost": {
+      "aci_tool_calls": 5,
+      "tool_schema_tokens_per_call": 8632.0,
+      "unique_evidence_per_1k_tokens": 0.04358817888588615,
+      "typed_mutation_ratio": 0.0,
+      "escape_hatch_ratio": 0.0,
+      "tool_schema_measurements": 5,
+      "tool_profile_calls": {
+        "all": 5
+      },
+      "tool_schema_tokens_by_profile": {
+        "all": 43160
+      }
+    }
+  }
+}

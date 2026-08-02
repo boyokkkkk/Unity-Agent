@@ -1,0 +1,11 @@
+--- Assets/Scripts/KitchenGameManager.cs
++++ Assets/Scripts/KitchenGameManager.cs
+@@ -44,7 +44,7 @@
+         if (state == State.WaitingToStart)
+         {
+             state = State.CountdownToStart;
+-            OnStateChanged?.Invoke(this, EventArgs.Empty);
++            
+         }    
+     }
+ 

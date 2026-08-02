@@ -31,6 +31,10 @@ class EdgeKind(str, Enum):
     PREFAB_SOURCE = "PREFAB_SOURCE"
     SERIALIZED_REF = "SERIALIZED_REF"
     UNITY_EVENT_CALL = "UNITY_EVENT_CALL"
+    # Causal graph edge types
+    PUBLISHES_EVENT = "PUBLISHES_EVENT"
+    SUBSCRIBES_TO = "SUBSCRIBES_TO"
+    WRITES_STATE = "WRITES_STATE"
 
 
 def stable_id(namespace: str, *parts: str) -> str:

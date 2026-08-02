@@ -4,6 +4,7 @@ import os
 import shutil
 import stat
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,7 +17,17 @@ def _remove_tree(path: Path) -> None:
         os.chmod(target, stat.S_IWRITE)
         function(target)
 
-    shutil.rmtree(path, onerror=make_writable)
+    last_error: OSError | None = None
+    for attempt in range(4):
+        try:
+            shutil.rmtree(path, onerror=make_writable)
+            return
+        except OSError as exc:
+            last_error = exc
+            if attempt < 3:
+                time.sleep(0.25 * (attempt + 1))
+    if path.exists() and last_error is not None:
+        raise last_error
 
 
 def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
