@@ -10,24 +10,42 @@
 ## 📖 推荐阅读顺序
 
 ### 1. 快速了解（5分钟）
-→ **`final_reports/EXECUTIVE_SUMMARY.md`**
+→ **`EXECUTIVE_SUMMARY.md`**
 
 快速了解整个项目的成果、关键修复和最终指标。
 
-### 2. 详细技术（15分钟）
-→ **`final_reports/PHASE_1_2_COMPLETION_SUMMARY.md`**
+### 2. 学术研究视角（30分钟）⭐ 强烈推荐
+→ **`RESEARCH_DOCUMENT.md`**
+
+**完整的学术研究文档，包含：**
+- 研究背景与动机
+- 系统架构设计（分层架构详解）
+- 关键创新点（架构/算法/工程三个层面）
+- 研究方法与实验设计
+- 详细的实验结果与分析
+- 与相关工作对比
+- 局限性与未来工作
+
+**适用场景：**
+- ✅ 制作技术简历
+- ✅ 准备技术面试
+- ✅ PPT演讲素材
+- ✅ 学术交流报告
+
+### 3. 详细技术总结（15分钟）
+→ **`PHASE_1_2_COMPLETION_SUMMARY.md`**
 
 深入了解技术实现、修复过程、经验教训和设计决策。
 
-### 3. Metrics分析（10分钟）
-→ **`final_reports/FINAL_METRICS_REPORT.md`**
+### 4. Metrics分析（10分钟）
+→ **`FINAL_METRICS_REPORT.md`**
 
 完整的Token消耗、性能数据和详细的任务结果分析。
 
-### 4. 具体修复（可选）
-→ **`final_reports/P0_FIX_REPORT.md`**  
-→ **`final_reports/P1_FIX_VERIFICATION_REPORT.md`**  
-→ **`final_reports/TOKEN_TRACKING_FIX_REPORT.md`**
+### 5. 具体修复细节（可选）
+→ **`P0_FIX_REPORT.md`**  
+→ **`P1_FIX_VERIFICATION_REPORT.md`**  
+→ **`TOKEN_TRACKING_FIX_REPORT.md`**
 
 了解P0、P1问题和Token跟踪的具体修复细节。
 
@@ -47,40 +65,46 @@
 
 ## 📁 完整文档列表
 
-### 最终报告（6个）
+### 最终报告（7个）
 
-1. **EXECUTIVE_SUMMARY.md** (5.5 KB)
+1. **RESEARCH_DOCUMENT.md** (60 KB) ⭐⭐⭐
+   - 【推荐】完整的学术研究文档
+   - 架构设计与创新点详解
+   - 研究方法与实验过程
+   - 适合简历、PPT、技术面试
+
+2. **EXECUTIVE_SUMMARY.md** (5.5 KB)
    - 执行摘要
    - 核心成果和关键数据
    - 生产就绪评估
 
-2. **FINAL_METRICS_REPORT.md** (6.2 KB)
+3. **FINAL_METRICS_REPORT.md** (6.2 KB)
    - 完整Token和性能分析
    - 每个任务的详细数据
    - 失败任务分析
 
-3. **PHASE_1_2_COMPLETION_SUMMARY.md** (13.2 KB)
+4. **PHASE_1_2_COMPLETION_SUMMARY.md** (13.2 KB)
    - 详细技术总结
    - 关键技术洞察
    - 经验教训和设计决策
    - Phase 3规划
 
-4. **P0_FIX_REPORT.md** (6.3 KB)
+5. **P0_FIX_REPORT.md** (6.3 KB)
    - 智能候选选择修复
    - 问题分析和解决方案
    - 验证结果
 
-5. **P1_FIX_VERIFICATION_REPORT.md** (10.9 KB)
+6. **P1_FIX_VERIFICATION_REPORT.md** (10.9 KB)
    - 换行符智能匹配修复
    - 6个任务修复验证
    - 详细实施过程
 
-6. **TOKEN_TRACKING_FIX_REPORT.md** (6.0 KB)
+7. **TOKEN_TRACKING_FIX_REPORT.md** (6.0 KB)
    - Token跟踪修复
    - 根本原因分析
    - 实施和验证
 
-**总文档量:** ~48 KB
+**总文档量:** ~108 KB
 
 ---
 
